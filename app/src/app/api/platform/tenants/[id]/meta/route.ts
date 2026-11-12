@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import { guardPlatform } from "@/lib/platform/auth";
 import { recordAudit, requestIp } from "@/lib/platform/audit";
-import { parseTenantId } from "@/lib/platform/routeTenant";
+import { invalidateFleetEnrichment } from "@/lib/platform/fleet";
+import { NOT_STAFF_ERROR, isActivePlatformStaff, parseTenantId } from "@/lib/platform/routeTenant";
 import { STAGES, setTenantMeta, type Stage } from "@/lib/platform/tenantMeta";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,9 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   if (!tenantId) return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, error: "That request does not make sense." }, { status: 400 });
+  if (parsed.data.ownerUserId != null && !isActivePlatformStaff(parsed.data.ownerUserId)) return NextResponse.json({ ok: false, error: NOT_STAFF_ERROR }, { status: 400 });
   setTenantMeta(tenantId, parsed.data);
+  invalidateFleetEnrichment(tenantId);
   recordAudit({ actorUserId: g.userId, actorEmail: g.email, actorRole: g.role, tenantId, action: "meta.set", detail: parsed.data, ip: requestIp(req) });
   return NextResponse.json({ ok: true });
 }

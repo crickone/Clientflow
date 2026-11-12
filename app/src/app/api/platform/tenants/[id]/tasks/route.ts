@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { guardPlatform } from "@/lib/platform/auth";
 import { recordAudit, requestIp } from "@/lib/platform/audit";
-import { parseId, parseTenantId, taskBelongs } from "@/lib/platform/routeTenant";
+import { NOT_STAFF_ERROR, isActivePlatformStaff, parseId, parseTenantId, taskBelongs } from "@/lib/platform/routeTenant";
 import { addTask, deleteTask, listTasks, setTaskDone } from "@/lib/platform/tasks";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +30,7 @@ export async function POST(req: NextRequest, props: Ctx) {
     .object({ title: z.string().trim().min(1).max(200), dueAt: z.number().int().nullable(), assignedTo: z.number().int().positive().nullable() })
     .safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, error: "Give the task a title." }, { status: 400 });
+  if (parsed.data.assignedTo != null && !isActivePlatformStaff(parsed.data.assignedTo)) return NextResponse.json({ ok: false, error: NOT_STAFF_ERROR }, { status: 400 });
   const task = addTask({ tenantId, ...parsed.data, createdBy: g.userId });
   recordAudit({ actorUserId: g.userId, actorEmail: g.email, actorRole: g.role, tenantId, action: "task.add", detail: { id: task.id }, ip: requestIp(req) });
   return NextResponse.json({ ok: true, task });

@@ -135,6 +135,11 @@ type Enrichment = Pick<FleetTenantRow, "setup" | "risk" | "stage">;
 const ENRICH_TTL_MS = 5 * 60 * 1000;
 const enrichCache = new Map<number, { at: number; key: string; value: Enrichment }>();
 
+/** Drop one business's cached setup/risk/stage so the next list read recomputes it. */
+export function invalidateFleetEnrichment(tenantId: number): void {
+  enrichCache.delete(tenantId);
+}
+
 /**
  * Setup + risk + stage open the business's own database, so they are cached
  * in-process for five minutes (keyed also on the facts that come from the
@@ -149,6 +154,7 @@ function enrich(id: number, archived: boolean, billingStatus: string | null, exe
   let setup = { requiredDone: 0, requiredTotal: 0 };
   let risk: Enrichment["risk"] = { score: 0, level: "low" };
   let stage: string | null = null;
+  let failed = false;
   try {
     const s = getSetupSummaryForTenant(id);
     setup = { requiredDone: s.requiredDone, requiredTotal: s.requiredTotal };
@@ -157,9 +163,10 @@ function enrich(id: number, archived: boolean, billingStatus: string | null, exe
     const m = getTenantMeta(id, { archived, billingStatus, exempt, setupRequiredDone: setup.requiredDone, setupRequiredTotal: setup.requiredTotal, riskScore: rk.score });
     stage = m.stage ?? m.stageAuto;
   } catch {
-    // keep the row; the console shows blanks
+    // keep the row; the console shows blanks, and the blanks are not cached
+    failed = true;
   }
   const value = { setup, risk, stage };
-  enrichCache.set(id, { at: now, key, value });
+  if (!failed) enrichCache.set(id, { at: now, key, value });
   return value;
 }

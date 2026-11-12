@@ -23,3 +23,10 @@ export function noteBelongs(noteId: number, tenantId: number): boolean {
 export function taskBelongs(taskId: number, tenantId: number): boolean {
   return Boolean(controlSqlite.prepare("SELECT 1 FROM platform_tasks WHERE id = ? AND tenant_id = ?").get(taskId, tenantId));
 }
+
+/** True when the id is an active member of the platform team. */
+export function isActivePlatformStaff(userId: number): boolean {
+  return Boolean(controlSqlite.prepare("SELECT 1 FROM users WHERE id = ? AND is_platform_admin = 1 AND is_active = 1").get(userId));
+}
+
+export const NOT_STAFF_ERROR = "That person is not on the platform team.";
