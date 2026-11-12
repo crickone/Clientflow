@@ -69,7 +69,9 @@ export function paginate<T>(rows: T[], page: number, size: number) {
 
 function csvCell(v: unknown): string {
   if (v === null || v === undefined) return "";
-  const s = String(v);
+  let s = String(v);
+  // Spreadsheet formula injection: text that starts like a formula gets a quote.
+  if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 

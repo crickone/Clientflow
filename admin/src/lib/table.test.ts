@@ -27,4 +27,9 @@ assert.equal(
   toCsv([{ a: 'He said "hi"', b: 1 }, { a: "x,y", b: null }], [{ key: "a", label: "A" }, { key: "b", label: "B" }]),
   'A,B\r\n"He said ""hi""",1\r\n"x,y",\r\n',
 );
+const cc = [{ key: "a", label: "A" }];
+assert.equal(toCsv([{ a: "=SUM(A1)" }], cc), "A\r\n'=SUM(A1)\r\n", "formula prefix is neutralised");
+assert.equal(toCsv([{ a: "@x" }], cc), "A\r\n'@x\r\n");
+assert.equal(toCsv([{ a: -5 }], cc), "A\r\n-5\r\n", "numbers untouched");
+assert.equal(toCsv([{ a: "=a,b" }], cc), "A\r\n\"'=a,b\"\r\n", "prefixed then quoted");
 console.log("table.test.ts: ok");

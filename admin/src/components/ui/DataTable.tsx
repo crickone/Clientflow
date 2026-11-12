@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Columns3, Download } from "lucide-react";
 
@@ -16,6 +16,8 @@ export interface Column<T> {
   hideable?: boolean;
   /** The value to sort and export by. Defaults to row[key]. */
   value?: (row: T) => unknown;
+  /** The CSV cell for this column. Defaults to the sort value. */
+  csv?: (row: T) => string | number;
   render?: (row: T) => ReactNode;
 }
 
@@ -25,19 +27,7 @@ export interface Column<T> {
  * here are hundreds, not millions); a list that needs server paging keeps
  * its own cursor and passes one page in.
  */
-export function DataTable<T>({
-  rows,
-  columns,
-  rowKey,
-  pageSize = 25,
-  defaultSort,
-  csvName,
-  empty,
-  selectable,
-  selected,
-  onSelect,
-  rowStyle,
-}: {
+export interface DataTableProps<T> {
   rows: T[];
   columns: Column<T>[];
   rowKey: (row: T) => string | number;
@@ -49,12 +39,52 @@ export function DataTable<T>({
   selected?: Set<string | number>;
   onSelect?: (next: Set<string | number>) => void;
   rowStyle?: (row: T) => CSSProperties | undefined;
-}) {
+}
+
+/** useSearchParams needs a Suspense boundary or static pages fail to build. */
+export function DataTable<T>(props: DataTableProps<T>) {
+  return (
+    <Suspense fallback={null}>
+      <DataTableInner {...props} />
+    </Suspense>
+  );
+}
+
+function DataTableInner<T>({
+  rows,
+  columns,
+  rowKey,
+  pageSize = 25,
+  defaultSort,
+  csvName,
+  empty,
+  selectable,
+  selected,
+  onSelect,
+  rowStyle,
+}: DataTableProps<T>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const state = readTableState(params, defaultSort ? { sort: defaultSort.key, dir: defaultSort.dir } : {});
   const [picker, setPicker] = useState(false);
+  const pickerRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!picker) return;
+    const onDown = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPicker(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPicker(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [picker]);
 
   const valueOf = (row: T, key: string) => {
     const col = columns.find((c) => c.key === key);
@@ -62,7 +92,7 @@ export function DataTable<T>({
   };
 
   const visible = columns.filter((c) => !state.cols || state.cols.includes(c.key) || c.hideable === false);
-  const sorted = useMemo(() => sortRows(rows, state.sort, state.dir, valueOf), [rows, state.sort, state.dir]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sorted = sortRows(rows, state.sort, state.dir, valueOf);
   const page = paginate(sorted, state.page, pageSize);
 
   function push(next: TableState) {
@@ -74,12 +104,17 @@ export function DataTable<T>({
   }
   function toggleCol(key: string) {
     const current = visible.map((c) => c.key);
+    if (current.includes(key)) {
+      // Keep at least one hideable column: an empty list reads back as "all".
+      const hideableShown = visible.filter((c) => c.hideable !== false);
+      if (hideableShown.length <= 1) return;
+    }
     const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
     push({ ...state, cols: next.length === columns.length ? null : next });
   }
   function exportCsv() {
     const csv = toCsv(
-      sorted.map((r) => Object.fromEntries(visible.map((c) => [c.key, valueOf(r, c.key)]))),
+      sorted.map((r) => Object.fromEntries(visible.map((c) => [c.key, c.csv ? c.csv(r) : valueOf(r, c.key)]))),
       visible.map((c) => ({ key: c.key, label: c.label })),
     );
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
@@ -100,12 +135,12 @@ export function DataTable<T>({
           {page.total === 0 ? "" : page.total <= pageSize ? `${page.total} ${page.total === 1 ? "row" : "rows"}` : `${page.from} to ${page.to} of ${page.total}`}
         </span>
         <span className="dt-tools">
-          <span style={{ position: "relative" }}>
+          <span ref={pickerRef} style={{ position: "relative" }}>
             <button type="button" className="btn btn--ghost btn--sm" onClick={() => setPicker((p) => !p)} aria-expanded={picker}>
               <Columns3 size={14} strokeWidth={1.75} aria-hidden /> Columns
             </button>
             {picker && (
-              <div className="dt-picker" role="menu">
+              <div className="dt-picker" role="group" aria-label="Columns">
                 {columns.filter((c) => c.hideable !== false).map((c) => (
                   <label key={c.key}>
                     <input type="checkbox" checked={visible.some((v) => v.key === c.key)} onChange={() => toggleCol(c.key)} /> {c.label}
