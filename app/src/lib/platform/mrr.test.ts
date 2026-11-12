@@ -166,9 +166,15 @@ const zero = (month: string) => ({ month, newCents: 0, expansionCents: 0, contra
 
 // A business whose first event is a churn counts one churn at the resolved price.
 {
-  const out = mrrMovements([ev({ tenantId: 3, month: "2026-10", type: "suspended" })], months, () => 9000);
+  const out = mrrMovements([ev({ tenantId: 3, month: "2026-10", type: "suspended" })], months, () => 9000, () => true);
   assert.equal(out[1].churnCents, 9000);
   assert.equal(out[1].netCents, -9000);
+}
+
+// A first-event churn for a business that never paid counts nothing.
+{
+  const out = mrrMovements([ev({ tenantId: 3, month: "2026-10", type: "offboarded" })], months, () => 9000, () => false);
+  assert.deepEqual(out[1], zero("2026-10"));
 }
 
 // A reactivated (charged) while already paying counts nothing.

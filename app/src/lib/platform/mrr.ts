@@ -55,7 +55,10 @@ interface TenantState {
   price: number | null;
 }
 
-export function mrrAnalysis(events: MrrEvent[], months: string[], startingPrice: StartingPrice = () => 0): MrrAnalysis {
+/** Whether the business is known to have paid (activated and not exempt). */
+export type EverPaid = (tenantId: number) => boolean;
+
+export function mrrAnalysis(events: MrrEvent[], months: string[], startingPrice: StartingPrice = () => 0, everPaid: EverPaid = () => false): MrrAnalysis {
   const by = new Map<string, MrrMovement>(
     months.map((m) => [m, { month: m, newCents: 0, expansionCents: 0, contractionCents: 0, churnCents: 0, reactivationCents: 0, netCents: 0 }]),
   );
@@ -89,8 +92,9 @@ export function mrrAnalysis(events: MrrEvent[], months: string[], startingPrice:
       case "billing_exempted": {
         if (e.type === "billing_exempted") s.exempt = true;
         // Backstop: a business whose first event is a churn was paying before
-        // the log began; seed it so the churn counts.
-        if (first && !s.exempt) s.paying = true;
+        // the log began, but only if it is known to have paid. A trial, an
+        // exempt account or test data never paid, so it counts no churn.
+        if (first && !s.exempt && everPaid(e.tenantId)) s.paying = true;
         if (!s.paying) break;
         s.paying = false;
         const price = s.price ?? priceAt();
@@ -126,6 +130,6 @@ export function mrrAnalysis(events: MrrEvent[], months: string[], startingPrice:
   };
 }
 
-export function mrrMovements(events: MrrEvent[], months: string[], startingPrice?: StartingPrice): MrrMovement[] {
-  return mrrAnalysis(events, months, startingPrice).movements;
+export function mrrMovements(events: MrrEvent[], months: string[], startingPrice?: StartingPrice, everPaid?: EverPaid): MrrMovement[] {
+  return mrrAnalysis(events, months, startingPrice, everPaid).movements;
 }

@@ -372,7 +372,7 @@ const requireLocal = createRequire(import.meta.url);
     controlSqlite.prepare("DELETE FROM users WHERE id = ?").run(userSoloId);
     for (const tbl of [
       "ai_usage", "user_invites", "site_domains", "tenant_billing", "memberships",
-      "gmail_connections", "client_credentials", "billing_invoices", "cms_library_assets",
+      "gmail_connections", "client_credentials", "billing_invoices", "cms_library_assets", "billing_events",
     ]) {
       controlSqlite.prepare(`DELETE FROM ${tbl} WHERE tenant_id = ?`).run(tenantAId);
     }
@@ -382,6 +382,7 @@ const requireLocal = createRequire(import.meta.url);
     controlSqlite.prepare("DELETE FROM memberships WHERE tenant_id = ?").run(tenantBId);
     controlSqlite.prepare("DELETE FROM tenant_billing WHERE tenant_id = ?").run(tenantBId);
     controlSqlite.prepare("DELETE FROM ai_usage WHERE tenant_id = ?").run(tenantBId);
+    controlSqlite.prepare("DELETE FROM billing_events WHERE tenant_id = ?").run(tenantBId);
     controlSqlite.prepare("DELETE FROM users WHERE id = ?").run(userBId);
     controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(tenantBId);
     try {
@@ -519,6 +520,7 @@ const requireLocal = createRequire(import.meta.url);
   const tenantId = tenant.id;
 
   const cleanup = () => {
+    controlSqlite.prepare("DELETE FROM billing_events WHERE tenant_id = ?").run(tenantId);
     controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(tenantId);
     fs.rmSync(path.join(dataDir, "tenants", slug), { recursive: true, force: true });
   };

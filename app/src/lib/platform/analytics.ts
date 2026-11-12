@@ -333,7 +333,12 @@ function platformBilling(months: string[]) {
       .filter((r) => r.price_override_cents >= 0)
       .map((r) => [r.tenant_id, r.price_override_cents]),
   );
-  const mrr = mrrAnalysis(mrrEvents, months, (tenantId) => overrides.get(tenantId) ?? monthlyPrice);
+  const paidIds = new Set(
+    (controlSqlite
+      .prepare("SELECT tenant_id FROM tenant_billing WHERE activated_at IS NOT NULL AND billing_exempt = 0")
+      .all() as Array<{ tenant_id: number }>).map((r) => r.tenant_id),
+  );
+  const mrr = mrrAnalysis(mrrEvents, months, (tenantId) => overrides.get(tenantId) ?? monthlyPrice, (tenantId) => paidIds.has(tenantId));
   const mrrMovementsOut = mrr.movements;
   const churnedByMonth = mrr.churnedByMonth;
 
