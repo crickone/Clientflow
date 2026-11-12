@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { programLibraryHidden, programTemplates } from "@/lib/db/schema";
 import { PLATFORM_PROGRAMS, platformProgram } from "./registry";
 import type { ProgramTemplate } from "./types";
+import { isFullBlock, mostDays } from "./editing";
 import { copyErrors, parseTemplate, templateErrors } from "./validate";
 
 /**
@@ -103,7 +104,9 @@ export function makeCopy(platformKey: string, userId: number | null): number | n
 /**
  * Save an edited copy. The engine, the lifts it needs, the training-max rule,
  * family and author always come from the original; the copy must still use
- * every lift the engine needs. Nothing is written unless it all passes.
+ * every lift the engine needs. Days a week is the most days in any week, and
+ * a copy of a full block is as long as its weeks. Nothing is written unless
+ * it all passes.
  */
 export function saveCopy(id: number, raw: unknown): { ok: true } | { ok: false; errors: string[] } {
   const row = getCopy(id);
@@ -121,6 +124,9 @@ export function saveCopy(id: number, raw: unknown): { ok: true } | { ok: false; 
     family: original.family,
     author: original.author,
   };
+  // A full block is as long as its weeks; a repeated cycle keeps the length it was given.
+  if (isFullBlock(original)) t.lengthWeeks = t.weeks.length;
+  t.daysPerWeek = mostDays(t);
   const missing = copyErrors(original, t);
   if (missing.length) return { ok: false, errors: missing };
   const errors = templateErrors(t);

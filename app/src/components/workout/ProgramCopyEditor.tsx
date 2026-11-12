@@ -1,7 +1,7 @@
 // app/src/components/workout/ProgramCopyEditor.tsx
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -9,15 +9,44 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
 import { saveCopyAction } from "@/app/workout/library/actions";
-import { SET_KINDS, blankExercise, convertSet, repsMax, repsMin, withReps } from "@/lib/programs/editing";
+import { SET_KINDS, blankExercise, convertSet, mostDays, repsMax, repsMin, withReps } from "@/lib/programs/editing";
 import { CANONICAL_EXERCISES } from "@/lib/programs/exercises";
 import { schemeLabel, weekLabel } from "@/lib/programs/planner";
 import { LIFT_LABEL, type ExerciseRx, type LiftKey, type ProgramTemplate, type SetRx } from "@/lib/programs/types";
 
-const num = (v: string, fallback: number) => {
-  const n = Number(v);
-  return v.trim() !== "" && Number.isFinite(n) ? n : fallback;
-};
+/**
+ * A number box that can be emptied while typing. Each usable number is kept as
+ * it is typed (the caller clamps it); leaving the box shows what was kept, so
+ * an empty or unusable entry goes back to the last good value. With
+ * allowEmpty, an empty box is a value of its own (null).
+ */
+function NumberField({
+  value,
+  onValue,
+  allowEmpty,
+  onBlur,
+  ...rest
+}: Omit<ComponentProps<typeof Input>, "value" | "onChange" | "type"> & { value: number | null; onValue: (n: number | null) => void; allowEmpty?: boolean }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <Input
+      {...rest}
+      type="number"
+      value={draft ?? (value === null ? "" : String(value))}
+      onChange={(e) => {
+        const v = e.target.value;
+        setDraft(v);
+        const n = Number(v);
+        if (v.trim() !== "" && Number.isFinite(n)) onValue(n);
+        else if (v.trim() === "" && allowEmpty) onValue(null);
+      }}
+      onBlur={(e) => {
+        setDraft(null);
+        onBlur?.(e);
+      }}
+    />
+  );
+}
 
 function ExerciseEditor({
   ex,
@@ -97,15 +126,14 @@ function ExerciseEditor({
               <span className="pe-load">
                 {(s.kind === "pct" || s.kind === "amrap") && (
                   <>
-                    <Input
-                      type="number"
+                    <NumberField
                       step="0.5"
                       aria-label={`Set ${si + 1} percentage`}
                       value={Math.round(s.pct * 1000) / 10}
-                      onChange={(e) =>
+                      onValue={(n) =>
                         onChange((x) => {
                           const cur = x.sets[si];
-                          if (cur.kind === "pct" || cur.kind === "amrap") cur.pct = num(e.target.value, cur.pct * 100) / 100;
+                          if (n !== null && (cur.kind === "pct" || cur.kind === "amrap")) cur.pct = n / 100;
                         })
                       }
                     />
@@ -115,17 +143,16 @@ function ExerciseEditor({
                 {s.kind === "rpe" && (
                   <>
                     <span className="pe-muted">RPE</span>
-                    <Input
-                      type="number"
+                    <NumberField
                       step="0.5"
                       min={5}
                       max={10}
                       aria-label={`Set ${si + 1} RPE`}
                       value={s.rpe}
-                      onChange={(e) =>
+                      onValue={(n) =>
                         onChange((x) => {
                           const cur = x.sets[si];
-                          if (cur.kind === "rpe") cur.rpe = Math.max(5, Math.min(10, num(e.target.value, cur.rpe)));
+                          if (n !== null && cur.kind === "rpe") cur.rpe = Math.max(5, Math.min(10, n));
                         })
                       }
                     />
@@ -134,45 +161,44 @@ function ExerciseEditor({
                 {s.kind === "fixed" && <span className="pe-muted">From progression{s.amrap ? ", as many as you can" : ""}</span>}
                 {s.kind === "same_as_last" && <span className="pe-muted">As the set before</span>}
               </span>
-              <Input
-                type="number"
+              <NumberField
                 min={1}
                 aria-label={`Set ${si + 1} reps`}
                 value={repsMin(s.reps)}
-                onChange={(e) =>
+                onValue={(n) =>
                   onChange((x) => {
                     const cur = x.sets[si];
-                    const min = Math.max(1, Math.round(num(e.target.value, repsMin(cur.reps))));
+                    if (n === null) return;
+                    const min = Math.max(1, Math.round(n));
                     if (cur.kind === "fixed" || cur.kind === "same_as_last") cur.reps = withReps(min, repsMax(cur.reps));
                     else cur.reps = min;
                   })
                 }
               />
               {s.kind === "fixed" || s.kind === "same_as_last" ? (
-                <Input
-                  type="number"
+                <NumberField
                   min={1}
+                  allowEmpty
                   aria-label={`Set ${si + 1} top of the rep range`}
                   placeholder="-"
-                  value={repsMax(s.reps) ?? ""}
-                  onChange={(e) =>
+                  value={repsMax(s.reps)}
+                  onValue={(n) =>
                     onChange((x) => {
                       const cur = x.sets[si];
-                      if (cur.kind === "fixed" || cur.kind === "same_as_last") cur.reps = withReps(repsMin(cur.reps), e.target.value ? Math.round(num(e.target.value, 0)) : null);
+                      if (cur.kind === "fixed" || cur.kind === "same_as_last") cur.reps = withReps(repsMin(cur.reps), n === null ? null : Math.round(n));
                     })
                   }
                 />
               ) : (
                 <span />
               )}
-              <Input
-                type="number"
+              <NumberField
                 min={0}
                 max={900}
                 step={15}
                 aria-label={`Set ${si + 1} rest in seconds`}
                 value={s.rest}
-                onChange={(e) => onChange((x) => void (x.sets[si].rest = Math.max(0, Math.min(900, Math.round(num(e.target.value, x.sets[si].rest))))))}
+                onValue={(n) => onChange((x) => void (n !== null && (x.sets[si].rest = Math.max(0, Math.min(900, Math.round(n))))))}
               />
               <button type="button" className="pe-icon" aria-label={`Remove set ${si + 1}`} disabled={ex.sets.length === 1} onClick={() => onChange((x) => void x.sets.splice(si, 1))}>
                 <Trash2 size={14} />
@@ -188,8 +214,25 @@ function ExerciseEditor({
   );
 }
 
-/** Weeks, then days, then exercises, then set rows, in the style of the Detailed builder. */
-export function ProgramCopyEditor({ id, initial, lifts, engineLabel, isBlock }: { id: number; initial: ProgramTemplate; lifts: LiftKey[]; engineLabel: string; isBlock: boolean }) {
+/**
+ * Weeks, then days, then exercises, then set rows, in the style of the Detailed builder.
+ * fullBlock: the original's weeks are its whole length, so the length is the number of weeks.
+ */
+export function ProgramCopyEditor({
+  id,
+  initial,
+  lifts,
+  engineLabel,
+  isBlock,
+  fullBlock,
+}: {
+  id: number;
+  initial: ProgramTemplate;
+  lifts: LiftKey[];
+  engineLabel: string;
+  isBlock: boolean;
+  fullBlock: boolean;
+}) {
   const router = useRouter();
   const [t, setT] = useState<ProgramTemplate>(initial);
   const [wi, setWi] = useState(0);
@@ -248,20 +291,25 @@ export function ProgramCopyEditor({ id, initial, lifts, engineLabel, isBlock }: 
             <span>Warning line (optional)</span>
             <Input value={t.warning ?? ""} onChange={(e) => edit((d) => void (d.warning = e.target.value || undefined))} />
           </label>
-          <label className="pe-field">
+          <div className="pe-field">
             <span>Days a week</span>
-            <select value={t.daysPerWeek} onChange={(e) => edit((d) => void (d.daysPerWeek = Number(e.target.value)))}>
-              {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="pe-field">
-            <span>Length in weeks</span>
-            <Input type="number" min={1} max={52} value={t.lengthWeeks} onChange={(e) => edit((d) => void (d.lengthWeeks = Math.max(1, Math.min(52, Math.round(num(e.target.value, d.lengthWeeks))))))} />
-          </label>
+            <p className="pe-static">
+              {mostDays(t)} {mostDays(t) === 1 ? "day" : "days"}, from the busiest week
+            </p>
+          </div>
+          {fullBlock ? (
+            <div className="pe-field">
+              <span>Length</span>
+              <p className="pe-static">
+                {t.weeks.length} {t.weeks.length === 1 ? "week" : "weeks"}, one for each week below
+              </p>
+            </div>
+          ) : (
+            <label className="pe-field">
+              <span>Length in weeks</span>
+              <NumberField min={1} max={52} value={t.lengthWeeks} onValue={(n) => edit((d) => void (n !== null && (d.lengthWeeks = Math.max(1, Math.min(52, Math.round(n))))))} />
+            </label>
+          )}
         </div>
         <label className="pe-field">
           <span>Description</span>

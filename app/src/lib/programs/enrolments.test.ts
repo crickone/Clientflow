@@ -40,6 +40,7 @@ const requireLocal = createRequire(import.meta.url);
   const { eq, sql } = requireLocal("drizzle-orm") as typeof import("drizzle-orm");
   const log = requireLocal("../workoutLog") as typeof import("../workoutLog");
   const en = requireLocal("./enrolments") as typeof import("./enrolments");
+  const lib = requireLocal("./library") as typeof import("./library");
 
   const slug = "programs-enrolments-test";
   const dbFile = `tenants/${slug}/${slug}.db`;
@@ -489,6 +490,26 @@ const requireLocal = createRequire(import.meta.url);
     assert.deepEqual(en.finishEnrolmentSession(clientId, sid), { reasons: ["Your program is paused, so it did not move on."], finished: false });
     assert.equal(stateOf(clientId), before);
     assert.equal(progressEvents(id, sid), 0);
+  });
+
+  // ── 8. gym copies ──
+  test("a live enrolment survives deleting the gym copy it started from", () => {
+    const clientId = newMember();
+    const copyId = lib.makeCopy("stronglifts-5x5", 1);
+    assert.ok(copyId);
+    const id = enrolIn(clientId, `copy-${copyId}`, maxes);
+    const before = en.liveEnrolment(clientId)!;
+    assert.equal(before.copyId, copyId);
+    assert.equal(before.programKey, null);
+    assert.equal(lib.deleteCopy(copyId), true);
+    const after = en.liveEnrolment(clientId);
+    assert.ok(after, "still live");
+    assert.equal(after.id, id);
+    assert.equal(after.status, "active");
+    assert.equal(after.copyId, null, "the link to the deleted copy is cleared");
+    assert.deepEqual(after.template, before.template, "the snapshot is kept");
+    runNext(clientId);
+    assert.equal(en.liveEnrolment(clientId)!.state.day, 1, "and it still runs");
   });
 
   try {

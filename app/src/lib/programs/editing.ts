@@ -1,6 +1,6 @@
 // app/src/lib/programs/editing.ts
 /** Helpers for the gym-copy editor. Pure. */
-import type { ExerciseRx, Reps, SetRx } from "./types";
+import type { ExerciseRx, ProgramTemplate, Reps, SetRx } from "./types";
 
 export const SET_KINDS: { value: SetRx["kind"]; label: string }[] = [
   { value: "pct", label: "% of training max" },
@@ -47,4 +47,18 @@ export function convertSet(s: SetRx, kind: SetRx["kind"]): SetRx {
 
 export function blankExercise(): ExerciseRx {
   return { name: "Back squat", sets: [{ kind: "fixed", reps: 5, rest: 120 }] };
+}
+
+/**
+ * True when the program's weeks are its whole length (every fixed block).
+ * A gym copy of one is as long as its weeks; a short cycle repeated for
+ * longer (StrongLifts' two weeks run for 12) keeps the length it is given.
+ */
+export function isFullBlock(t: Pick<ProgramTemplate, "weeks" | "lengthWeeks">): boolean {
+  return t.weeks.length === t.lengthWeeks;
+}
+
+/** The most days in any one week. */
+export function mostDays(t: Pick<ProgramTemplate, "weeks">): number {
+  return Math.max(1, ...t.weeks.map((w) => w.days.length));
 }

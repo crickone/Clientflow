@@ -5832,6 +5832,7 @@ select.pg-input { padding-right: 36px; }
 .pe-field { display: grid; gap: 6px; }
 .pe-field > span { font-size: 12px; color: var(--text-tertiary); }
 .pe-hint { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-tertiary); }
+.pe-static { display: flex; align-items: center; min-height: 46px; margin: 0; font-size: 14.5px; color: var(--text-primary); }
 .pe-errors { padding: 12px 16px; border: 1px solid var(--danger); border-radius: 12px; font-size: 13px; color: var(--text-primary); }
 .pe-errors ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-secondary); }
 .pe-weeks { display: flex; flex-wrap: wrap; gap: 6px; }

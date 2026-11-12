@@ -88,6 +88,37 @@ const requireLocal = createRequire(import.meta.url);
       assert.ok(firstSet.kind === "pct" && firstSet.pct === 0.68);
       assert.equal(lib.listCopies().length, 1);
 
+      // ── length and days a week follow the weeks of a full block ──
+      const longer = structuredClone(saved.template);
+      longer.weeks.splice(1, 0, structuredClone(longer.weeks[0]));
+      longer.lengthWeeks = 4;
+      assert.deepEqual(lib.saveCopy(id, longer), { ok: true });
+      assert.equal(lib.getCopy(id)!.template.lengthWeeks, 5, "a Smolov copy with a week added is 5 weeks long");
+      assert.equal(lib.getCopy(id)!.template.weeks.length, 5);
+      const fewerDays = structuredClone(lib.getCopy(id)!.template);
+      for (const w of fewerDays.weeks) w.days.splice(3);
+      fewerDays.daysPerWeek = 6;
+      assert.deepEqual(lib.saveCopy(id, fewerDays), { ok: true });
+      assert.equal(lib.getCopy(id)!.template.daysPerWeek, 3, "days a week is the most days in any week");
+
+      // ── a short cycle repeated for longer keeps its length ──
+      const slId = lib.makeCopy("stronglifts-5x5", 7)!;
+      const sl = structuredClone(lib.getCopy(slId)!.template);
+      assert.equal(sl.weeks.length, 2);
+      assert.equal(sl.lengthWeeks, 12);
+      sl.weeks.push(structuredClone(sl.weeks[0]));
+      sl.weeks[2].days.push(structuredClone(sl.weeks[2].days[0]));
+      assert.deepEqual(lib.saveCopy(slId, sl), { ok: true });
+      const slSaved = lib.getCopy(slId)!.template;
+      assert.equal(slSaved.weeks.length, 3);
+      assert.equal(slSaved.lengthWeeks, 12, "a StrongLifts copy with a week added keeps 12 weeks");
+      assert.equal(slSaved.daysPerWeek, 4, "days a week follows the busiest week");
+      const slShorter = structuredClone(slSaved);
+      slShorter.lengthWeeks = 8;
+      assert.deepEqual(lib.saveCopy(slId, slShorter), { ok: true });
+      assert.equal(lib.getCopy(slId)!.template.lengthWeeks, 8, "the gym's own length for a repeated cycle is kept");
+      assert.equal(lib.deleteCopy(slId), true);
+
       // ── a copy that drops a lift the engine needs is refused, naming the lift ──
       const dropped = structuredClone(saved.template);
       for (const w of dropped.weeks) for (const d of w.days) d.exercises = d.exercises.map(() => ({ name: "Front squat", sets: [{ kind: "fixed" as const, reps: 5, rest: 120 }] }));
