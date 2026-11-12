@@ -66,6 +66,8 @@ import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/
 import { goalTarget } from "@/lib/goals";
 import { ACTIVITY_BY_KEY, GOAL_BY_KEY } from "@/lib/goalsModel";
 import { liftRecords, listSessions, openSession } from "@/lib/workoutLog";
+import { ClientProgramPanel } from "@/components/clients/ClientProgramPanel";
+import { programPanelData } from "@/lib/programs/staffView";
 import { ClientWorkoutLog } from "@/components/clients/ClientWorkoutLog";
 import { trainingOverview } from "@/lib/trainingOverview";
 import { ClientBodyScans } from "@/components/clients/ClientBodyScans";
@@ -128,7 +130,9 @@ export default async function ClientProfile(
   const clientGoal = goalTarget(id);
   const workoutSessions = listSessions(id, 60);
   const openWorkout = openSession(id);
-  const showWorkoutLog = assignedWk.length > 0 || workoutSessions.length > 0 || openWorkout !== null;
+  const programPanel = programsEnabled ? programPanelData(id) : null;
+  const hasProgram = programPanel !== null;
+  const showWorkoutLog = assignedWk.length > 0 || workoutSessions.length > 0 || openWorkout !== null || hasProgram;
   const lifts = showWorkoutLog ? liftRecords(id) : [];
   const training = showWorkoutLog ? trainingOverview(id) : null;
   const mealsLogged = mealCount(id);
@@ -257,6 +261,7 @@ export default async function ClientProfile(
 
         {showWorkoutLog && training && (
           <TabsContent value="workouts">
+            {programPanel && <ClientProgramPanel clientId={id} data={programPanel} />}
             <ClientWorkoutLog sessions={workoutSessions} records={lifts} open={openWorkout} overview={training} />
           </TabsContent>
         )}
