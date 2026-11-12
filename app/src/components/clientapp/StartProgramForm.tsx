@@ -9,13 +9,15 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/clientapp/ui";
 import { startProgramAction, type MaxEntry } from "@/app/app/programs/actions";
 import type { LiftKey, WeightUnit } from "@/lib/programs/types";
-import { STEP_OPTIONS, formatWeight, maxFromSet, parseWeightIn, trainingMax, type StepKey } from "@/lib/programs/units";
+import { STEP_OPTIONS, formatWeight, kgToUnit, maxFromSet, parseWeightIn, trainingMax, type StepKey } from "@/lib/programs/units";
 import { WEEKDAY_SHORT } from "@/lib/trainingProgress";
 
 interface LiftRow {
   lift: LiftKey;
   label: string;
   logged: { kg: number; reps: number; e1rm: number } | null;
+  /** A max carried from the member's last program, filled in as their 1-rep max. */
+  keptKg?: number | null;
 }
 interface RowState {
   mode: MaxEntry["kind"];
@@ -44,7 +46,9 @@ export function StartProgramForm({
   const router = useRouter();
   const [unit, setUnit] = useState<WeightUnit>(initialUnit);
   const [step, setStep] = useState<StepKey>(initialUnit === "lb" ? "5lb" : initialStep === "5lb" ? "2.5kg" : initialStep);
-  const [rows, setRows] = useState<RowState[]>(lifts.map((l) => ({ mode: l.logged ? "logged" : "one_rm", weight: "", reps: "" })));
+  const [rows, setRows] = useState<RowState[]>(
+    lifts.map((l) => (l.keptKg ? { mode: "one_rm", weight: String(kgToUnit(l.keptKg, initialUnit)), reps: "" } : { mode: l.logged ? "logged" : "one_rm", weight: "", reps: "" })),
+  );
   const [startDate, setStartDate] = useState(today);
   const [days, setDays] = useState<number[]>(defaultWeekdays);
   const [pending, start] = useTransition();
@@ -116,6 +120,7 @@ export function StartProgramForm({
         return (
           <Card key={l.lift} style={{ display: "grid", gap: 10 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>{l.label}</div>
+            {l.keptKg ? <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>Filled in from your last program.</div> : null}
             <div className="pg-chips" role="group" aria-label={`How to set your ${l.label.toLowerCase()} max`}>
               {l.logged && (
                 <button type="button" className="pg-chip" aria-pressed={r.mode === "logged"} onClick={() => setRow(i, { mode: "logged" })}>

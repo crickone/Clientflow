@@ -18,7 +18,7 @@ const files = walk(root);
 const pages = files.filter((f) => f.endsWith("page.tsx"));
 const actions = files.filter((f) => f.endsWith("actions.ts"));
 const rel = (f: string) => path.relative(root, f);
-for (const want of ["page.tsx", "[key]/page.tsx", "[key]/start/page.tsx", "mine/page.tsx", "built/new/page.tsx", "built/[id]/page.tsx"]) {
+for (const want of ["page.tsx", "[key]/page.tsx", "[key]/start/page.tsx", "mine/page.tsx", "built/new/page.tsx", "built/[id]/page.tsx", "built/[id]/start/page.tsx"]) {
   assert.ok(pages.some((f) => rel(f) === want), `has ${want}`);
 }
 for (const want of ["actions.ts", "built/actions.ts"]) assert.ok(actions.some((f) => rel(f) === want), `has ${want}`);

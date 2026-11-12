@@ -1,10 +1,12 @@
 // app/src/app/app/programs/mine/page.tsx
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, Pause } from "lucide-react";
+import { AlertTriangle, Pause, Pencil } from "lucide-react";
 
 import { requireProgramsPage } from "@/lib/programs/access";
 import { actorLabel } from "@/lib/programs/cards";
 import { enrolmentEvents, liveEnrolment, planFor, programWeek, sessionTitle } from "@/lib/programs/enrolments";
+import { parseMemberKey } from "@/lib/programs/memberTemplate";
 import { summarisePlanned, weekLabel } from "@/lib/programs/planner";
 import { LIFT_LABEL } from "@/lib/programs/types";
 import { formatWeight } from "@/lib/programs/units";
@@ -15,6 +17,7 @@ import { WeekStrip } from "@/components/clientapp/WeekStrip";
 import { StartProgramSessionButton } from "@/components/clientapp/StartProgramSessionButton";
 import { MyProgramControls } from "@/components/clientapp/MyProgramControls";
 import { RestartProgramForm } from "@/components/clientapp/RestartProgramForm";
+import { OwnMaxForm } from "@/components/clientapp/OwnMaxForm";
 
 export const dynamic = "force-dynamic";
 
@@ -33,11 +36,19 @@ export default async function MyProgramPage() {
   const events = enrolmentEvents(view.id, 30);
   const today = dateKey(Date.now());
   const fmt = (kg: number) => formatWeight(kg, view.unit);
+  // One of the member's own programs: they can edit it and set its maxes.
+  const ownId = view.programKey ? parseMemberKey(view.programKey) : null;
   const startsLater = view.startDate > today ? `. Starts ${new Date(`${view.startDate}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}` : "";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <PageTitle sub={`${weekLabel(t, view.state)}${startsLater}`}>{t.name}</PageTitle>
+
+      {ownId !== null && (
+        <Link href={`/app/programs/built/${ownId}`} className="mb-link">
+          <Pencil size={16} aria-hidden /> Edit program
+        </Link>
+      )}
 
       {view.status === "paused" && (
         <Card style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -92,6 +103,7 @@ export default async function MyProgramPage() {
               </span>
             </div>
           ))}
+          {ownId !== null && <OwnMaxForm unit={view.unit} lifts={t.lifts} />}
         </Card>
       )}
 
