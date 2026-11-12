@@ -5746,3 +5746,6 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .tm-choice input { margin-top: 3px; }
 .tm-choice span { display: grid; gap: 2px; font-size: 13px; color: var(--text-secondary); }
 .tm-choice b { font-size: 14px; color: var(--text-primary); font-weight: 600; }
+
+/* Program sessions in the logger: a Plan column and an optional RPE box. */
+.wl-grid--rpe { grid-template-columns: 22px minmax(0, 1fr) 58px 46px 42px 44px; gap: 6px; }

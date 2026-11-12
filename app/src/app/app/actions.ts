@@ -32,6 +32,8 @@ import {
   startSession,
   type StartResult,
 } from "@/lib/workoutLog";
+import { finishEnrolmentSession } from "@/lib/programs/enrolments";
+import { memberSeesPrograms } from "@/lib/programs/access";
 import { listExercises } from "@/lib/exerciseLibrary";
 import { searchExercises } from "@/lib/workoutGroupsModel";
 import { setTrainingPlan } from "@/lib/trainingOverview";
@@ -217,6 +219,7 @@ const setSchema = z.object({
   weightKg: z.number().min(0).max(1000).nullable(),
   reps: z.number().int().min(1).max(999).nullable(),
   done: z.boolean(),
+  rpe: z.number().min(1).max(10).nullable().optional(),
 });
 const exercisesSchema = z.array(z.object({ id: z.number().int().positive(), sets: z.array(setSchema).max(20) })).max(60);
 
@@ -240,10 +243,13 @@ export async function saveWorkoutAction(sessionId: number, exercises: unknown): 
   return { ok: saveSessionSets(clientId, id.data, ex.data) };
 }
 
-export type FinishResult = { ok: true; bests: { name: string; weightKg: number; reps: number }[] } | { ok: false; error: string };
+export type FinishResult =
+  | { ok: true; bests: { name: string; weightKg: number; reps: number }[]; program: { reasons: string[]; finished: boolean } | null }
+  | { ok: false; error: string };
 
 export async function finishWorkoutAction(sessionId: number, exercises: unknown): Promise<FinishResult> {
-  const { clientId } = requireClient();
+  const current = requireClient();
+  const { clientId } = current;
   const id = idSchema.safeParse(sessionId);
   const ex = exercisesSchema.safeParse(exercises);
   if (!id.success || !ex.success) return { ok: false, error: "Couldn't save this workout." };
@@ -252,9 +258,23 @@ export async function finishWorkoutAction(sessionId: number, exercises: unknown)
   if (!session) return { ok: false, error: "Workout not found." };
   const { best } = exerciseHistory(clientId, session.exercises.map((e) => e.exerciseKey), session.id);
   finishSession(clientId, session.id);
+  // The program moves on once per session: finishEnrolmentSession is idempotent and returns null when
+  // already counted, so a retry after a failure is safe and a later re-save changes nothing.
+  let program: { reasons: string[]; finished: boolean } | null = null;
+  let programError: string | null = null;
+  if (session.enrolmentId && memberSeesPrograms(current)) {
+    try {
+      program = finishEnrolmentSession(clientId, session.id);
+    } catch (err) {
+      console.error("[programs] finishing a program session failed:", err);
+      programError = "Your workout is saved, but your program could not move on. Try finishing again in a moment.";
+    }
+  }
   revalidatePath("/app/workouts");
   revalidatePath("/app");
-  return { ok: true, bests: personalBests(session.exercises, best) };
+  if (session.enrolmentId) revalidatePath("/app/programs/mine");
+  if (programError) return { ok: false, error: programError };
+  return { ok: true, bests: personalBests(session.exercises, best), program };
 }
 
 export async function discardWorkoutAction(sessionId: number): Promise<{ ok: boolean }> {

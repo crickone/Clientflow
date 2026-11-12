@@ -5,7 +5,7 @@
  * previews and the logger show. Pure.
  */
 import type { DayRx, EngineState, ExerciseRx, PlannedExercise, PlannedSession, PlannedSet, ProgramTemplate, Reps, SetRx, WeightUnit } from "./types";
-import { formatWeight, roundToStep, weightForRpe } from "./units";
+import { formatWeight, kgToUnit, roundToStep, weightForRpe } from "./units";
 
 /**
  * The key an exercise's working weight is kept under: its name, its GZCLP
@@ -208,4 +208,11 @@ export function schemeLabel(sets: SetRx[]): string {
   const last = sets[sets.length - 1];
   const plus = !!last && (last.kind === "amrap" || (last.kind === "fixed" && last.amrap === true));
   return `${sets.length} x ${first ? repsText(first.reps) : "0"}${plus ? "+" : ""}`;
+}
+
+/** One planned set in the logger's Plan column: "102.5 x 9", "70 x 5+", "RPE 8, 140", "8-12 reps". */
+export function planSetLabel(p: PlannedSet, unit: WeightUnit): string {
+  const w = p.kg !== null ? String(kgToUnit(p.kg, unit)) : null;
+  if (p.rpe !== null) return w ? `RPE ${p.rpe}, ${w}` : `RPE ${p.rpe}`;
+  return w ? `${w} x ${repsLabel(p)}` : `${repsLabel(p)} reps`;
 }

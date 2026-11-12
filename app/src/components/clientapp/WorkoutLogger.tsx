@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Minus, Plus, Timer, Trash2, TrendingUp, Trophy } from "lucide-react";
+import { Check, ListChecks, Minus, Plus, Timer, Trash2, TrendingUp, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -25,9 +25,7 @@ import {
   beatsPrevious,
   completeSet,
   durationLabel,
-  formatSet,
   parseReps,
-  parseWeight,
   restLabel,
   targetRepsNumber,
   volumeKg,
@@ -35,20 +33,30 @@ import {
   type SessionExercise,
   type SessionView,
 } from "@/lib/workoutLogModel";
+import { planSetLabel } from "@/lib/programs/planner";
+import type { PlannedSet, WeightUnit } from "@/lib/programs/types";
+import { formatSetIn, formatWeight, kgToUnit, parseRpe, parseWeightIn } from "@/lib/programs/units";
 
 /** What the member is typing: raw strings, so "62." survives until it parses. */
 interface DraftSet {
   w: string;
   r: string;
+  rpe: string;
   done: boolean;
 }
 type Draft = Record<number, DraftSet[]>;
 
-function toDraft(s: LoggedSet): DraftSet {
-  return { w: s.weightKg === null ? "" : String(s.weightKg), r: s.reps === null ? "" : String(s.reps), done: s.done };
+/** Boxes show the member's unit; everything saved is kg. */
+function toDraft(s: LoggedSet, unit: WeightUnit): DraftSet {
+  return {
+    w: s.weightKg === null ? "" : String(kgToUnit(s.weightKg, unit)),
+    r: s.reps === null ? "" : String(s.reps),
+    rpe: s.rpe == null ? "" : String(s.rpe),
+    done: s.done,
+  };
 }
-function toLogged(d: DraftSet): LoggedSet {
-  return { weightKg: parseWeight(d.w), reps: parseReps(d.r), done: d.done };
+function toLogged(d: DraftSet, unit: WeightUnit): LoggedSet {
+  return { weightKg: parseWeightIn(d.w, unit), reps: parseReps(d.r), done: d.done, rpe: parseRpe(d.rpe) };
 }
 
 function clock(ms: number) {
@@ -70,15 +78,22 @@ export function WorkoutLogger({
   session,
   previous,
   previousAt = {},
+  unit = "kg",
 }: {
   session: SessionView;
   previous: Record<string, LoggedSet[]>;
   /** When each exercise was last done (the session "Last time" comes from). */
   previousAt?: Record<string, number>;
+  /** The member's display unit. Weights are still saved in kg. */
+  unit?: WeightUnit;
 }) {
   const router = useRouter();
   const finishedAlready = session.finishedAt !== null;
-  const [draft, setDraft] = useState<Draft>(() => Object.fromEntries(session.exercises.map((e) => [e.id, e.sets.map(toDraft)])));
+  const draftOf = (s: LoggedSet) => toDraft(s, unit);
+  const loggedOf = (d: DraftSet) => toLogged(d, unit);
+  /** A DIY program session: show the plan and an RPE box. */
+  const isProgram = session.exercises.some((e) => e.plan);
+  const [draft, setDraft] = useState<Draft>(() => Object.fromEntries(session.exercises.map((e) => [e.id, e.sets.map((s) => toDraft(s, unit))])));
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [now, setNow] = useState(() => Date.now());
   const [rest, setRest] = useState<{ until: number; total: number } | null>(null);
@@ -97,8 +112,8 @@ export function WorkoutLogger({
   latest.current = draft;
 
   const payload = useCallback(
-    () => Object.entries(latest.current).map(([id, sets]) => ({ id: Number(id), sets: sets.map(toLogged) })),
-    [],
+    () => Object.entries(latest.current).map(([id, sets]) => ({ id: Number(id), sets: sets.map((d) => toLogged(d, unit)) })),
+    [unit],
   );
 
   const flush = useCallback(async () => {
@@ -175,16 +190,30 @@ export function WorkoutLogger({
    * jumps to the next exercise, and the group's rest starts after the last.
    * A blank weight takes the suggested next weight before last time's.
    */
-  function tick(exId: number, i: number, restSeconds: number, targetReps: string | null, prev: LoggedSet | undefined, opts: { rests: boolean; nextId: number | null; suggestKg: number | null }) {
+  function tick(
+    exId: number,
+    i: number,
+    restSeconds: number,
+    targetReps: string | null,
+    prev: LoggedSet | undefined,
+    opts: { rests: boolean; nextId: number | null; suggestKg: number | null; plan?: PlannedSet },
+  ) {
     const sets = draft[exId];
     const s = sets[i];
     if (s.done) {
       update(exId, (xs) => xs.map((x, k) => (k === i ? { ...x, done: false } : x)));
       return;
     }
-    const base = !s.w && opts.suggestKg !== null && i === 0 ? { ...s, w: String(opts.suggestKg) } : s;
-    const filled = completeSet(toLogged(base), prev && opts.suggestKg !== null ? { ...prev, weightKg: opts.suggestKg } : prev, i > 0 ? toLogged(sets[i - 1]) : undefined, targetReps);
-    update(exId, (xs) => xs.map((x, k) => (k === i ? toDraft(filled) : x)));
+    const base = !s.w && opts.suggestKg !== null && i === 0 ? { ...s, w: String(kgToUnit(opts.suggestKg, unit)) } : s;
+    // A planned set fills from the plan: its weight, and its reps (the minimum on a + set).
+    const planned = opts.plan ? { weightKg: opts.plan.kg, reps: opts.plan.reps, done: true } : undefined;
+    const filled = completeSet(
+      loggedOf(base),
+      planned ?? (prev && opts.suggestKg !== null ? { ...prev, weightKg: opts.suggestKg } : prev),
+      i > 0 ? loggedOf(sets[i - 1]) : undefined,
+      targetReps,
+    );
+    update(exId, (xs) => xs.map((x, k) => (k === i ? { ...draftOf(filled), rpe: x.rpe } : x)));
     if (finishedAlready) return;
     if (opts.rests && restSeconds > 0) setRest({ until: Date.now() + restSeconds * 1000, total: restSeconds });
     else if (!opts.rests && opts.nextId !== null) document.getElementById(`wl-ex-${opts.nextId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -201,7 +230,7 @@ export function WorkoutLogger({
     const r = await addWorkoutExerciseAction(session.id, hit);
     if (!r.ok) return void toast.error(r.error);
     setExercises((xs) => [...xs, r.exercise]);
-    setDraft((d) => ({ ...d, [r.exercise.id]: r.exercise.sets.map(toDraft) }));
+    setDraft((d) => ({ ...d, [r.exercise.id]: r.exercise.sets.map(draftOf) }));
     if (r.previous.length) setPrevMap((m) => ({ ...m, [r.exercise.exerciseKey]: r.previous }));
     if (r.previousAt) setPrevAtMap((m) => ({ ...m, [r.exercise.exerciseKey]: r.previousAt! }));
     setTimeout(() => document.getElementById(`wl-ex-${r.exercise.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
@@ -252,7 +281,7 @@ export function WorkoutLogger({
   }
 
   if (result) {
-    const logged = exercises.map((e) => ({ sets: (draft[e.id] ?? []).map(toLogged) }));
+    const logged = exercises.map((e) => ({ sets: (draft[e.id] ?? []).map(loggedOf) }));
     const vol = volumeKg(logged);
     return (
       <div className="wl">
@@ -262,6 +291,23 @@ export function WorkoutLogger({
           <Stat label="Sets" value={String(doneCount)} />
           <Stat label="Lifted" value={vol > 0 ? `${vol.toLocaleString("en-IE")} kg` : "-"} />
         </Card>
+        {result.program && (
+          <Card style={{ display: "grid", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14.5, fontWeight: 600, color: "var(--text-primary)" }}>
+              <ListChecks size={17} style={{ color: "var(--accent-ink)" }} />
+              {result.program.finished ? "Program done" : "Your program"}
+            </div>
+            {result.program.reasons.length === 0 ? (
+              <div style={{ fontSize: 13.5, color: "var(--text-secondary)" }}>Nothing changes until your next session.</div>
+            ) : (
+              result.program.reasons.map((r) => (
+                <div key={r} style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                  {r}
+                </div>
+              ))
+            )}
+          </Card>
+        )}
         {result.bests.length > 0 && (
           <Card style={{ display: "grid", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14.5, fontWeight: 600, color: "var(--text-primary)" }}>
@@ -271,7 +317,7 @@ export function WorkoutLogger({
             {result.bests.map((b) => (
               <div key={b.name} style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, color: "var(--text-secondary)" }}>
                 <span>{b.name}</span>
-                <span style={{ color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{formatSet(b)}</span>
+                <span style={{ color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{formatSetIn(b, unit)}</span>
               </div>
             ))}
           </Card>
@@ -280,8 +326,8 @@ export function WorkoutLogger({
           <Button onClick={() => router.push("/app/workouts/history")} style={{ width: "100%" }}>
             See my workout history
           </Button>
-          <Button variant="secondary" onClick={() => router.push("/app/workouts")} style={{ width: "100%" }}>
-            Back to workouts
+          <Button variant="secondary" onClick={() => router.push(session.enrolmentId ? "/app/programs/mine" : "/app/workouts")} style={{ width: "100%" }}>
+            {session.enrolmentId ? "Back to my program" : "Back to workouts"}
           </Button>
         </div>
       </div>
@@ -335,7 +381,9 @@ export function WorkoutLogger({
                   </Card>
                 );
               }
-              const sug = nextWeight(prev, ex.targetReps);
+              const plan = ex.plan ?? null;
+              // A program session plans every weight; the "try X today" hint is for coach programs.
+              const sug = plan ? null : nextWeight(prev, ex.targetReps);
               return (
                 <div key={ex.id} className="wl-group" data-joined={joinedHere} data-ingroup={joinedHere || startsGroup}>
                 {startsGroup && (
@@ -356,11 +404,17 @@ export function WorkoutLogger({
                       {ex.targetReps ? ` x ${ex.targetReps}` : ""}
                       {rests ? (groupRest > 0 ? ` · rest ${restLabel(groupRest)}` : "") : " · then straight on"}
                     </div>
+                    {plan && plan.sets.some((p) => p.amrap) && !allDone && (
+                      <div className="wl-ex-notes">Sets marked + are as many as you can. Type the reps you got.</div>
+                    )}
+                    {plan && plan.sets.some((p) => p.rpe !== null) && !allDone && (
+                      <div className="wl-ex-notes">RPE is how hard a set feels: 10 is your limit, 8 leaves two reps in the tank. The weight shown is a suggestion.</div>
+                    )}
                     {sug && !allDone && (
                       <div className="wl-next" data-change={sug.change}>
                         {sug.change === "up" ? <TrendingUp size={14} /> : null}
                         <span>
-                          <b>{sug.change === "up" ? `Try ${sug.weightKg} kg today.` : `${sug.weightKg} kg again.`}</b> {sug.reason}
+                          <b>{sug.change === "up" ? `Try ${formatWeight(sug.weightKg, unit)} today.` : `${formatWeight(sug.weightKg, unit)} again.`}</b> {sug.reason}
                         </span>
                       </div>
                     )}
@@ -372,29 +426,33 @@ export function WorkoutLogger({
                     {ex.notes && <div className="wl-ex-notes">{ex.notes}</div>}
                   </div>
 
-                  <div className="wl-grid wl-grid-head" aria-hidden>
+                  <div className={`wl-grid wl-grid-head${isProgram ? " wl-grid--rpe" : ""}`} aria-hidden>
                     <span>Set</span>
-                    <span>Last time</span>
-                    <span>kg</span>
+                    <span>{plan ? "Plan" : "Last time"}</span>
+                    <span>{unit}</span>
                     <span>Reps</span>
+                    {isProgram && <span>RPE</span>}
                     <span />
                   </div>
                   {sets.map((s, i) => {
                     const p = prev[i] && prev[i].done ? prev[i] : undefined;
-                    const beat = beatsPrevious(toLogged(s), p);
+                    const ps = plan?.sets[i];
+                    const beat = beatsPrevious(loggedOf(s), p);
+                    const kgHint = ps && ps.kg !== null ? ps.kg : sug ? sug.weightKg : (p?.weightKg ?? null);
+                    const repsHint = ps ? ps.reps : (p?.reps ?? targetRepsNumber(ex.targetReps));
                     return (
-                      <div key={i} className="wl-grid wl-set" data-done={s.done} data-beat={beat}>
+                      <div key={i} className={`wl-grid wl-set${isProgram ? " wl-grid--rpe" : ""}`} data-done={s.done} data-beat={beat}>
                         <span className="wl-setno">{i + 1}</span>
                         <span className="wl-prev">
-                          {p && (p.weightKg !== null || p.reps !== null) ? formatSet(p) : "-"}
-                          {beat && <TrendingUp size={14} strokeWidth={2.5} aria-label="Beat last time" />}
+                          {ps ? planSetLabel(ps, unit) : p && (p.weightKg !== null || p.reps !== null) ? formatSetIn(p, unit) : "-"}
+                          {beat && !ps && <TrendingUp size={14} strokeWidth={2.5} aria-label="Beat last time" />}
                         </span>
                         <input
                           className="wl-input"
                           inputMode="decimal"
                           enterKeyHint="next"
-                          aria-label={`${ex.name} set ${i + 1} weight in kg`}
-                          placeholder={sug ? String(sug.weightKg) : p?.weightKg != null ? String(p.weightKg) : ""}
+                          aria-label={`${ex.name} set ${i + 1} weight in ${unit}`}
+                          placeholder={kgHint !== null ? String(kgToUnit(kgHint, unit)) : ""}
                           value={s.w}
                           onChange={(e) => update(ex.id, (xs) => xs.map((x, k) => (k === i ? { ...x, w: e.target.value.replace(/[^\d.,]/g, "").slice(0, 6) } : x)))}
                         />
@@ -403,16 +461,28 @@ export function WorkoutLogger({
                           inputMode="numeric"
                           enterKeyHint="done"
                           aria-label={`${ex.name} set ${i + 1} reps`}
-                          placeholder={p?.reps != null ? String(p.reps) : targetRepsNumber(ex.targetReps)?.toString() ?? ""}
+                          placeholder={repsHint != null ? String(repsHint) : ""}
                           value={s.r}
                           onChange={(e) => update(ex.id, (xs) => xs.map((x, k) => (k === i ? { ...x, r: e.target.value.replace(/\D/g, "").slice(0, 3) } : x)))}
                         />
+                        {isProgram && (
+                          <input
+                            className="wl-input"
+                            inputMode="decimal"
+                            aria-label={`${ex.name} set ${i + 1} effort, RPE 1 to 10, optional`}
+                            placeholder={ps?.rpe != null ? String(ps.rpe) : ""}
+                            value={s.rpe}
+                            onChange={(e) => update(ex.id, (xs) => xs.map((x, k) => (k === i ? { ...x, rpe: e.target.value.replace(/[^\d.,]/g, "").slice(0, 4) } : x)))}
+                          />
+                        )}
                         <button
                           type="button"
                           className="wl-tick"
                           aria-pressed={s.done}
                           aria-label={s.done ? `Untick set ${i + 1}` : `Tick off set ${i + 1}`}
-                          onClick={() => tick(ex.id, i, groupRest, ex.targetReps, p, { rests, nextId: rests ? null : inSection[xi + 1]?.id ?? null, suggestKg: sug?.weightKg ?? null })}
+                          onClick={() =>
+                            tick(ex.id, i, groupRest, ex.targetReps, p, { rests, nextId: rests ? null : (inSection[xi + 1]?.id ?? null), suggestKg: sug?.weightKg ?? null, plan: ps })
+                          }
                         >
                           <Check size={18} strokeWidth={2.6} />
                         </button>
@@ -420,7 +490,7 @@ export function WorkoutLogger({
                     );
                   })}
                   <div className="wl-set-actions">
-                    <button type="button" className="wl-link" onClick={() => update(ex.id, (xs) => (xs.length >= 20 ? xs : [...xs, { w: xs[xs.length - 1]?.w ?? "", r: "", done: false }]))}>
+                    <button type="button" className="wl-link" onClick={() => update(ex.id, (xs) => (xs.length >= 20 ? xs : [...xs, { w: xs[xs.length - 1]?.w ?? "", r: "", rpe: "", done: false }]))}>
                       <Plus size={14} /> Add set
                     </button>
                     {sets.length > 1 && !sets[sets.length - 1].done && (
