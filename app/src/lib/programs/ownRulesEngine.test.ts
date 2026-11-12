@@ -112,4 +112,44 @@ const sk = skipSession(t, { ...s0, day: 1 });
 assert.deepEqual([sk.state.week, sk.state.day, sk.state.cycle, sk.state.finished], [0, 0, 1, false]);
 assert.deepEqual(sk.reasons, []);
 
+// ── a start weight never stores 0 kg ──
+const startOf = (kg: number) => initState({ ...t, weeks: [{ days: [{ name: "A", exercises: [{ ...curl, rule: { kind: "manual", startKg: kg } }] }] }] }, {}, 2.5).weights;
+assert.deepEqual(startOf(1), {}, "1 kg at a 2.5 kg step stores no weight");
+assert.deepEqual(startOf(3), { "manual:hammer curl": 2.5 });
+
+// ── a test day: one max per lift, from the best set across the day ──
+const twoSquats: ProgramTemplate = { ...t, weeks: [{ days: [{ name: "Test", exercises: [{ ...squat, sets: [{ kind: "fixed", reps: 1, rest: 240 }] }, { ...squat, name: "Pause squat", sets: [{ kind: "fixed", reps: 5, rest: 240 }] }], test: true }] }] };
+const ts0 = { ...initState(twoSquats, { squat: 90 }, 2.5), week: 0, day: 0 };
+const tp = planSession(twoSquats, ts0, ctx)!;
+const tr = progress({ template: twoSquats, state: ts0, result: { exercises: tp.exercises.map((e, i) => ({ planned: e, sets: [i === 0 ? { kg: 100, reps: 1, done: true } : { kg: 70, reps: 5, done: true }] })) }, stepKg: 2.5, unit: "kg" });
+assert.equal(tr.state.maxes.squat, 100, "the 100 x 1 set wins over 70 x 5");
+assert.equal(tr.reasons.filter((x) => x.includes("squat max")).length, 1, "one reason per lift");
+
+// ── a removed exercise's test result moves nothing ──
+const gone: ProgramTemplate = { ...twoSquats, weeks: [{ days: [{ name: "Test", exercises: [{ ...squat, name: "Other squat", sets: [{ kind: "fixed", reps: 1, rest: 240 }] }], test: true }] }] };
+const tg = progress({ template: gone, state: ts0, result: { exercises: tp.exercises.slice(0, 1).map((e) => ({ planned: e, sets: [{ kg: 150, reps: 1, done: true }] })) }, stepKg: 2.5, unit: "kg" });
+assert.equal(tg.state.maxes.squat, 90, "a removed exercise leaves the max alone");
+assert.deepEqual(tg.reasons, []);
+
+// ── an unknown rule kind skips only its own exercise ──
+const bogusEx: ExerciseRx = { ...curl, rule: { kind: "bogus" } as never };
+const bt: ProgramTemplate = { ...t, weeks: [{ days: [{ name: "Day A", exercises: [bogusEx, bench], test: true }] }] };
+const bs = { ...initState(bt, {}, 2.5), week: 0, day: 0 };
+const bp = planSession(bt, bs, ctx)!;
+const br = progress({ template: bt, state: bs, result: done(bp, (_e, _s, kg, reps) => ({ kg, reps, done: true })), stepKg: 2.5, unit: "kg" });
+assert.equal(br.state.weights["linear:bench press"], 62.5, "the exercise after the unknown rule still moves");
+
+// ── the bar floor on a linear exercise with a lift ──
+const barEx: ExerciseRx = { name: "Back squat", lift: "squat", sets: [{ kind: "fixed", reps: 5, rest: 180 }], rule: { kind: "linear", incKg: 2.5, deloadAfter: 1, startKg: 20 } };
+const barT: ProgramTemplate = { ...t, weeks: [{ days: [{ name: "Day A", exercises: [barEx] }] }] };
+const barS = initState(barT, {}, 2.5);
+const barP = planSession(barT, barS, ctx)!;
+const barR = progress({ template: barT, state: barS, result: done(barP, (_e, _s, kg) => ({ kg, reps: 3, done: true })), stepKg: 2.5, unit: "kg" });
+assert.equal(barR.state.weights["linear:back squat"], 20);
+assert.ok(barR.reasons.some((x) => x.includes("the empty bar")), "reason names the empty bar");
+
+// ── a reason in lb for a member using lb ──
+const lbR = progress({ template: t, state: s0, result: done(plan, (_ei, _si, kg, reps, repsMax) => ({ kg, reps: repsMax ?? reps, done: true })), stepKg: 2.26796, unit: "lb" });
+assert.ok(lbR.reasons.some((x) => x.includes(" lb")) && !lbR.reasons.some((x) => x.includes(" kg")), "reasons are in lb");
+
 console.log("programs/ownRulesEngine: ok");

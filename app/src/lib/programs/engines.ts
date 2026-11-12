@@ -105,7 +105,8 @@ export function initState(t: ProgramTemplate, maxes: Partial<Record<LiftKey, num
         if (key in s.weights || !progresses(ex)) continue;
         const own = ownStartKg(ex);
         if (own !== undefined) {
-          s.weights[key] = roundToStep(own, stepKg);
+          const w = roundToStep(own, stepKg);
+          if (w > 0) s.weights[key] = w;
           continue;
         }
         if (!ex.lift) continue;
@@ -434,13 +435,18 @@ function manualExercise(c: Ctx, r: ExerciseResult): void {
   if (prev === undefined || !sameKg(prev, used)) c.reasons.push(`Next ${p.name.toLowerCase()} ${c.fmt(used)}, the weight you used.`);
 }
 
-/** A test day in a member-built program: each lift's max moves to the best set, and its percentages use it from the next session. */
-function ownTestMaxes(c: Ctx): void {
+/** A test day in a member-built program: each lift's max moves to its best set across the day, and its percentages use it from the next session. */
+function ownTestMaxes(c: Ctx, live: Set<string>): void {
+  const bests = new Map<LiftKey, { e1: number; kg: number; reps: number } | null>();
   for (const r of c.result.exercises) {
     const lift = r.planned.lift;
-    if (!lift || !c.template.lifts.includes(lift)) continue;
-    const label = LIFT_LABEL[lift].toLowerCase();
+    if (!lift || !c.template.lifts.includes(lift) || !live.has(r.planned.stateKey)) continue;
     const best = bestTestSet(r);
+    const cur = bests.get(lift);
+    if (cur === undefined || (best && (!cur || best.e1 > cur.e1))) bests.set(lift, best);
+  }
+  for (const [lift, best] of bests) {
+    const label = LIFT_LABEL[lift].toLowerCase();
     if (!best) {
       const cur = c.state.maxes[lift];
       c.reasons.push(cur !== undefined ? `No ${label} max from today. It stays at ${c.fmt(cur)}.` : `No ${label} max from today.`);
@@ -479,12 +485,13 @@ function ownRules(c: Ctx): void {
         break;
       default: {
         const never: never = rule;
-        return never;
+        void never;
+        continue;
       }
     }
   }
   if (firsts > 0) c.reasons.push(FIRST_RANGE_WEIGHTS);
-  if (c.template.weeks[c.state.week]?.days[c.state.day]?.test) ownTestMaxes(c);
+  if (c.template.weeks[c.state.week]?.days[c.state.day]?.test) ownTestMaxes(c, live);
 }
 
 function fixedVolume(c: Ctx, s: FixedVolumeSettings): void {
