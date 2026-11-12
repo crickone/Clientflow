@@ -27,29 +27,53 @@ export function BusinessesTable({
   const ask = useConfirm();
 
   async function run(action: BulkAction, label: string, danger = false, amount = false) {
-    const picked = [...selected].map(Number);
-    const r = await ask({
-      title: `${label} for ${picked.length} ${picked.length === 1 ? "business" : "businesses"}`,
-      confirmLabel: label,
-      danger,
-      prompt: amount ? { label: "Amount in euro", placeholder: "50", minLength: 1 } : undefined,
-    });
-    if (!r.ok) return;
-    // Validate before anything is sent: a bad amount never reaches the server.
-    let body: Record<string, unknown> = {};
-    if (amount) {
-      const euros = Number(r.value);
-      if (!Number.isFinite(euros) || euros <= 0) {
-        notify.fail("Give an amount in euro.");
+    try {
+      const archived = new Set(tenants.filter((t) => t.archivedAt !== null).map((t) => t.id));
+      const all = [...selected].map(Number);
+      const picked = all.filter((id) => !archived.has(id));
+      const skipped = all.length - picked.length;
+      if (picked.length === 0) {
+        notify.fail("Every selected business is archived.");
         return;
       }
-      body = { cents: Math.round(euros * 100) };
+      const skipNote = skipped > 0 ? `${skipped} archived ${skipped === 1 ? "business" : "businesses"} will be skipped.` : undefined;
+      const r = await ask({
+        title: `${label} for ${picked.length} ${picked.length === 1 ? "business" : "businesses"}`,
+        body: skipNote,
+        confirmLabel: label,
+        danger,
+        prompt: amount ? { label: "Amount in euro", placeholder: "50", minLength: 1 } : undefined,
+      });
+      if (!r.ok) return;
+      // Validate before anything is sent: a bad amount never reaches the server.
+      let body: Record<string, unknown> = {};
+      if (amount) {
+        const euros = Number(r.value);
+        if (!Number.isFinite(euros) || euros <= 0) {
+          notify.fail("Give an amount in euro.");
+          return;
+        }
+        body = { cents: Math.round(euros * 100) };
+      }
+      const res = await bulkTenantAction(picked, action, body);
+      if (res.refused) {
+        notify.fail(res.refused);
+        return;
+      }
+      const skippedText = skipped > 0 ? `, ${skipped} archived skipped` : "";
+      if (res.failed.length === 0) {
+        notify.ok(`${label}: done for ${res.done}${skippedText}`);
+        setSelected(new Set());
+      } else {
+        const shown = res.failed.slice(0, 3).map((f) => `#${f.id} ${f.error}`).join("; ");
+        const more = res.failed.length > 3 ? ` and ${res.failed.length - 3} more` : "";
+        notify.fail(`${label}: ${res.done} done, ${res.failed.length} failed (${shown}${more})${skippedText}`);
+        setSelected(new Set(res.failed.map((f) => f.id)));
+      }
+      router.refresh();
+    } catch (e) {
+      notify.fail("Bulk action failed: " + (e instanceof Error ? e.message : String(e)));
     }
-    const res = await bulkTenantAction(picked, action, body);
-    if (res.failed.length === 0) notify.ok(`${label}: done for ${res.done}`);
-    else notify.fail(`${label}: ${res.done} done, ${res.failed.length} failed (${res.failed.map((f) => `#${f.id} ${f.error}`).join("; ")})`);
-    setSelected(new Set());
-    router.refresh();
   }
 
   const columns: Column<FleetTenantRow>[] = [
