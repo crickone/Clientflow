@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { workoutSessionExercises, workoutSessions, workoutSetLogs, type WorkoutSession } from "@/lib/db/schema";
 import type { ProgramInput } from "@/lib/workoutModel";
 import { DEFAULT_REST_SECONDS, bestSet, exerciseKey, restFor, setsDone, volumeKg, type LoggedSet, type SessionExercise, type SessionView } from "@/lib/workoutLogModel";
+import { repsLabel } from "@/lib/programs/planner";
+import type { PlannedExercise } from "@/lib/programs/types";
 
 /**
  * Workout logging for the CURRENT tenant (ambient `db`). Every function that
@@ -84,7 +86,8 @@ export const OWN_WORKOUT_TITLE = "Own workout";
 
 /** A workout the member builds as they go, outside any programme. */
 export function startFreeSession(clientId: number): StartResult {
-  const blocked = clearOpenSessions(clientId, (s) => s.programId === null);
+  // A program session also has no programId; never resume one as an own workout.
+  const blocked = clearOpenSessions(clientId, (s) => s.programId === null && s.enrolmentId === null);
   if (blocked) return blocked;
   const now = Date.now();
   const [row] = db
@@ -93,6 +96,68 @@ export function startFreeSession(clientId: number): StartResult {
     .returning({ id: workoutSessions.id })
     .all();
   return { ok: true, sessionId: row.id };
+}
+
+export interface PlannedSessionInput {
+  enrolmentId: number;
+  /** The session's position in the program (the day_position). */
+  position: number;
+  programTitle: string;
+  dayName: string;
+  exercises: { exerciseId: number | null; name: string; plan: PlannedExercise }[];
+}
+
+/**
+ * Start (or resume) a DIY program session. Every set carries the weight the
+ * program planned (target_weight_kg); each exercise keeps its planned sets
+ * (rx_json) so finishing it can run the program's progression.
+ */
+export function startPlannedSession(clientId: number, input: PlannedSessionInput): StartResult {
+  if (input.exercises.length === 0) return { ok: false, error: "This session has no exercises." };
+  const blocked = clearOpenSessions(clientId, (s) => s.enrolmentId === input.enrolmentId && s.dayPosition === input.position);
+  if (blocked) return blocked;
+  return db.transaction((tx) => {
+    const now = Date.now();
+    const [row] = tx
+      .insert(workoutSessions)
+      .values({ clientId, programId: null, enrolmentId: input.enrolmentId, dayPosition: input.position, programTitle: input.programTitle, dayName: input.dayName, startedAt: now, updatedAt: now })
+      .returning({ id: workoutSessions.id })
+      .all();
+    input.exercises.forEach((ex, i) => {
+      const sets = ex.plan.sets.slice(0, MAX_SETS);
+      const first = sets[0];
+      const [exRow] = tx
+        .insert(workoutSessionExercises)
+        .values({
+          sessionId: row.id,
+          position: i,
+          section: "workout",
+          exerciseKey: exerciseKey(ex.exerciseId, ex.name),
+          name: ex.name.trim(),
+          targetSets: Math.max(1, sets.length),
+          targetReps: first ? repsLabel(first) : null,
+          restSeconds: restFor(first?.rest),
+          joined: ex.plan.joined,
+          notes: ex.plan.notes,
+          rxJson: JSON.stringify(ex.plan),
+        })
+        .returning({ id: workoutSessionExercises.id })
+        .all();
+      sets.forEach((s, k) => tx.insert(workoutSetLogs).values({ sessionExerciseId: exRow.id, setNumber: k + 1, done: false, targetWeightKg: s.kg }).run());
+    });
+    return { ok: true as const, sessionId: row.id };
+  });
+}
+
+/** The planned sets a program session was started with, or null. */
+function parsePlan(raw: string | null): PlannedExercise | null {
+  if (!raw) return null;
+  try {
+    const p = JSON.parse(raw) as PlannedExercise;
+    return Array.isArray(p?.sets) ? p : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Add an exercise to the end of a member's session, with `sets` empty sets. */
@@ -159,13 +224,14 @@ function assemble(rows: WorkoutSession[]): SessionView[] {
   const setsBy = new Map<number, LoggedSet[]>();
   for (const s of setRows) {
     const list = setsBy.get(s.sessionExerciseId) ?? [];
-    list.push({ weightKg: s.weightKg, reps: s.reps, done: s.done });
+    list.push({ weightKg: s.weightKg, reps: s.reps, done: s.done, targetKg: s.targetWeightKg, rpe: s.rpe });
     setsBy.set(s.sessionExerciseId, list);
   }
   return rows.map((r) => ({
     id: r.id,
     clientId: r.clientId,
     programId: r.programId,
+    enrolmentId: r.enrolmentId,
     dayPosition: r.dayPosition,
     programTitle: r.programTitle,
     dayName: r.dayName,
@@ -185,6 +251,7 @@ function assemble(rows: WorkoutSession[]): SessionView[] {
           restSeconds: restFor(e.restSeconds),
           notes: e.notes,
           joined: e.joined,
+          plan: parsePlan(e.rxJson),
           sets: setsBy.get(e.id) ?? [],
         }),
       ),
@@ -234,12 +301,33 @@ export function saveSessionSets(clientId: number, sessionId: number, exercises: 
   const owned = new Set(
     db.select({ id: workoutSessionExercises.id }).from(workoutSessionExercises).where(eq(workoutSessionExercises.sessionId, sessionId)).all().map((r) => r.id),
   );
+  // A program session's planned weight lives on the set row and the app never
+  // sends it back, so carry it across the delete-and-insert by set number.
+  const targets = new Map<string, number | null>();
+  if (owned.size > 0) {
+    const rows = db
+      .select({ ex: workoutSetLogs.sessionExerciseId, n: workoutSetLogs.setNumber, t: workoutSetLogs.targetWeightKg })
+      .from(workoutSetLogs)
+      .where(inArray(workoutSetLogs.sessionExerciseId, [...owned]))
+      .all();
+    for (const r of rows) targets.set(`${r.ex}:${r.n}`, r.t);
+  }
   db.transaction((tx) => {
     for (const ex of exercises) {
       if (!owned.has(ex.id)) continue;
       tx.delete(workoutSetLogs).where(eq(workoutSetLogs.sessionExerciseId, ex.id)).run();
       ex.sets.slice(0, MAX_SETS).forEach((s, i) => {
-        tx.insert(workoutSetLogs).values({ sessionExerciseId: ex.id, setNumber: i + 1, weightKg: s.weightKg, reps: s.reps, done: s.done }).run();
+        tx.insert(workoutSetLogs)
+          .values({
+            sessionExerciseId: ex.id,
+            setNumber: i + 1,
+            weightKg: s.weightKg,
+            reps: s.reps,
+            done: s.done,
+            targetWeightKg: targets.get(`${ex.id}:${i + 1}`) ?? null,
+            rpe: s.rpe ?? null,
+          })
+          .run();
       });
     }
     tx.update(workoutSessions).set({ updatedAt: Date.now() }).where(eq(workoutSessions.id, sessionId)).run();

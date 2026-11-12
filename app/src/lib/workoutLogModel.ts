@@ -1,9 +1,14 @@
 // Pure workout-log model: types + set maths shared by server and client (no server-only).
+import type { PlannedExercise } from "@/lib/programs/types";
 
 export interface LoggedSet {
   weightKg: number | null;
   reps: number | null;
   done: boolean;
+  /** A program session: the weight the program planned for this set. */
+  targetKg?: number | null;
+  /** How hard the set felt, 1 to 10, if the member said. */
+  rpe?: number | null;
 }
 
 /** One exercise inside a logged session: what the coach set, and what was lifted. */
@@ -18,6 +23,8 @@ export interface SessionExercise {
   notes: string | null;
   /** Done back to back with the exercise above (superset or circuit). */
   joined?: boolean;
+  /** A program session: the planned sets this exercise was started with. */
+  plan?: PlannedExercise | null;
   sets: LoggedSet[];
 }
 
@@ -25,6 +32,8 @@ export interface SessionView {
   id: number;
   clientId: number;
   programId: number | null;
+  /** The DIY program enrolment this session belongs to. */
+  enrolmentId?: number | null;
   dayPosition: number;
   programTitle: string;
   dayName: string;
