@@ -76,7 +76,7 @@ export async function startProgramAction(raw: unknown): Promise<Result> {
   const c = member();
   if (!c) return OFF;
   const p = startZ.safeParse(raw);
-  if (!p.success) return { ok: false, error: "Check your entries and try again." };
+  if (!p.success) return { ok: false, error: p.error.issues.find((i) => i.path[0] === "startDate")?.message ?? "Check your entries and try again." };
   const v = p.data;
   if ((v.unit === "lb") !== (v.step === "5lb")) return { ok: false, error: "Pick a smallest jump in the same unit." };
   if (!programByKey(v.key)) return { ok: false, error: "That program isn't available." };
