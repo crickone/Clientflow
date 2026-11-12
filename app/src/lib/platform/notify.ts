@@ -1,6 +1,6 @@
 import "server-only";
 
-import { claimDailyRun, controlSqlite } from "@/lib/db/control";
+import { claimDailyRun, controlSqlite, resetDailyClaim } from "@/lib/db/control";
 import { escapeHtml, sendPlatformEmail } from "@/lib/email";
 import { getPlatformSetting, setPlatformSetting } from "@/lib/billing/settings";
 import { dublinToday } from "@/lib/billing/dates";
@@ -31,8 +31,16 @@ export function setNotifyPrefs(userId: number, prefs: NotifyPrefs): void {
 }
 
 export function shouldNotifyInstant(a: { level: "warn" | "bad"; notifiedAt: number | null; openedAt: number }, now: number): boolean {
-  void now;
-  return a.level === "bad" && a.notifiedAt === null;
+  return a.level === "bad" && a.notifiedAt === null && now - a.openedAt <= INSTANT_MAX_AGE_MS;
+}
+
+/** Alerts already open longer than this when first considered are marked seen, not emailed. */
+const INSTANT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+export type SendEmail = typeof sendPlatformEmail;
+
+function subjectLine(s: string): string {
+  return s.replace(/[\r\n]+/g, " ").trim();
 }
 
 function recipients(kind: keyof NotifyPrefs): string[] {
@@ -58,34 +66,37 @@ export function digestHtml(alerts: PlatformAlertRow[], baseUrl: string): string 
 }
 
 /** Emails each newly opened `bad` alert once. Returns how many emails went out. */
-export async function sendInstantAlerts(now: number = Date.now()): Promise<number> {
+export async function sendInstantAlerts(now: number = Date.now(), send: SendEmail = sendPlatformEmail): Promise<number> {
   const rows = controlSqlite
     .prepare("SELECT id, level, opened_at, notified_at FROM platform_alerts WHERE resolved_at IS NULL AND level = 'bad' AND notified_at IS NULL")
     .all() as Array<{ id: number; level: "bad"; opened_at: number; notified_at: number | null }>;
-  const due = rows.filter((r) => shouldNotifyInstant({ level: r.level, notifiedAt: r.notified_at, openedAt: r.opened_at }, now));
+  if (rows.length === 0) return 0;
+  const claim = controlSqlite.prepare("UPDATE platform_alerts SET notified_at = ? WHERE id = ? AND notified_at IS NULL");
+  // Claim first so a second process cannot send the same alert. Alerts that were
+  // already long open when first seen are marked notified without an email.
+  const claimed = rows.filter((r) => claim.run(now, r.id).changes > 0);
+  const due = claimed.filter((r) => shouldNotifyInstant({ level: r.level, notifiedAt: null, openedAt: r.opened_at }, now));
   if (due.length === 0) return 0;
-  // Claim first so a second process cannot send the same alert.
-  const claimed = due.filter((r) => controlSqlite.prepare("UPDATE platform_alerts SET notified_at = ? WHERE id = ? AND notified_at IS NULL").run(now, r.id).changes > 0);
-  if (claimed.length === 0) return 0;
   const to = recipients("instant");
   if (to.length === 0) return 0;
-  const alerts = listOpenAlerts({ includeSnoozed: true, now }).filter((a) => claimed.some((c) => c.id === a.id));
-  const res = await sendPlatformEmail({
+  const alerts = listOpenAlerts({ includeSnoozed: true, now }).filter((a) => due.some((c) => c.id === a.id));
+  if (alerts.length === 0) return 0;
+  const res = await send({
     to,
-    subject: alerts.length === 1 ? `[Adonis] ${alerts[0].title}` : `[Adonis] ${alerts.length} new alerts need action`,
-    html: `<ul style="padding-left:18px">${alerts.map((a) => line(a, CONSOLE_URL)).join("")}</ul><p style="margin:16px 0 0"><a href="${CONSOLE_URL}/inbox">Open the inbox</a></p>`,
+    subject: subjectLine(alerts.length === 1 ? `[Adonis] ${alerts[0].title}` : `[Adonis] ${alerts.length} new alerts need action`),
+    html: `<ul style="padding-left:18px">${alerts.map((a) => line(a, CONSOLE_URL)).join("")}</ul><p style="margin:16px 0 0"><a href="${escapeHtml(CONSOLE_URL)}/inbox">Open the inbox</a></p>`,
   });
   if (!res.ok) {
     console.error("[notify] instant alert email failed:", res.error);
     // Release the claim so the next sync tries again.
-    for (const c of claimed) controlSqlite.prepare("UPDATE platform_alerts SET notified_at = NULL WHERE id = ?").run(c.id);
+    for (const c of due) controlSqlite.prepare("UPDATE platform_alerts SET notified_at = NULL WHERE id = ?").run(c.id);
     return 0;
   }
   return 1;
 }
 
 /** Once per Dublin day, at or after 08:00, when anything is open. */
-export async function sendDailyDigest(now: number = Date.now()): Promise<boolean> {
+export async function sendDailyDigest(now: number = Date.now(), send: SendEmail = sendPlatformEmail): Promise<boolean> {
   const dublinHour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Dublin", hour: "2-digit", hourCycle: "h23" }).format(new Date(now)));
   if (dublinHour < 8) return false;
   const today = dublinToday(new Date(now));
@@ -94,7 +105,11 @@ export async function sendDailyDigest(now: number = Date.now()): Promise<boolean
   if (!claimDailyRun("alert_digest_last_run", today)) return false;
   const to = recipients("digest");
   if (to.length === 0) return false;
-  const res = await sendPlatformEmail({ to, subject: `[Adonis] Morning: ${alerts.length} open ${alerts.length === 1 ? "alert" : "alerts"}`, html: digestHtml(alerts, CONSOLE_URL) });
-  if (!res.ok) console.error("[notify] digest email failed:", res.error);
+  const res = await send({ to, subject: subjectLine(`[Adonis] Morning: ${alerts.length} open ${alerts.length === 1 ? "alert" : "alerts"}`), html: digestHtml(alerts, CONSOLE_URL) });
+  if (!res.ok) {
+    console.error("[notify] digest email failed:", res.error);
+    // Release the claim so the next tick retries today.
+    resetDailyClaim("alert_digest_last_run");
+  }
   return res.ok;
 }
