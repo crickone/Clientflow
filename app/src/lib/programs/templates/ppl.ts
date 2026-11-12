@@ -41,11 +41,11 @@ export const pushPullLegs: ProgramTemplate = {
     "A push day (chest, shoulders, triceps), a pull day (back, biceps) and a leg day, each twice a week. A heavier compound lift opens each day, then accessories in higher rep ranges. You pick each starting weight; each exercise goes up by your smallest jump once you reach the top of its range on every set.",
   summary: "Six days a week: push, pull and legs, each twice, with a heavier lift to open each day.",
   phases: [
-    { name: "Find your weights", fromWeek: 1, toWeek: 1, note: "Pick a weight for each exercise that lets you reach the bottom of its rep range on every set." },
+    { name: "Find your weights", fromWeek: 1, toWeek: 1, note: "The first time you do each workout, pick a weight for each exercise that lets you reach the bottom of its rep range on every set. From the second time on, add reps." },
     { name: "Build", fromWeek: 2, toWeek: 12, note: "Add reps each session. When every set reaches the top of the range, the weight goes up by your smallest jump." },
   ],
   whyItWorks:
-    "Each day trains muscles that work together, so the others rest while you train. Every muscle gets two sessions a week. The heavier lift comes first, while you are fresh, then the accessories in higher reps.",
+    "Each day trains one group of muscles that work together, so the other two groups rest that day. Every muscle gets two sessions a week. The heavier lift comes first, while you are fresh, then the accessories in higher reps.",
   engine: { key: "double_progression" },
   weeks: [week([push, pull, legs, push, pull, legs])],
 };

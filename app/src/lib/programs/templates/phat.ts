@@ -78,7 +78,7 @@ export const phat: ProgramTemplate = {
     { name: "Build", fromWeek: 2, toWeek: 12, note: "Add reps each session. When every set reaches the top of the range, the weight goes up by your smallest jump." },
   ],
   whyItWorks:
-    "The power days train strength with heavy sets of three to five. The other three days add volume in higher rep ranges, and the speed sets practise moving a lighter weight fast. Each muscle is trained twice a week.",
+    "The power days train strength with heavy compound sets of three to five, with heavier accessory work. The other three days add volume in higher rep ranges, and the speed sets practise moving a lighter weight fast. Each muscle is trained twice a week.",
   engine: { key: "double_progression" },
   weeks: [week([upperPower, lowerPower, backShoulders, lowerHypertrophy, chestArms])],
 };

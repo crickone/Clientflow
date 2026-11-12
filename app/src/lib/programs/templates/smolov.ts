@@ -24,12 +24,12 @@ export const smolovBase: ProgramTemplate = {
   summary: "Four squat sessions a week for three weeks, each week heavier than the last, then a test of your new max.",
   phases: [
     { name: "Base", fromWeek: 1, toWeek: 1, note: "4 x 9, 5 x 7, 7 x 5 and 10 x 3 at 70% to 85% of your max. Hard, with a lot of reps." },
-    { name: "Plus 10 kg", fromWeek: 2, toWeek: 2, note: "The same four sessions with 10 kg more on every set. Sleep and eat well." },
+    { name: "Plus 10 kg", fromWeek: 2, toWeek: 2, note: "The same four sessions with 10 kg more on every set than in week 1." },
     { name: "Plus 15 kg", fromWeek: 3, toWeek: 3, note: "The same sessions with 15 kg more than week 1. The hardest week." },
-    { name: "Test", fromWeek: 4, toWeek: 4, note: "One session: work up to a new 1-rep max with a spotter or safety bars." },
+    { name: "Test", fromWeek: 4, toWeek: 4, note: "One session: work up to a heavy single to test your max, with a spotter or safety bars." },
   ],
   whyItWorks:
-    "The same four sessions repeat for three weeks while the weight climbs, so you squat a lot of reps at 70% to 85% of your max. Fixed jumps of 10 kg and 15 kg make each week harder than the last. The test week reads your new max from your best set.",
+    "The same four sessions repeat for three weeks while the weight climbs: 70% to 85% of your max in week 1, with 10 kg added in week 2 and 15 kg over week 1 in week 3. You squat a lot of reps at each weight. The test week works out your max from your best set.",
   engine: { key: "fixed_block" },
   weeks: [baseWeek(0, "Base"), baseWeek(10, "Base, plus 10 kg"), baseWeek(15, "Base, plus 15 kg"), week([day("Test day", [maxTest("Back squat", "squat")], true)], "Test")],
 };
@@ -58,10 +58,10 @@ function smolovJr(lift: LiftKey, name: string, key: string, title: string, adds:
       { name: "Week 1", fromWeek: 1, toWeek: 1, note: "6 x 6, 7 x 5, 8 x 4 and 10 x 3 at 70% to 85% of your max." },
       { name: `Plus ${adds[0]} kg`, fromWeek: 2, toWeek: 2, note: `The same four sessions with ${adds[0]} kg more on every set.` },
       { name: `Plus ${adds[1]} kg`, fromWeek: 3, toWeek: 3, note: `The same sessions with ${adds[1]} kg more than week 1. The hardest week.` },
-      { name: "Test", fromWeek: 4, toWeek: 4, note: "One session: work up to a new 1-rep max with a spotter or safety bars." },
+      { name: "Test", fromWeek: 4, toWeek: 4, note: "One session: work up to a heavy single to test your max, with a spotter or safety bars." },
     ],
     whyItWorks:
-      "A short block on one lift: the same four sessions each week, with a fixed jump in weight. The sets get shorter as the percentage rises, so each day has a similar number of reps. The test week reads your new max from your best set.",
+      "A short block on one lift: the same four sessions each week, with a fixed jump in weight. The sets get shorter as the percentage rises, so each day has a similar number of reps. The test week works out your max from your best set.",
     engine: { key: "fixed_block" },
     weeks: [
       jrWeek(name, lift, 0, "Week 1"),

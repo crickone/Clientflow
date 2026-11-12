@@ -50,7 +50,7 @@ export const wendlerBbb: ProgramTemplate = {
   name: "5/3/1 Boring But Big",
   who: "Intermediate lifters who want steady strength gains and some size.",
   description: `${WAVE_TEXT} After the main lift: 5 sets of 10 at 50% of the training max, then one assistance exercise. ${TM_TEXT}`,
-  summary: "Four days a week, one main lift a day, then five sets of ten. The training max goes up each cycle.",
+  summary: "Four days a week, one main lift a day, then five sets of ten. The training max goes up each cycle for every lift whose + sets met their minimum reps.",
   phases: [
     { name: "5s week", fromWeek: 1, toWeek: 1, note: "Sets of five at 65%, 75% and 85% of your training max, the last one for as many reps as you can. Then 5 x 10 at 50%." },
     { name: "3s week", fromWeek: 2, toWeek: 2, note: "Sets of three at 70%, 80% and 90%, the last one for as many reps as you can. Then 5 x 10 at 50%." },
@@ -59,7 +59,7 @@ export const wendlerBbb: ProgramTemplate = {
   ],
   phasesRepeat: true,
   whyItWorks:
-    "Your training max is 90% of your max, so the main sets start lighter than you can lift. That leaves room to beat the reps on the last set. The training max rises a little each cycle, which keeps the climb slow and steady. The 5 x 10 adds volume for size.",
+    "Your training max is 90% of your max, so the main sets start lighter than you can lift. That leaves room to beat the reps on the last set. Each cycle, the training max rises for every lift whose + sets met their minimum reps, and holds for the others. The 5 x 10 adds volume for size.",
   weeks: wendler(
     (_w, d) => ex(d.name, times(5, pct(0.5, 10, 90)), { lift: d.lift, notes: "Boring But Big: 5 sets of 10 at 50% of your training max." }),
     {
@@ -87,7 +87,7 @@ export const wendlerFsl: ProgramTemplate = {
   ],
   phasesRepeat: true,
   whyItWorks:
-    "The extra sets use the lightest weight of the day, so you get more practice at the main lift without much extra strain. The sessions stay shorter than Boring But Big. The training max starts at 90% of your max and rises a little each cycle.",
+    "The extra sets use the lightest weight of the day, so you get more practice at the main lift without much extra strain. The sessions stay shorter than Boring But Big. The training max starts at 90% of your max. Each cycle it rises for every lift whose + sets met their minimum reps, and holds for the others.",
   weeks: wendler(
     (w, d) => ex(d.name, times(5, pct(WAVES[w][0][0], 5, 90)), { lift: d.lift, notes: "First Set Last: 5 sets of 5 at your first set's weight." }),
     {

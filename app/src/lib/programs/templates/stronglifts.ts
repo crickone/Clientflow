@@ -28,13 +28,12 @@ export const strongLifts: ProgramTemplate = {
   who: "New lifters, and anyone coming back to the barbell after a long break.",
   description:
     "Two workouts, A and B, alternated three days a week. You squat every session. Every lift is five sets of five except the deadlift, which is one set of five. Get every rep and the weight goes up next time: 2.5 kg, or 5 kg on the deadlift. Miss reps three sessions in a row on a lift and it drops 10%.",
-  summary: "Three full-body sessions a week, five sets of five on most lifts, a little heavier every session.",
+  summary: "Three full-body sessions a week, five sets of five on most lifts. Each lift goes up every session you get all your reps.",
   phases: [
-    { name: "Light start", fromWeek: 1, toWeek: 2, note: "The weights start at half your max. Use these sessions to practise each lift." },
-    { name: "Steady climb", fromWeek: 3, toWeek: 12, note: "Each lift goes up every session you get all your reps. The sessions get harder as the weights near your max." },
+    { name: "Add weight", fromWeek: 1, toWeek: 12, note: "The first sessions start at half your max. Each lift goes up every session you get all your reps. Miss reps three sessions in a row on a lift and it drops 10%." },
   ],
   whyItWorks:
-    "You do the same five lifts often, and each one gets a little heavier every time. You squat every session, so the squat gets the most practice. When a lift stalls, the 10% drop gives you a few lighter sessions before you try the weight again.",
+    "You do the same five lifts often, and each one gets a little heavier every time you get all your reps. You squat in each session, so the squat gets the most practice. When a lift stalls, the 10% drop gives you a few lighter sessions before you try the weight again.",
   engine: { key: "linear", increment: 2.5, increments: { deadlift: 5 }, deloadAfter: 3, deloadPct: 0.1, startPct: 0.5 },
   weeks: [week([A, B, A]), week([B, A, B])],
 };

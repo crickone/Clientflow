@@ -19,14 +19,14 @@ export const russianSquatRoutine: ProgramTemplate = {
   description:
     "Six weeks of squats three times a week, almost all at 80% of your max. For three weeks the sets stay at six while the reps climb from two to six on alternate days. Then the weight climbs to 85%, 90%, 95% and 100% while the sets drop. The last session is a single at 105%, your new max.",
   warning: "Squats three times a week for six weeks with no easy weeks. Keep other leg work light.",
-  summary: "Squats three times a week for six weeks: three weeks of growing sets at 80%, then three of heavier, shorter sets ending in a new max.",
+  summary: "Squats three times a week for six weeks: three weeks at 80% with more reps per set, then three of heavier, shorter sets, ending with an attempt at 105% of your max.",
   phases: [
     { name: "Volume", fromWeek: 1, toWeek: 3, note: "Every set is at 80% of your max. Every other session is 6 x 2; the sessions between grow from 6 x 3 to 6 x 6." },
     { name: "Intensity", fromWeek: 4, toWeek: 5, note: "The weight climbs to 85%, 90% and 95% while the sets and reps drop. The 6 x 2 sessions stay at 80%." },
-    { name: "Test", fromWeek: 6, toWeek: 6, note: "2 x 2 at 100%, a light 6 x 2, then a single at 105% of your old max." },
+    { name: "Test", fromWeek: 6, toWeek: 6, note: "2 x 2 at 100%, then 6 x 2 at 80%, then a last session that works up to one attempt at 105% of your max." },
   ],
   whyItWorks:
-    "Most of the work sits at one weight, 80% of your max, while the reps climb. The second half raises the weight and cuts the reps, so you finish on heavy doubles and singles. The light 6 x 2 sessions keep you practising between the hard ones.",
+    "Most of the work sits at one weight, 80% of your max, while the reps climb. The second half raises the weight and cuts the reps, so the last week is 2 x 2 at 100% and an attempt at 105%. The 6 x 2 sessions at 80% keep you practising between the harder ones.",
   engine: { key: "fixed_block" },
   weeks: [
     week(three(sq(6, 2, 0.8), sq(6, 3, 0.8), sq(6, 2, 0.8))),

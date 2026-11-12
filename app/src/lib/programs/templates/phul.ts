@@ -55,7 +55,7 @@ export const phul: ProgramTemplate = {
     { name: "Build", fromWeek: 2, toWeek: 12, note: "Add reps each session. When every set reaches the top of the range, the weight goes up by your smallest jump." },
   ],
   whyItWorks:
-    "The power days use heavy sets of three to five; the hypertrophy days use sets of eight to fifteen. Each muscle gets one heavy and one higher-rep session a week. Adding reps before weight keeps every jump small.",
+    "The power days use heavy compound sets of three to five, with heavier accessory work. The hypertrophy days use sets of eight to fifteen. Each muscle gets one heavy and one higher-rep session a week.",
   engine: { key: "double_progression" },
   weeks: [week([upperPower, lowerPower, upperHypertrophy, lowerHypertrophy])],
 };

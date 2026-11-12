@@ -44,7 +44,7 @@ export const arnoldStyle: ProgramTemplate = {
   warning: "Six sessions a week. Plan your recovery and food around it.",
   summary: "Six days a week: chest and back, shoulders and arms, then legs, each twice.",
   phases: [
-    { name: "Find your weights", fromWeek: 1, toWeek: 1, note: "Pick a weight for each exercise that lets you reach the bottom of its rep range on every set." },
+    { name: "Find your weights", fromWeek: 1, toWeek: 1, note: "The first time you do each workout, pick a weight for each exercise that lets you reach the bottom of its rep range on every set. From the second time on, add reps." },
     { name: "Build", fromWeek: 2, toWeek: 12, note: "Add reps each session. When every set reaches the top of the range, the weight goes up by your smallest jump." },
   ],
   whyItWorks:

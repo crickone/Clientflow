@@ -32,11 +32,10 @@ export const gzclp: ProgramTemplate = {
     "Four workouts in rotation. Each has a heavy main lift (T1: 5 x 3 with a last set for as many as you can), a lighter second lift (T2: 3 x 10) and an accessory (T3: 3 x 15 with a last set for as many as you can). Hit your reps and the weight goes up. Miss, and the lift moves to its next rep scheme: 6 x 2 then 10 x 1 for T1, 3 x 8 then 3 x 6 for T2. T3 goes up once the last set reaches 25.",
   summary: "Four workouts in rotation, each with a heavy main lift, a lighter second lift and an accessory.",
   phases: [
-    { name: "Settle in", fromWeek: 1, toWeek: 2, note: "Main lifts start at 73% of your max and second lifts at 55%. Pick light weights for the accessories." },
-    { name: "Build", fromWeek: 3, toWeek: 12, note: "Each lift moves on its own: up when you hit your reps, on to its next rep scheme when you miss." },
+    { name: "Build", fromWeek: 1, toWeek: 12, note: "Each main lift starts at 73% of your max in its first session, and each second lift at 55%. Pick your own accessory weights. Main and second lifts go up every session you hit your reps; a miss moves the lift to its next rep scheme at the same weight. An accessory goes up once its last set reaches 25." },
   ],
   whyItWorks:
-    "Each lift has a plan for when it stalls: the same weight with fewer reps per set, before any weight comes off. The three tiers split each session into heavy, medium and light work. Each main lift is trained heavy once every four sessions.",
+    "Each main and second lift has a plan for when it stalls: first the same weight with fewer reps per set. After its last scheme, a main lift goes back to 5 x 3 at 85% of the stalled weight, and a second lift goes back to 3 x 10, 5 kg over its last 3 x 10 start. The three tiers split each session into heavy, medium and light work. Each main lift is trained heavy once every four sessions.",
   engine: { key: "tm_cycle", rule: "gzclp", increment: 2.5, increments: { squat: 5, deadlift: 5 }, t2ResetKg: 5, t3AmrapTarget: 25 },
   weeks: [
     week([

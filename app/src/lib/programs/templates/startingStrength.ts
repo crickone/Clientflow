@@ -28,10 +28,9 @@ export const startingStrength: ProgramTemplate = {
   who: "New lifters who want to get strong on the main barbell lifts quickly.",
   description:
     "Two short workouts, A and B, alternated three days a week. Three sets of five on the squat and on the press or bench, then one heavy set of five on the deadlift. The weight goes up every session while you get every rep. Miss reps three sessions in a row on a lift and it drops 10%. This is the first phase of the novice program.",
-  summary: "Three short sessions a week on the squat, press, bench and deadlift, a little heavier every session.",
+  summary: "Three short sessions a week on the squat, press, bench and deadlift. Each lift goes up every session you get all your reps.",
   phases: [
-    { name: "Light start", fromWeek: 1, toWeek: 2, note: "The weights start at half your max. Use these sessions to settle your technique." },
-    { name: "Steady climb", fromWeek: 3, toWeek: 12, note: "Each lift goes up every session you get all your reps. You squat every session; the press and bench take turns." },
+    { name: "Add weight", fromWeek: 1, toWeek: 12, note: "The first sessions start at half your max. Each lift goes up every session you get all your reps. You squat in each session; the press and bench take turns." },
   ],
   whyItWorks:
     "Three sets of five is enough work to earn the next jump without long sessions. The press and bench take turns, so each gets a rest between sessions. One set of deadlifts keeps the sessions short.",

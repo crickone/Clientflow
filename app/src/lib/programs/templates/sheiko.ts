@@ -28,7 +28,7 @@ export const sheikoStyle: ProgramTemplate = {
   warning: "Bench three times a week and a lot of total sets. Built for lifters preparing for a meet.",
   summary: "Squat, bench and deadlift practised often at moderate weights, three days a week, ending in a test week.",
   phases: [
-    { name: "Build", fromWeek: 1, toWeek: 3, note: "Each lift climbs through lighter sets to work sets of twos, threes and fours at 70% to 85%. You bench every session." },
+    { name: "Build", fromWeek: 1, toWeek: 3, note: "Each lift climbs through lighter sets to work sets of twos, threes and fours at 70% to 85%, and some singles at 85%. You bench in all three sessions." },
     { name: "Lighter week", fromWeek: 4, toWeek: 4, note: "Fewer sets, topping out at 70%, with no accessories." },
     { name: "Test", fromWeek: 5, toWeek: 5, note: "A max test of squat and bench on one day, then deadlift on another." },
   ],
