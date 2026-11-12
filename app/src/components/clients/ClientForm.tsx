@@ -16,9 +16,11 @@ import {
 
 interface Props {
   client?: Client;
+  /** The Programs module is on: offer coach guided or DIY when adding a member. */
+  showTrainingMode?: boolean;
 }
 
-export function ClientForm({ client }: Props) {
+export function ClientForm({ client, showTrainingMode = false }: Props) {
   const action = client
     ? updateClientAction.bind(null, client.id)
     : createClientAction;
@@ -90,6 +92,28 @@ export function ClientForm({ client }: Props) {
           />
         </div>
       </Card>
+
+      {!client && showTrainingMode && (
+        <Card>
+          <CardLabel>Training</CardLabel>
+          <div className="tm-choice" role="radiogroup" aria-label="Training mode">
+            <label>
+              <input type="radio" name="trainingMode" value="coach" defaultChecked />
+              <span>
+                <b>Coach guided</b>
+                The member follows the programs you assign.
+              </span>
+            </label>
+            <label>
+              <input type="radio" name="trainingMode" value="diy" />
+              <span>
+                <b>DIY</b>
+                The member can also pick and run a program from the library on their own.
+              </span>
+            </label>
+          </div>
+        </Card>
+      )}
 
       <Card>
         <CardLabel>Consent</CardLabel>

@@ -17,7 +17,13 @@ const requireLocal = createRequire(import.meta.url);
     controlSqlite.prepare("DELETE FROM platform_flags").run();
     const fresh = listPlatformFlags();
     assert.equal(fresh.length, MODULE_CATALOG.length);
-    assert.ok(fresh.every((f) => f.mode === "all" && f.percent === 100 && f.allow.length === 0), "default all");
+    assert.ok(
+      fresh.every((f) => f.mode === (MODULE_CATALOG.find((m) => m.key === f.key)!.defaultRollout ?? "all") && f.percent === 100 && f.allow.length === 0),
+      "with no row: everyone, except a module that starts with nobody",
+    );
+    assert.equal(fresh.find((f) => f.key === "programs")!.mode, "none", "Programs starts with nobody");
+    setPlatformFlag({ key: "programs", mode: "allow", percent: 100, allow: [42] });
+    assert.deepEqual(listPlatformFlags().find((f) => f.key === "programs"), { key: "programs", mode: "allow", percent: 100, allow: [42] }, "a saved rollout wins");
 
     setPlatformFlag({ key, mode: "allow", percent: 150, allow: [3, 9] });
     const f = listPlatformFlags().find((x) => x.key === key)!;

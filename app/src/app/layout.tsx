@@ -15,7 +15,8 @@ import {
   getSessionUser,
   listActiveMemberships,
 } from "@/lib/auth";
-import { getClientSession } from "@/lib/clientAuth";
+import { getClientSession, getCurrentClient } from "@/lib/clientAuth";
+import { memberSeesPrograms } from "@/lib/programs/access";
 import type { SidebarAccount } from "@/components/layout/Sidebar";
 import { resolveCurrentTenant } from "@/lib/db/tenant";
 import { getTheme, getThemeForTenant, getVenueType, getSchedulingMode, getFeatureFlags } from "@/lib/settings";
@@ -266,6 +267,16 @@ export default async function RootLayout({
         }
       }
     }
+    // The Programs tab: DIY members of a business with the module on.
+    let showPrograms = false;
+    if (pathname !== "/app/login") {
+      try {
+        showPrograms = memberSeesPrograms(getCurrentClient());
+      } catch (err) {
+        console.error("[programs] could not resolve the member for the tab bar:", err);
+      }
+    }
+
     return (
       <html lang="en" className={FONT_VARS}>
         {appHead}
@@ -274,7 +285,7 @@ export default async function RootLayout({
           <MotionRoot>
             <SpotlightTracker />
             <ConfirmProvider>
-              <ClientAppFrame logoSrc={clientLogo} businessName={clientBusiness}>
+              <ClientAppFrame logoSrc={clientLogo} businessName={clientBusiness} showPrograms={showPrograms}>
                 {children}
               </ClientAppFrame>
             </ConfirmProvider>

@@ -5733,3 +5733,16 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .adp-foot { font-size: 12.5px; color: var(--text-tertiary); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .adp-refresh { color: var(--text-secondary); display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
 .adp-refresh:hover { color: var(--text-primary); }
+
+/* Training mode (Programs module): the switch on the client page and the add-member choice. */
+.tm-switch { display: inline-flex; border: 1px solid var(--hairline); border-radius: var(--radius); overflow: hidden; }
+.tm-switch button { min-height: 32px; padding: 0 14px; border: 0; background: transparent; color: var(--text-tertiary); font: inherit; font-size: 12.5px; cursor: pointer; }
+.tm-switch button + button { border-left: 1px solid var(--hairline); }
+.tm-switch button[aria-pressed="true"] { background: var(--surface-2); color: var(--text-primary); font-weight: 600; }
+.tm-switch button:disabled { cursor: default; opacity: 0.7; }
+.tm-choice { display: grid; gap: 10px; }
+.tm-choice label { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--hairline); border-radius: var(--radius); cursor: pointer; }
+.tm-choice label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.tm-choice input { margin-top: 3px; }
+.tm-choice span { display: grid; gap: 2px; font-size: 13px; color: var(--text-secondary); }
+.tm-choice b { font-size: 14px; color: var(--text-primary); font-weight: 600; }

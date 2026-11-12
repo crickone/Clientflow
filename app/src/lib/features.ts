@@ -22,6 +22,11 @@ export interface ModuleDef {
   blurb: string;
   /** Path prefixes this module owns. The guard matches on these. */
   paths: string[];
+  /**
+   * The platform rollout before an owner has set one in the console. Absent
+   * means everyone. A module that is not ready for the fleet says "none".
+   */
+  defaultRollout?: "all" | "none";
 }
 
 export const MODULE_CATALOG: ModuleDef[] = [
@@ -31,6 +36,7 @@ export const MODULE_CATALOG: ModuleDef[] = [
   { key: "timetable", label: "Timetable and attendance", blurb: "Group classes, the schedule and attendance.", paths: ["/timetable", "/attendance"] },
   { key: "nutrition", label: "Nutrition", blurb: "Nutrition plans, meals and the food library.", paths: ["/nutrition"] },
   { key: "workout", label: "Workout", blurb: "Programs, workouts, circuits and the exercise library.", paths: ["/workout"] },
+  { key: "programs", label: "Programs", blurb: "The program library members run on their own, and DIY training mode.", paths: ["/workout/library"], defaultRollout: "none" },
   { key: "forms", label: "Forms", blurb: "Questionnaires, check-ins, habits and contact forms.", paths: ["/forms"] },
   { key: "automations", label: "Automations", blurb: "Trigger-based message series.", paths: ["/automations"] },
   { key: "products", label: "Memberships and packages", blurb: "Memberships, packages, session bundles and vouchers.", paths: ["/memberships", "/session-packages", "/packages", "/vouchers"] },

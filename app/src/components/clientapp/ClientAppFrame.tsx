@@ -2,36 +2,46 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarRange, ChevronLeft, Dumbbell, LayoutDashboard, Salad, User } from "lucide-react";
+import { BookOpen, CalendarRange, ChevronLeft, Dumbbell, LayoutDashboard, Salad, User, type LucideIcon } from "lucide-react";
 
 import { Logo } from "@/components/ui/Logo";
 
-const TABS = [
+type Tab = { href: string; label: string; icon: LucideIcon; exact?: boolean };
+const BASE_TABS: Tab[] = [
   { href: "/app", label: "Home", icon: LayoutDashboard, exact: true },
   { href: "/app/timetable", label: "Classes", icon: CalendarRange },
   { href: "/app/nutrition", label: "Nutrition", icon: Salad },
   { href: "/app/workouts", label: "Workouts", icon: Dumbbell },
   { href: "/app/profile", label: "Profile", icon: User },
 ];
-const TAB_HREFS = new Set(TABS.map((t) => t.href));
+/** DIY members of a business with the Programs module on (lib/programs/access.ts). */
+const PROGRAMS_TAB: Tab = { href: "/app/programs", label: "Programs", icon: BookOpen };
+
+function tabsFor(showPrograms: boolean): Tab[] {
+  return showPrograms ? [...BASE_TABS.slice(0, 4), PROGRAMS_TAB, BASE_TABS[4]] : BASE_TABS;
+}
 
 export function ClientAppFrame({
   logoSrc,
   businessName,
+  showPrograms = false,
   children,
 }: {
   logoSrc: string | null;
   businessName: string;
+  showPrograms?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const tabs = tabsFor(showPrograms);
+  const tabHrefs = new Set(tabs.map((t) => t.href));
   const router = useRouter();
   const isLogin = pathname === "/app/login";
   // The welcome steps (documents to agree to, Welcome Q&A) come before the
   // app: no tabs and no back button until they're done.
   const isWelcome = pathname === "/app/welcome";
   // Sub-page = any /app route that isn't one of the bottom-nav tabs → show a back button.
-  const isSubPage = !isLogin && !isWelcome && !TAB_HREFS.has(pathname);
+  const isSubPage = !isLogin && !isWelcome && !tabHrefs.has(pathname);
 
   // Sign-off can't wait for the next page load: if the gym switches it on or
   // edits a document while the app is open, check again whenever the app
@@ -130,13 +140,13 @@ export function ClientAppFrame({
               position: "sticky",
               bottom: 0,
               display: "grid",
-              gridTemplateColumns: `repeat(${TABS.length}, 1fr)`,
+              gridTemplateColumns: `repeat(${tabs.length}, 1fr)`,
               background: "var(--glass)",
               backdropFilter: "blur(10px)",
               borderTop: "1px solid var(--hairline)",
             }}
           >
-            {TABS.map((t) => {
+            {tabs.map((t) => {
               const active = t.exact ? pathname === t.href : pathname.startsWith(t.href);
               const Icon = t.icon;
               return (

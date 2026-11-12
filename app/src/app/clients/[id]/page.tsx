@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { TrainingModeSwitch } from "@/components/clients/TrainingModeSwitch";
+import { programsOn } from "@/lib/programs/access";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarPlus, Pencil, Star } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -106,6 +108,7 @@ export default async function ClientProfile(
   const assignedWk = assignedWorkouts(id);
   const availWk = availableWorkouts();
   const membership = getCurrentMembership();
+  const programsEnabled = membership ? programsOn(membership.tenant.id) : false;
   const activeMembership = clientMembership(id);
   const agreements = clientAgreementView(id);
   const memberForms = clientForms(id);
@@ -167,6 +170,7 @@ export default async function ClientProfile(
               {clientGoal && <Badge tone="neutral">Goal: {GOAL_BY_KEY[clientGoal.goal.goal].label}</Badge>}
               {agreements.on && <Badge tone={agreedAll ? "green" : "neutral"}>{agreedAll ? "Agreed to terms" : "Terms not agreed"}</Badge>}
               {cancelNotice && <Badge tone="amber">Asked to cancel</Badge>}
+              {programsEnabled && <TrainingModeSwitch clientId={id} mode={client.trainingMode} />}
             </div>
           </div>
         </div>

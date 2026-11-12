@@ -120,4 +120,11 @@ applyRollout(own, [{ ...all, mode: "none" }], 5);
 assert.deepEqual(own, {}, "own flags stay empty");
 console.log("features rollout: ok");
 
+// ── Programs: the library tab sits under /workout but is its own module ──
+check("/workout/library is programs", moduleForPath("/workout/library")?.key === "programs");
+check("/workout/library/smolov-base is programs", moduleForPath("/workout/library/smolov-base")?.key === "programs");
+check("/workout/exercises is still workout", moduleForPath("/workout/exercises")?.key === "workout");
+check("Programs starts with nobody", MODULE_CATALOG.find((m) => m.key === "programs")?.defaultRollout === "none");
+check("a rollout of nobody switches Programs off", applyRollout({}, [{ key: "programs", mode: "none", percent: 0, allow: [] }], 5).programs === false);
+
 console.log(`features: ${passed} checks passed.`);

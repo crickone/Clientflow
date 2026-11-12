@@ -1,5 +1,7 @@
 "use server";
 
+import { getCurrentTenant } from "@/lib/db/tenant";
+import { programsOn } from "@/lib/programs/access";
 import { revalidatePath } from "next/cache";
 import { requireAdmin, requireUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -103,6 +105,7 @@ export async function createClientAction(
       emergencyContactPhone: v.emergencyContactPhone || null,
       gdprConsent: v.gdprConsent ?? false,
       gdprConsentDate: v.gdprConsent ? new Date() : null,
+      trainingMode: formData.get("trainingMode") === "diy" && programsOn(getCurrentTenant().id) ? "diy" : "coach",
     })
     .returning({ id: clients.id })
     .all();

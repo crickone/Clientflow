@@ -18,8 +18,14 @@ export function listPlatformFlags(): PlatformFlag[] {
   const rows = selectRows();
   return MODULE_CATALOG.map((m) => {
     const r = rows.find((x) => x.key === m.key);
-    // Anything other than a known mode is treated as "all", so an odd row can never switch a module off.
-    const mode: PlatformFlag["mode"] = r && MODES.has(r.mode as PlatformFlag["mode"]) ? (r.mode as PlatformFlag["mode"]) : "all";
+    // No row yet: the module's default rollout (everyone, unless the catalog
+    // says a new module starts with nobody). A row with an unknown mode is
+    // treated as "all", so an odd row can never switch a module off.
+    const mode: PlatformFlag["mode"] = !r
+      ? (m.defaultRollout ?? "all")
+      : MODES.has(r.mode as PlatformFlag["mode"])
+        ? (r.mode as PlatformFlag["mode"])
+        : "all";
     let allow: number[] = [];
     if (r) {
       try {
