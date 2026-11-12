@@ -7,7 +7,7 @@
 import { initState } from "./engines";
 import { planExercise, setsFor, summarisePlanned, summariseRx, type PlanContext } from "./planner";
 import { LIFT_LABEL, type DayRx, type ExerciseRx, type LiftKey, type PlannedExercise, type ProgramTemplate, type WeightUnit } from "./types";
-import { formatWeight } from "./units";
+import { STEP_5LB_KG, formatWeight, roundToStep } from "./units";
 import { WEEKDAY_SHORT, addDays, isoWeekday } from "@/lib/trainingProgress";
 
 /** The time a set takes, before its rest. */
@@ -146,9 +146,30 @@ export function weightWhy(ex: PlannedExercise, rx: Pick<ExerciseRx, "sets"> | un
     const of = tmPct === 1 ? "your max" : "your training max";
     const range = pcts.length === 1 ? pctText(pcts[0]) : `${pctText(pcts[0])} to ${pctText(pcts[pcts.length - 1])}`;
     const add = Math.max(0, ...(rx?.sets ?? []).map((s) => (s.kind === "pct" || s.kind === "amrap" ? (s.addKg ?? 0) : 0)));
-    return `${range} of ${of}${add > 0 ? `, plus ${formatWeight(add, unit)} this week` : ""}.`;
+    return `${range} of ${of}${add > 0 ? `, plus ${unit === "lb" ? `about ${formatWeight(roundToStep(add, STEP_5LB_KG), "lb")}` : formatWeight(add, unit)} this week` : ""}.`;
   }
   const rpes = [...new Set(ex.sets.flatMap((s) => (s.rpe !== null ? [s.rpe] : [])))].sort((a, b) => a - b);
   if (rpes.length) return `Worked out for RPE ${rpes.join(" and ")} from your best logged set.`;
   return null;
+}
+
+/** True when the engine moves weights between sessions: linear, GZCLP, or an own-rules linear or range exercise. */
+export function weightsMoveBetweenSessions(t: Pick<ProgramTemplate, "engine" | "weeks">): boolean {
+  const e = t.engine;
+  if (e.key === "linear") return true;
+  if (e.key === "tm_cycle") return e.rule === "gzclp";
+  if (e.key === "own_rules") return t.weeks.some((w) => w.days.some((d) => d.exercises.some((ex) => ex.rule?.kind === "linear" || ex.rule?.kind === "range")));
+  return false;
+}
+
+/** "These 2 weeks repeat for 12 weeks.": only when the content does not repeat and the weeks run for longer. */
+export function repeatNote(t: Pick<ProgramTemplate, "weeks" | "lengthWeeks">, contentRepeats: boolean): string | null {
+  const n = t.weeks.length;
+  if (contentRepeats || n === 0 || n >= t.lengthWeeks) return null;
+  return n === 1 ? `This week repeats for ${t.lengthWeeks} weeks.` : `These ${n} weeks repeat for ${t.lengthWeeks} weeks.`;
+}
+
+/** True when the program has at least one timed set, so a session length is worth showing. */
+export function hasSessionTime(t: Pick<ProgramTemplate, "weeks">): boolean {
+  return t.weeks.some((w) => w.days.some((d) => daySeconds(d) > 0));
 }

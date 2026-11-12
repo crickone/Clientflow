@@ -2,7 +2,7 @@
 import { notFound } from "next/navigation";
 
 import { requireProgramsPage } from "@/lib/programs/access";
-import { currentPhase, programContent, type ProgramContent } from "@/lib/programs/content";
+import { currentPhase, programContent, withContentFrom, type ContentSource, type ProgramContent } from "@/lib/programs/content";
 import { liveEnrolment } from "@/lib/programs/enrolments";
 import { programByKey } from "@/lib/programs/library";
 import { getMemberProgram } from "@/lib/programs/memberPrograms";
@@ -28,6 +28,7 @@ export default async function ProgramDetailPage(props: { params: Promise<{ key: 
   const ownId = parseMemberKey(programKey);
   let t: ProgramTemplate;
   let content: ProgramContent;
+  let src: ContentSource;
   let running: boolean;
   let startHref: string;
   if (ownId !== null) {
@@ -35,14 +36,16 @@ export default async function ProgramDetailPage(props: { params: Promise<{ key: 
     const p = getMemberProgram(clientId, ownId);
     if (!p) notFound();
     t = p.template;
-    content = programContent(t, { kind: "member" });
+    src = { kind: "member" };
+    content = programContent(t, src);
     running = live?.programKey === memberKey(ownId);
     startHref = `/app/programs/built/${ownId}/start`;
   } else {
     const entry = programByKey(programKey);
     if (!entry) notFound();
     t = entry.template;
-    content = programContent(t, entry.copyId !== null ? { kind: "copy", basedOnName: entry.basedOnName ?? t.name } : { kind: "platform" });
+    src = entry.copyId !== null ? { kind: "copy", basedOnName: entry.basedOnName ?? t.name } : { kind: "platform" };
+    content = programContent(t, src);
     running = !!live && (entry.copyId !== null ? live.copyId === entry.copyId : live.programKey === t.key);
     startHref = `/app/programs/${encodeURIComponent(t.key)}/start`;
   }
@@ -54,7 +57,7 @@ export default async function ProgramDetailPage(props: { params: Promise<{ key: 
       template={t}
       content={content}
       memberBuilt={ownId !== null}
-      current={running && live && !live.state.finished ? currentPhase(content, live.template, live.state) : null}
+      current={running && live && !live.state.finished ? currentPhase(programContent(withContentFrom(live.template, t), src), live.template, live.state) : null}
       unit={unit}
       stepKg={stepKg}
       action={action}

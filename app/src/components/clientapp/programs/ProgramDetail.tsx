@@ -10,7 +10,7 @@ import { ChevronDown, Pencil } from "lucide-react";
 
 import { PhaseBar, Pills, PkCard, PkHeader, PkSection, StickyBar, Warn } from "@/components/clientapp/programs/kit";
 import { weeksText, type ProgramContent } from "@/lib/programs/content";
-import { lengthTag, sessionMinutes, typicalWeek, wholeProgram, type OutlineDay } from "@/lib/programs/outline";
+import { hasSessionTime, lengthTag, repeatNote, sessionMinutes, typicalWeek, wholeProgram, type OutlineDay } from "@/lib/programs/outline";
 import { howWeightsMove } from "@/lib/programs/progressionText";
 import { FAMILY_LABEL, LEVEL_LABEL, LIFT_LABEL, type ProgramTemplate, type WeightUnit } from "@/lib/programs/types";
 
@@ -66,7 +66,8 @@ export function ProgramDetail({
   editHref?: string;
 }) {
   const length = lengthTag(t, content.repeats);
-  const pills = [`${t.daysPerWeek} ${t.daysPerWeek === 1 ? "day" : "days"} a week`, length, `About ${sessionMinutes(t)} min`, ...(memberBuilt ? [] : [LEVEL_LABEL[t.level]])];
+  const repeatLine = repeatNote(t, content.repeats);
+  const pills = [`${t.daysPerWeek} ${t.daysPerWeek === 1 ? "day" : "days"} a week`, length, ...(hasSessionTime(t) ? [`About ${sessionMinutes(t)} min`] : []), ...(memberBuilt ? [] : [LEVEL_LABEL[t.level]])];
   const notes = content.phases.filter((p) => p.note.trim());
   return (
     <div className="pk">
@@ -82,6 +83,7 @@ export function ProgramDetail({
       <PkSection label="The shape of it">
         <PhaseBar phases={content.phases} current={current} named />
         {content.repeats && <span className="pk-small">{t.weeks.length === 1 ? "One week that repeats." : `These ${t.weeks.length} weeks repeat.`}</span>}
+        {repeatLine && <span className="pk-small">{repeatLine}</span>}
       </PkSection>
 
       <PkSection label="A typical week">
@@ -133,6 +135,7 @@ export function ProgramDetail({
           </details>
         ))}
         <span className="pk-small">Your weights are worked out from your maxes when you start.</span>
+        {repeatLine && <span className="pk-small">{repeatLine}</span>}
       </PkSection>
 
       {t.warning && <Warn>{t.warning}</Warn>}

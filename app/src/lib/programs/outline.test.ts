@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 
 import { initState } from "./engines";
-import { daySeconds, firstSets, firstWeek, focusTag, lengthTag, sessionMinutes, shortDate, trainingDates, typicalWeek, weightWhy, wholeProgram } from "./outline";
+import { daySeconds, firstSets, hasSessionTime, repeatNote, weightsMoveBetweenSessions, firstWeek, focusTag, lengthTag, sessionMinutes, shortDate, trainingDates, typicalWeek, weightWhy, wholeProgram } from "./outline";
 import { planExercise } from "./planner";
 import { applyRule, newExercise } from "./memberEditing";
 import { blankMemberTemplate } from "./memberTemplate";
@@ -113,5 +113,23 @@ const slPlan = planExercise(sl.weeks[0].days[0].exercises[0], 0, initState(sl, {
 assert.equal(weightWhy(slPlan, sl.weeks[0].days[0].exercises[0], sl.tmPct, "kg"), null, "a working weight needs no line");
 const chin = planExercise(bbb.weeks[0].days[0].exercises[2], 2, bst, { stepKg: 2.5 });
 assert.equal(weightWhy(chin, bbb.weeks[0].days[0].exercises[2], bbb.tmPct, "kg"), "Bodyweight.");
+
+// ── weights between sessions, repeat note, session time, lb add-on ──
+assert.equal(weightsMoveBetweenSessions(get("stronglifts-5x5")), true);
+assert.equal(weightsMoveBetweenSessions(get("gzclp")), true);
+assert.equal(weightsMoveBetweenSessions(get("smolov-base")), false);
+assert.equal(weightsMoveBetweenSessions(get("531-bbb")), false);
+assert.equal(weightsMoveBetweenSessions({ engine: { key: "own_rules" }, weeks: [{ days: [{ name: "A", exercises: [{ name: "Plank", rule: { kind: "manual" }, sets: [] }] }] }] } as never), false);
+assert.equal(weightsMoveBetweenSessions({ engine: { key: "own_rules" }, weeks: [{ days: [{ name: "A", exercises: [{ name: "Plank", rule: { kind: "range" }, sets: [] }] }] }] } as never), true);
+assert.equal(repeatNote({ weeks: [{ days: [] }, { days: [] }], lengthWeeks: 12 }, false), "These 2 weeks repeat for 12 weeks.");
+assert.equal(repeatNote({ weeks: [{ days: [] }], lengthWeeks: 8 }, false), "This week repeats for 8 weeks.");
+assert.equal(repeatNote({ weeks: [{ days: [] }], lengthWeeks: 8 }, true), null);
+assert.equal(repeatNote({ weeks: [{ days: [] }, { days: [] }], lengthWeeks: 2 }, false), null);
+assert.equal(hasSessionTime({ weeks: [{ days: [] }] }), false);
+assert.equal(hasSessionTime(get("gzclp")), true);
+const smEx = get("smolov-base").weeks[1].days[0].exercises[0];
+const smPlan = planExercise(smEx, 0, initState(get("smolov-base"), { squat: 100 }, 2.5), { stepKg: 2.5 });
+assert.ok(weightWhy(smPlan, smEx, 1, "lb")?.includes("plus about 20 lb this week"), "lb add-on rounds like the program page");
+assert.ok(weightWhy(smPlan, smEx, 1, "kg")?.includes("plus 10 kg this week"));
 
 console.log("programs/outline: ok");

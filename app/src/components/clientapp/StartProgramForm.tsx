@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 import { PkCard, PkSection, StepBar, StickyBar } from "@/components/clientapp/programs/kit";
 import { startProgramAction } from "@/app/app/programs/actions";
-import { firstSets, firstWeek, shortDate, trainingDates, type PlanExtra } from "@/lib/programs/outline";
+import { firstSets, firstWeek, shortDate, trainingDates, weightsMoveBetweenSessions, type PlanExtra } from "@/lib/programs/outline";
 import { STEP_TITLE, initialStart, maxEntries, maxesKg, reduceStart, rowMaxKg, startSteps, stepBlocker, stepForError, type StartLift } from "@/lib/programs/startFlow";
 import type { ProgramTemplate, WeightUnit } from "@/lib/programs/types";
 import { STEP_OPTIONS, formatWeight, kgToUnit, stepFromKey, trainingMax, type StepKey } from "@/lib/programs/units";
@@ -274,6 +274,7 @@ export function StartProgramForm({
             </div>
           </div>
           <PkSection label="Your first week">
+            {weightsMoveBetweenSessions(template) && <span className="pk-small">Later sessions go up when you get all your reps.</span>}
             {firstWeek(template, maxes, stepKg, s.unit, extra).map((d, i) => (
               <div key={i} className="pk-day">
                 <span className="pk-day-name">

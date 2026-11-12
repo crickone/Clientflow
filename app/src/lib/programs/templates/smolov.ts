@@ -24,8 +24,8 @@ export const smolovBase: ProgramTemplate = {
   summary: "Four squat sessions a week for three weeks, each week heavier than the last, then a test of your new max.",
   phases: [
     { name: "Base", fromWeek: 1, toWeek: 1, note: "4 x 9, 5 x 7, 7 x 5 and 10 x 3 at 70% to 85% of your max. Hard, with a lot of reps." },
-    { name: "Plus 10 kg", fromWeek: 2, toWeek: 2, note: "The same four sessions with 10 kg more on every set than in week 1." },
-    { name: "Plus 15 kg", fromWeek: 3, toWeek: 3, note: "The same sessions with 15 kg more than week 1. The hardest week." },
+    { name: "Heavier", fromWeek: 2, toWeek: 2, note: "The same four sessions with 10 kg more on every set than in week 1." },
+    { name: "Heaviest", fromWeek: 3, toWeek: 3, note: "The same sessions with 15 kg more than week 1. The hardest week." },
     { name: "Test", fromWeek: 4, toWeek: 4, note: "One session: work up to a heavy single to test your max, with a spotter or safety bars." },
   ],
   whyItWorks:
@@ -56,8 +56,8 @@ function smolovJr(lift: LiftKey, name: string, key: string, title: string, adds:
     summary: `Four ${name.toLowerCase()} sessions a week for three weeks, heavier each week, then a test of your new max.`,
     phases: [
       { name: "Week 1", fromWeek: 1, toWeek: 1, note: "6 x 6, 7 x 5, 8 x 4 and 10 x 3 at 70% to 85% of your max." },
-      { name: `Plus ${adds[0]} kg`, fromWeek: 2, toWeek: 2, note: `The same four sessions with ${adds[0]} kg more on every set.` },
-      { name: `Plus ${adds[1]} kg`, fromWeek: 3, toWeek: 3, note: `The same sessions with ${adds[1]} kg more than week 1. The hardest week.` },
+      { name: "Heavier", fromWeek: 2, toWeek: 2, note: `The same four sessions with ${adds[0]} kg more on every set.` },
+      { name: "Heaviest", fromWeek: 3, toWeek: 3, note: `The same sessions with ${adds[1]} kg more than week 1. The hardest week.` },
       { name: "Test", fromWeek: 4, toWeek: 4, note: "One session: work up to a heavy single to test your max, with a spotter or safety bars." },
     ],
     whyItWorks:
