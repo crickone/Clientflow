@@ -2,8 +2,10 @@ import Link from "next/link";
 
 import { api } from "@/lib/api";
 import { fmtCents, fmtMonthShort } from "@/lib/format";
-import { Sparkline, ShareBar } from "@/components/charts/Sparkline";
-import type { PlatformAnalytics } from "@/lib/types";
+import { ShareBar } from "@/components/charts/Sparkline";
+import { LineChart } from "@/components/charts/LineChart";
+import { BarChart } from "@/components/charts/BarChart";
+import type { AlertsResponse, PlatformAnalytics } from "@/lib/types";
 
 /**
  * The fleet board.
@@ -53,19 +55,29 @@ function Readout({ label, value, note }: { label: string; value: string; note?: 
 }
 
 export default async function DashboardPage() {
-  const data = await api<PlatformAnalytics>("/analytics", { revalidate: 30, tags: ["fleet"] });
+  const [data, alertsRes] = await Promise.all([
+    api<PlatformAnalytics>("/analytics", { revalidate: 30, tags: ["fleet"] }),
+    api<AlertsResponse>("/alerts", { revalidate: 60, tags: ["fleet"] }).catch(() => null),
+  ]);
   const { platform, gyms } = data;
+  const alerts = alertsRes?.alerts ?? [];
+  const counts = alertsRes?.counts ?? null;
+  // An older main-app deploy may not send the newer series yet.
+  const mrrMovements = platform.mrrMovements ?? [];
+  const aiSpend = (gyms.aiSpendByMonth ?? []).map((p) => p.cents / 100);
+  const emailSent = (gyms.emailByMonth ?? []).map((p) => p.sent);
 
   const growth = platform.gymsByMonth.map((p) => p.total);
   const growthLabels = platform.gymsByMonth.map((p) => fmtMonthShort(p.month));
   const collected = platform.collectedByMonth.map((p) => p.cents);
-  const anyRevenue = collected.some((c) => c > 0);
 
   // Ordered by what they contribute, so the row that matters is the first one.
   const fleet = [...gyms.perGym].sort((a, b) => b.gmvCentsMonthly - a.gmvCentsMonthly);
   const maxGmv = Math.max(1, ...fleet.map((g) => g.gmvCentsMonthly));
 
-  const needsAttention = fleet.filter((g) => !g.exempt && g.status !== "active").length;
+  const needsAttention = counts
+    ? counts.bad + counts.warn
+    : fleet.filter((g) => !g.exempt && g.status !== "active").length;
 
   return (
     <div className="board">
@@ -99,6 +111,29 @@ export default async function DashboardPage() {
           />
         </div>
       </header>
+
+      {alertsRes ? (
+        <section className="cluster">
+          <h2>
+            Needs you
+            <Link href="/inbox" className="fleet-count">Open the inbox</Link>
+          </h2>
+          {alerts.length === 0 ? (
+            <p style={{ margin: "6px 0 0", color: "var(--text-secondary)", fontSize: 13.5 }}>Nothing open.</p>
+          ) : (
+            <ul className="inbox">
+              {alerts.slice(0, 5).map((a) => (
+                <li key={a.id} className={`inbox-row is-${a.level}`} style={{ padding: "12px 0" }}>
+                  <span className="inbox-icon" aria-hidden style={{ width: 8, height: 8, borderRadius: 4, background: a.level === "bad" ? "var(--red)" : "var(--amber)", marginTop: 7 }} />
+                  <div className="inbox-main">
+                    <Link href={a.href ?? "/inbox"} className="inbox-title">{a.title}</Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       {/* The signature: the fleet as a row of channels. */}
       <section className="fleet">
@@ -144,31 +179,19 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      {/* Trend, only where one exists. */}
       <section className="board-trends">
-        <div className="trend">
-          <div className="trend-top">
-            <span className="readout-label">Businesses on platform</span>
-            <Sparkline values={growth} />
-          </div>
-          <p className="trend-note">
-            {growth.length > 1 && growth[growth.length - 1]! > growth[0]!
-              ? `${growth[0]} in ${growthLabels[0]} to ${growth[growth.length - 1]} in ${growthLabels[growthLabels.length - 1]}.`
-              : "No change over the last twelve months."}
-          </p>
+        <h2>Twelve months</h2>
+        <div className="chart-grid-2">
+          <LineChart title="Businesses on the platform" labels={growthLabels} series={[{ label: "Total", values: growth, accent: true }]} />
+          <LineChart title="Subscription revenue collected" labels={growthLabels} series={[{ label: "Collected", values: collected.map((c) => c / 100), accent: true }]} format={(v) => `€${Math.round(v)}`} />
+          <LineChart title="AI spend across businesses" labels={growthLabels} series={[{ label: "Spend", values: aiSpend, accent: true }]} format={(v) => `€${Math.round(v)}`} />
+          <LineChart title="Emails sent" labels={growthLabels} series={[{ label: "Sent", values: emailSent, accent: true }]} />
         </div>
-
-        <div className="trend">
-          <div className="trend-top">
-            <span className="readout-label">Subscription revenue collected</span>
-            {anyRevenue ? <Sparkline values={collected} /> : null}
-          </div>
-          <p className="trend-note">
-            {anyRevenue
-              ? `${fmtCents(collected.reduce((a, b) => a + b, 0))} over the last twelve months.`
-              : "Nothing collected yet — every business is on an exemption."}
-          </p>
-        </div>
+        <BarChart
+          title="MRR movements"
+          groups={mrrMovements.map((m) => ({ label: fmtMonthShort(m.month), up: (m.newCents + m.expansionCents + m.reactivationCents) / 100, down: (m.churnCents + m.contractionCents) / 100, net: m.netCents / 100 }))}
+          format={(v) => `€${Math.round(v)}`}
+        />
       </section>
 
       {/* The client-side totals, as a gauge cluster rather than five more cards. */}

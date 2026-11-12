@@ -215,6 +215,8 @@ export interface PlatformAnalytics {
     };
     collectedByMonth: Array<{ month: string; cents: number }>;
     gymsByMonth: Array<{ month: string; total: number; added: number }>;
+    mrrMovements: Array<{ month: string; newCents: number; expansionCents: number; contractionCents: number; churnCents: number; reactivationCents: number; netCents: number }>;
+    churnedByMonth: Array<{ month: string; count: number }>;
   };
   gyms: {
     tenantsCounted: number;
@@ -225,6 +227,8 @@ export interface PlatformAnalytics {
     revenueCentsThisMonth: number;
     leads: number;
     classesThisWeek: number;
+    aiSpendByMonth: Array<{ month: string; cents: number }>;
+    emailByMonth: Array<{ month: string; sent: number }>;
     perGym: PerGymRow[];
   };
 }
