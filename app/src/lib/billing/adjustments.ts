@@ -2,6 +2,7 @@ import "server-only";
 
 import { controlSqlite } from "@/lib/db/control";
 import { getMonthlyPriceCents } from "./settings";
+import { logEvent } from "./engine";
 
 /**
  * The money things a console does that the automatic run cannot: a price
@@ -54,9 +55,14 @@ export function setPriceOverride(tenantId: number, cents: number | null, actor: 
     return { ok: false, error: "Give a price between €0 and €10,000." };
   }
 
+  const previousPriceCents = getEffectiveMonthlyPriceCents(tenantId);
   controlSqlite
     .prepare("UPDATE tenant_billing SET price_override_cents = ?, updated_at = ? WHERE tenant_id = ?")
     .run(cents, Date.now(), tenantId);
+  const priceCents = cents ?? getMonthlyPriceCents();
+  if (priceCents !== previousPriceCents) {
+    logEvent(tenantId, "price_changed", { priceCents, previousPriceCents }, actor);
+  }
   logMoney(tenantId, "price_override_set", { cents }, actor);
 
   return cents === null

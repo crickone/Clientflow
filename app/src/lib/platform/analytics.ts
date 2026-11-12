@@ -15,6 +15,7 @@ import {
 } from "@/lib/db/schema";
 import { getMonthlyPriceCents } from "@/lib/billing/settings";
 import { addDays, dublinToday } from "@/lib/billing/dates";
+import { mrrMovements, type MrrEvent, type MrrMovement } from "./mrr";
 
 /**
  * Platform analytics: a cross-tenant business-intelligence projection the admin
@@ -124,6 +125,9 @@ export interface PlatformAnalytics {
     };
     collectedByMonth: Array<{ month: string; cents: number }>;
     gymsByMonth: Array<{ month: string; total: number; added: number }>;
+    /** New, expansion, contraction, churn, reactivation, net. Last 12 months. */
+    mrrMovements: MrrMovement[];
+    churnedByMonth: Array<{ month: string; count: number }>;
   };
   gyms: {
     tenantsCounted: number;
@@ -135,6 +139,8 @@ export interface PlatformAnalytics {
     leads: number;
     classesThisWeek: number;
     perGym: PerGymRow[];
+    aiSpendByMonth: Array<{ month: string; cents: number }>;
+    emailByMonth: Array<{ month: string; sent: number }>;
   };
 }
 
@@ -295,7 +301,21 @@ function platformBilling(months: string[]) {
     added: tenantMonths.filter((tm) => tm === month).length,
   }));
 
-  return { mrrCents, arrCents: mrrCents * 12, gyms, collectedByMonth, gymsByMonth };
+  const evRows = controlSqlite
+    .prepare("SELECT tenant_id, type, detail, created_at FROM billing_events WHERE tenant_id IS NOT NULL AND type IN ('activated','reactivated','suspended','offboarded','cancelled','price_changed') AND created_at >= ?")
+    .all(dublinMonthStartMs(months[0])) as Array<{ tenant_id: number; type: MrrEvent["type"]; detail: string | null; created_at: number }>;
+  const mrrEvents: MrrEvent[] = evRows.map((r) => {
+    let d: { priceCents?: number; previousPriceCents?: number } = {};
+    try { d = r.detail ? JSON.parse(r.detail) : {}; } catch { d = {}; }
+    return { tenantId: r.tenant_id, month: dublinMonthOf(r.created_at), type: r.type, priceCents: d.priceCents ?? monthlyPrice, previousPriceCents: d.previousPriceCents };
+  });
+  const mrrMovementsOut = mrrMovements(mrrEvents, months);
+  const churnedByMonth = months.map((month) => ({
+    month,
+    count: mrrEvents.filter((e) => e.month === month && (e.type === "suspended" || e.type === "offboarded" || e.type === "cancelled")).length,
+  }));
+
+  return { mrrCents, arrCents: mrrCents * 12, gyms, collectedByMonth, gymsByMonth, mrrMovements: mrrMovementsOut, churnedByMonth };
 }
 
 // ── Entry point ─────────────────────────────────────────────────────────────
@@ -370,6 +390,11 @@ export function getPlatformAnalytics(): PlatformAnalytics {
   // Leaderboard order: biggest monthly membership volume first.
   perGym.sort((a, b) => b.gmvCentsMonthly - a.gmvCentsMonthly || b.revenueCentsThisMonth - a.revenueCentsThisMonth);
 
+  const aiRows = controlSqlite.prepare("SELECT yyyymm, SUM(cost_cents) AS cents FROM ai_usage GROUP BY yyyymm").all() as Array<{ yyyymm: string; cents: number }>;
+  const aiSpendByMonth = months.map((month) => ({ month, cents: Math.round(aiRows.find((r) => r.yyyymm === month)?.cents ?? 0) }));
+  const emailRows = controlSqlite.prepare("SELECT yyyymm, SUM(sent_count) AS sent FROM email_usage GROUP BY yyyymm").all() as Array<{ yyyymm: string; sent: number }>;
+  const emailByMonth = months.map((month) => ({ month, sent: emailRows.find((r) => r.yyyymm === month)?.sent ?? 0 }));
+
   return {
     generatedAt: Date.now(),
     platform,
@@ -383,6 +408,8 @@ export function getPlatformAnalytics(): PlatformAnalytics {
       leads: leadsTotal,
       classesThisWeek,
       perGym,
+      aiSpendByMonth,
+      emailByMonth,
     },
   };
 }
