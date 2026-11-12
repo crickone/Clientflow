@@ -3,12 +3,11 @@ import { notFound, redirect } from "next/navigation";
 
 import { requireProgramsPage } from "@/lib/programs/access";
 import { defaultWeekdays } from "@/lib/programs/cards";
-import { bestLoggedSet, liveEnrolment } from "@/lib/programs/enrolments";
+import { bestLoggedSet, liveEnrolment, planContextFor } from "@/lib/programs/enrolments";
 import { programByKey } from "@/lib/programs/library";
 import { LIFT_LABEL } from "@/lib/programs/types";
 import { keyFromStep } from "@/lib/programs/units";
 import { dateKey } from "@/lib/trainingProgress";
-import { PageTitle } from "@/components/clientapp/ui";
 import { StartProgramForm } from "@/components/clientapp/StartProgramForm";
 
 export const dynamic = "force-dynamic";
@@ -33,17 +32,17 @@ export default async function StartProgramPage(props: { params: Promise<{ key: s
   });
   const unit = client.weightUnit === "lb" ? "lb" : "kg";
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <PageTitle sub={t.name}>Start program</PageTitle>
-      <StartProgramForm
-        programKey={t.key}
-        tmPct={t.tmPct}
-        lifts={lifts}
-        initialUnit={unit}
-        initialStep={keyFromStep(client.plateStepKg)}
-        defaultWeekdays={defaultWeekdays(t.daysPerWeek)}
-        today={dateKey(Date.now())}
-      />
-    </div>
+    <StartProgramForm
+      programKey={t.key}
+      programName={t.name}
+      template={t}
+      extra={planContextFor(clientId, t)}
+      lifts={lifts}
+      initialUnit={unit}
+      initialStep={keyFromStep(client.plateStepKg)}
+      defaultWeekdays={defaultWeekdays(t.daysPerWeek)}
+      today={dateKey(Date.now())}
+      backHref={`/app/programs/${encodeURIComponent(t.key)}`}
+    />
   );
 }

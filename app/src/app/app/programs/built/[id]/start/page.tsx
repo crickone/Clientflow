@@ -1,15 +1,16 @@
 // app/src/app/app/programs/built/[id]/start/page.tsx
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { requireProgramsPage } from "@/lib/programs/access";
 import { defaultWeekdays } from "@/lib/programs/cards";
-import { bestLoggedSet, liveEnrolment } from "@/lib/programs/enrolments";
+import { bestLoggedSet, liveEnrolment, planContextFor } from "@/lib/programs/enrolments";
 import { getMemberProgram } from "@/lib/programs/memberPrograms";
 import { memberKey, validateMemberTemplate } from "@/lib/programs/memberTemplate";
 import { LIFT_LABEL } from "@/lib/programs/types";
 import { keyFromStep } from "@/lib/programs/units";
 import { dateKey } from "@/lib/trainingProgress";
-import { Card, PageTitle } from "@/components/clientapp/ui";
+import { PkHeader } from "@/components/clientapp/programs/kit";
 import { StartProgramForm } from "@/components/clientapp/StartProgramForm";
 
 export const dynamic = "force-dynamic";
@@ -26,16 +27,19 @@ export default async function StartBuiltProgramPage(props: { params: Promise<{ i
   const check = validateMemberTemplate(p.template, memberKey(id));
   if (!check.ok) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <PageTitle sub={p.name}>Start program</PageTitle>
-        <Card style={{ display: "grid", gap: 6 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Fix these before you start</div>
-          {check.errors.map((e) => (
-            <div key={e} style={{ fontSize: 13.5, color: "var(--text-secondary)", overflowWrap: "anywhere" }}>
-              {e}
-            </div>
-          ))}
-        </Card>
+      <div className="pk">
+        <PkHeader title="Start program" lead={p.name} />
+        <div className="pk-error" role="alert">
+          <b>Fix these before you start</b>
+          <ul>
+            {check.errors.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        </div>
+        <Link href={`/app/programs/built/${id}`} className="pk-btn">
+          Edit program
+        </Link>
       </div>
     );
   }
@@ -46,17 +50,17 @@ export default async function StartBuiltProgramPage(props: { params: Promise<{ i
   });
   const unit = client.weightUnit === "lb" ? "lb" : "kg";
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <PageTitle sub={t.name}>Start program</PageTitle>
-      <StartProgramForm
-        programKey={memberKey(id)}
-        tmPct={1}
-        lifts={lifts}
-        initialUnit={unit}
-        initialStep={keyFromStep(client.plateStepKg)}
-        defaultWeekdays={defaultWeekdays(t.daysPerWeek)}
-        today={dateKey(Date.now())}
-      />
-    </div>
+    <StartProgramForm
+      programKey={memberKey(id)}
+      programName={t.name}
+      template={t}
+      extra={planContextFor(clientId, t)}
+      lifts={lifts}
+      initialUnit={unit}
+      initialStep={keyFromStep(client.plateStepKg)}
+      defaultWeekdays={defaultWeekdays(t.daysPerWeek)}
+      today={dateKey(Date.now())}
+      backHref={`/app/programs/${encodeURIComponent(memberKey(id))}`}
+    />
   );
 }

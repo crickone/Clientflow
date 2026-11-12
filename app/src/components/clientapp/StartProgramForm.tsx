@@ -1,189 +1,286 @@
 // app/src/components/clientapp/StartProgramForm.tsx
 "use client";
 
-import { useState, useTransition } from "react";
+import { useReducer, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/clientapp/ui";
-import { startProgramAction, type MaxEntry } from "@/app/app/programs/actions";
-import type { LiftKey, WeightUnit } from "@/lib/programs/types";
-import { STEP_OPTIONS, convertTyped, formatWeight, kgToUnit, maxFromSet, parseWeightIn, trainingMax, type StepKey } from "@/lib/programs/units";
+import { PkCard, PkSection, StepBar, StickyBar } from "@/components/clientapp/programs/kit";
+import { startProgramAction } from "@/app/app/programs/actions";
+import { firstSets, firstWeek, shortDate, trainingDates, type PlanExtra } from "@/lib/programs/outline";
+import { STEP_TITLE, initialStart, maxEntries, maxesKg, reduceStart, rowMaxKg, startSteps, stepForError, type StartLift } from "@/lib/programs/startFlow";
+import type { ProgramTemplate, WeightUnit } from "@/lib/programs/types";
+import { STEP_OPTIONS, formatWeight, kgToUnit, stepFromKey, trainingMax, type StepKey } from "@/lib/programs/units";
 import { WEEKDAY_SHORT } from "@/lib/trainingProgress";
 
-interface LiftRow {
-  lift: LiftKey;
-  label: string;
-  logged: { kg: number; reps: number; e1rm: number } | null;
-  /** A max carried from the member's last program, filled in as their 1-rep max. */
-  keptKg?: number | null;
-}
-interface RowState {
-  mode: MaxEntry["kind"];
-  weight: string;
-  reps: string;
-}
-
-/** Maxes three ways, units, smallest jump, start date and training days. */
+/**
+ * Starting a program, one question per screen: weights, maxes (when the
+ * program takes any), days, then a review with the whole first week at the
+ * member's real weights. Back keeps everything; the server checks it all on
+ * Start, and an error shows on the screen it belongs to.
+ */
 export function StartProgramForm({
   programKey,
-  tmPct,
+  programName,
+  template,
+  extra,
   lifts,
   initialUnit,
   initialStep,
   defaultWeekdays,
   today,
+  backHref,
 }: {
   programKey: string;
-  tmPct: number;
-  lifts: LiftRow[];
+  programName: string;
+  /** The program as it will start, for the previews. */
+  template: ProgramTemplate;
+  /** What the app will plan from (logged lifts and last weights), plain data, so the preview matches session 1. */
+  extra: PlanExtra;
+  lifts: StartLift[];
   initialUnit: WeightUnit;
   initialStep: StepKey;
   defaultWeekdays: number[];
   today: string;
+  /** Where Back goes from the first screen. */
+  backHref: string;
 }) {
   const router = useRouter();
-  const [unit, setUnit] = useState<WeightUnit>(initialUnit);
-  const [step, setStep] = useState<StepKey>(initialUnit === "lb" ? "5lb" : initialStep === "5lb" ? "2.5kg" : initialStep);
-  const [rows, setRows] = useState<RowState[]>(
-    lifts.map((l) => (l.keptKg ? { mode: "one_rm", weight: String(kgToUnit(l.keptKg, initialUnit)), reps: "" } : { mode: l.logged ? "logged" : "one_rm", weight: "", reps: "" })),
+  const steps = startSteps(lifts.length > 0);
+  const [s, dispatch] = useReducer(
+    (state: ReturnType<typeof initialStart>, a: Parameters<typeof reduceStart>[1]) => reduceStart(state, a, steps.length),
+    { lifts, unit: initialUnit, step: initialStep, weekdays: defaultWeekdays, today },
+    (input) => initialStart(input, (kg) => String(kgToUnit(kg, input.unit))),
   );
-  const [startDate, setStartDate] = useState(today);
-  const [days, setDays] = useState<number[]>(defaultWeekdays);
+  const [error, setError] = useState<{ at: number; text: string } | null>(null);
   const [pending, start] = useTransition();
+  const step = steps[s.at];
+  const stepKg = stepFromKey(s.step);
+  const fmt = (kg: number) => formatWeight(kg, s.unit);
+  const maxes = maxesKg(s, lifts);
 
-  const setRow = (i: number, patch: Partial<RowState>) => setRows((xs) => xs.map((x, k) => (k === i ? { ...x, ...patch } : x)));
-
-  function estimate(i: number): number | null {
-    const r = rows[i];
-    if (r.mode === "logged") return lifts[i].logged?.e1rm ?? null;
-    const kg = parseWeightIn(r.weight, unit);
-    if (kg === null || kg <= 0) return null;
-    return r.mode === "one_rm" ? kg : maxFromSet(kg, Number(r.reps));
-  }
-
-  function pickUnit(u: WeightUnit) {
-    if (u === unit) return;
-    // A max or set weight already typed in follows the switch.
-    setRows((xs) => xs.map((x) => (x.weight ? { ...x, weight: convertTyped(x.weight, unit, u) } : x)));
-    setUnit(u);
-    setStep(u === "lb" ? "5lb" : "2.5kg");
-  }
-
-  function toggleDay(d: number) {
-    setDays((xs) => (xs.includes(d) ? xs.filter((x) => x !== d) : [...xs, d].sort((a, b) => a - b)));
+  function go(next: number) {
+    dispatch({ type: "go", at: next });
+    window.scrollTo({ top: 0 });
   }
 
   function submit() {
+    setError(null);
     start(async () => {
-      const maxes: MaxEntry[] = rows.map((r, i) => ({
-        lift: lifts[i].lift,
-        kind: r.mode,
-        weight: r.mode === "logged" ? null : Number(r.weight.replace(",", ".")) || null,
-        reps: r.mode === "set" ? Number(r.reps) || null : null,
-      }));
-      const res = await startProgramAction({ key: programKey, unit, step, startDate, weekdays: days, maxes });
-      if (!res.ok) return void toast.error(res.error);
+      const res = await startProgramAction({ key: programKey, unit: s.unit, step: s.step, startDate: s.startDate, weekdays: s.days, maxes: maxEntries(s, lifts) });
+      if (!res.ok) {
+        const at = stepForError(res.error, steps);
+        setError({ at, text: res.error });
+        toast.error(res.error);
+        go(at);
+        return;
+      }
       toast.success("Program started");
       router.push("/app/programs/mine");
       router.refresh();
     });
   }
 
-  const steps = STEP_OPTIONS.filter((s) => s.unit === unit);
+  const kgSteps = STEP_OPTIONS.filter((o) => o.unit === s.unit);
+  const dates = trainingDates(s.startDate, s.days, template.weeks[0]?.days.length ?? 0);
 
   return (
-    <div style={{ display: "grid", gap: 14 }}>
-      <Card style={{ display: "grid", gap: 12 }}>
-        <div className="td-label">Units</div>
-        <div className="pg-chips" role="group" aria-label="Units">
-          {(["kg", "lb"] as const).map((u) => (
-            <button key={u} type="button" className="pg-chip" aria-pressed={unit === u} onClick={() => pickUnit(u)}>
-              {u === "kg" ? "Kilograms" : "Pounds"}
-            </button>
-          ))}
-        </div>
-        <label style={{ display: "grid", gap: 6 }}>
-          <span className="td-label">Smallest jump</span>
-          <select className="pg-input" value={step} onChange={(e) => setStep(e.target.value as StepKey)}>
-            {steps.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>Every weight rounds to this jump.</div>
-      </Card>
+    <div className="pk">
+      <div className="pk-head">
+        <span className="pk-small">
+          Start {programName}, step {s.at + 1} of {steps.length}
+        </span>
+        <StepBar at={s.at} of={steps.length} label={`Step ${s.at + 1} of ${steps.length}: ${STEP_TITLE[step]}`} />
+      </div>
 
-      {lifts.map((l, i) => {
-        const r = rows[i];
-        const est = estimate(i);
-        return (
-          <Card key={l.lift} style={{ display: "grid", gap: 10 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>{l.label}</div>
-            {l.keptKg ? <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>Filled in from your last program.</div> : null}
-            <div className="pg-chips" role="group" aria-label={`How to set your ${l.label.toLowerCase()} max`}>
-              {l.logged && (
-                <button type="button" className="pg-chip" aria-pressed={r.mode === "logged"} onClick={() => setRow(i, { mode: "logged" })}>
-                  Best logged
+      {error && error.at === s.at && (
+        <div className="pk-error" role="alert">
+          {error.text}
+        </div>
+      )}
+
+      {step === "weights" && (
+        <>
+          <h1 className="pk-question">How do you want your weights?</h1>
+          <PkSection label="Weights in">
+            <div className="pk-seg" role="group" aria-label="Weights in">
+              {(["kg", "lb"] as const).map((u) => (
+                <button key={u} type="button" aria-pressed={s.unit === u} onClick={() => dispatch({ type: "unit", unit: u })}>
+                  {u === "kg" ? "Kilograms" : "Pounds"}
                 </button>
-              )}
-              <button type="button" className="pg-chip" aria-pressed={r.mode === "one_rm"} onClick={() => setRow(i, { mode: "one_rm" })}>
-                1-rep max
-              </button>
-              <button type="button" className="pg-chip" aria-pressed={r.mode === "set"} onClick={() => setRow(i, { mode: "set" })}>
-                A recent set
-              </button>
+              ))}
             </div>
-            {r.mode === "logged" && l.logged && (
-              <div style={{ fontSize: 13.5, color: "var(--text-secondary)" }}>
-                Your best in the last 90 days: {formatWeight(l.logged.kg, unit)} x {l.logged.reps}.
-              </div>
-            )}
-            {r.mode === "one_rm" && (
-              <input className="pg-input" inputMode="decimal" aria-label={`${l.label} 1-rep max in ${unit}`} placeholder={`Max in ${unit}`} value={r.weight} onChange={(e) => setRow(i, { weight: e.target.value })} />
-            )}
-            {r.mode === "set" && (
-              <div className="pg-row">
-                <input className="pg-input" inputMode="decimal" aria-label={`${l.label} weight in ${unit}`} placeholder={`Weight in ${unit}`} value={r.weight} onChange={(e) => setRow(i, { weight: e.target.value })} />
-                <input className="pg-input" inputMode="numeric" aria-label={`${l.label} reps`} placeholder="Reps, 1 to 10" value={r.reps} onChange={(e) => setRow(i, { reps: e.target.value.replace(/\D/g, "").slice(0, 2) })} />
-              </div>
-            )}
-            {est !== null ? (
-              <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-                Max about {formatWeight(est, unit)}
-                {tmPct !== 1 ? `. Training max ${formatWeight(trainingMax(est, tmPct), unit)}.` : "."}
-              </div>
-            ) : r.mode === "set" && Number(r.reps) > 10 ? (
-              <div style={{ fontSize: 13, color: "var(--danger)" }}>Use a set of 10 reps or fewer.</div>
-            ) : null}
-          </Card>
-        );
-      })}
+          </PkSection>
+          <PkSection label="Smallest jump">
+            <div className="pk-seg" role="group" aria-label="Smallest jump">
+              {kgSteps.map((o) => (
+                <button key={o.key} type="button" aria-pressed={s.step === o.key} onClick={() => dispatch({ type: "step", step: o.key })}>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <span className="pk-small">Every weight rounds to this jump.</span>
+          </PkSection>
+        </>
+      )}
 
-      <Card style={{ display: "grid", gap: 12 }}>
-        <label style={{ display: "grid", gap: 6 }}>
-          <span className="td-label">Start date</span>
-          <input className="pg-input" type="date" value={startDate} min={today} onChange={(e) => setStartDate(e.target.value || today)} />
-        </label>
-        <div style={{ display: "grid", gap: 8 }}>
-          <div className="td-label">Days you train</div>
-          <div className="td-days">
-            {WEEKDAY_SHORT.map((label, i) => (
-              <button key={label} type="button" className="td-day" aria-pressed={days.includes(i + 1)} onClick={() => toggleDay(i + 1)}>
-                {label}
-              </button>
+      {step === "maxes" && (
+        <>
+          <h1 className="pk-question">{lifts.length === 1 ? `What's your ${lifts[0].label.toLowerCase()} max?` : "What are your maxes?"}</h1>
+          <span className="pk-muted">Every weight in the program is worked out from {lifts.length === 1 ? "this" : "these"}.</span>
+          {lifts.map((l, i) => {
+            const r = s.rows[i];
+            const est = rowMaxKg(r, l, s.unit);
+            const preview = est !== null ? firstSets(template, l.lift, est, stepKg, s.unit, extra) : null;
+            return (
+              <PkCard key={l.lift}>
+                <h2 className="pk-card-title">{l.label}</h2>
+                {l.keptKg ? <span className="pk-small">Filled in from your last program.</span> : null}
+                <div className="pk-seg" role="group" aria-label={`How to set your ${l.label.toLowerCase()} max`}>
+                  <button type="button" aria-pressed={r.mode === "one_rm"} onClick={() => dispatch({ type: "row", index: i, patch: { mode: "one_rm" } })}>
+                    1-rep max
+                  </button>
+                  <button type="button" aria-pressed={r.mode === "set"} onClick={() => dispatch({ type: "row", index: i, patch: { mode: "set" } })}>
+                    A recent set
+                  </button>
+                  {l.logged && (
+                    <button type="button" aria-pressed={r.mode === "logged"} onClick={() => dispatch({ type: "row", index: i, patch: { mode: "logged" } })}>
+                      From my log
+                    </button>
+                  )}
+                </div>
+                {r.mode === "logged" && l.logged && (
+                  <span className="pk-muted">
+                    Your best in the last 90 days: {fmt(l.logged.kg)} x {l.logged.reps}.
+                  </span>
+                )}
+                {r.mode === "one_rm" && (
+                  <input
+                    className="pk-input pk-big"
+                    inputMode="decimal"
+                    aria-label={`${l.label} 1-rep max in ${s.unit}`}
+                    placeholder={s.unit}
+                    value={r.weight}
+                    onChange={(e) => dispatch({ type: "row", index: i, patch: { weight: e.target.value } })}
+                  />
+                )}
+                {r.mode === "set" && (
+                  <div className="pk-pair">
+                    <label className="pk-field">
+                      <span>Weight ({s.unit})</span>
+                      <input className="pk-input" inputMode="decimal" aria-label={`${l.label} weight in ${s.unit}`} value={r.weight} onChange={(e) => dispatch({ type: "row", index: i, patch: { weight: e.target.value } })} />
+                    </label>
+                    <label className="pk-field">
+                      <span>Reps, 1 to 10</span>
+                      <input
+                        className="pk-input"
+                        inputMode="numeric"
+                        aria-label={`${l.label} reps`}
+                        value={r.reps}
+                        onChange={(e) => dispatch({ type: "row", index: i, patch: { reps: e.target.value.replace(/\D/g, "").slice(0, 2) } })}
+                      />
+                    </label>
+                  </div>
+                )}
+                {est !== null ? (
+                  <span className="pk-muted">
+                    Max about {fmt(est)}
+                    {template.tmPct !== 1 ? `. Training max ${fmt(trainingMax(est, template.tmPct))}.` : "."}
+                    {preview ? ` Your first sets: ${preview}.` : ""}
+                  </span>
+                ) : r.mode === "set" && Number(r.reps) > 10 ? (
+                  <span className="pk-muted">Use a set of 10 reps or fewer.</span>
+                ) : null}
+              </PkCard>
+            );
+          })}
+        </>
+      )}
+
+      {step === "days" && (
+        <>
+          <h1 className="pk-question">When do you train?</h1>
+          <PkSection label="Days you train">
+            <div className="td-days" role="group" aria-label="Days you train">
+              {WEEKDAY_SHORT.map((label, i) => (
+                <button key={label} type="button" className="td-day" aria-pressed={s.days.includes(i + 1)} onClick={() => dispatch({ type: "day", day: i + 1 })}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <span className="pk-small">Your program moves on when you finish a session, so a missed day just waits for you.</span>
+          </PkSection>
+          <label className="pk-field">
+            <span>Start date</span>
+            <input className="pk-input" type="date" value={s.startDate} min={today} onChange={(e) => dispatch({ type: "startDate", value: e.target.value || today })} />
+          </label>
+        </>
+      )}
+
+      {step === "review" && (
+        <>
+          <h1 className="pk-question">Ready to go</h1>
+          <div>
+            {lifts.map((l) => (
+              <div key={l.lift} className="pk-sum">
+                <span>{l.label} max</span>
+                <span>{maxes[l.lift] !== undefined ? fmt(maxes[l.lift]!) : "Not set"}</span>
+              </div>
             ))}
+            <div className="pk-sum">
+              <span>Weights in</span>
+              <span>
+                {s.unit}, {fmt(stepKg)} jumps
+              </span>
+            </div>
+            <div className="pk-sum">
+              <span>Training days</span>
+              <span>{s.days.length ? s.days.map((d) => WEEKDAY_SHORT[d - 1]).join(" ") : "None picked"}</span>
+            </div>
+            <div className="pk-sum">
+              <span>First session</span>
+              <span>{shortDate(dates[0] ?? s.startDate)}</span>
+            </div>
           </div>
-          <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>Your program moves on when you finish a session, so a missed day just waits for you.</div>
-        </div>
-      </Card>
+          <PkSection label="Your first week">
+            {firstWeek(template, maxes, stepKg, s.unit, extra).map((d, i) => (
+              <div key={i} className="pk-day">
+                <span className="pk-day-name">
+                  {dates[i] ? `${shortDate(dates[i])}, ` : ""}
+                  {d.name}
+                </span>
+                {d.lines.map((line, k) => (
+                  <span key={k} className="pk-muted">
+                    {line}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </PkSection>
+        </>
+      )}
 
-      <Button onClick={submit} loading={pending} style={{ width: "100%" }}>
-        Start program
-      </Button>
+      <StickyBar>
+        {step === "review" ? (
+          <button type="button" className="pk-cta" onClick={submit} disabled={pending}>
+            {pending ? "Starting" : "Start program"}
+          </button>
+        ) : (
+          <button type="button" className="pk-cta" onClick={() => go(s.at + 1)}>
+            Next: {STEP_TITLE[steps[s.at + 1]].toLowerCase()}
+          </button>
+        )}
+      </StickyBar>
+      {s.at > 0 ? (
+        <button type="button" className="pk-ghost" onClick={() => go(s.at - 1)} disabled={pending}>
+          Back
+        </button>
+      ) : (
+        <Link href={backHref} className="pk-ghost">
+          Back
+        </Link>
+      )}
     </div>
   );
 }
