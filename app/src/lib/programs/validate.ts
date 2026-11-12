@@ -229,10 +229,12 @@ export function templateErrors(t: ProgramTemplate): string[] {
   const errors: string[] = [];
   t.weeks.forEach((w, wi) =>
     w.days.forEach((d) =>
-      d.exercises.forEach((e) => {
+      d.exercises.forEach((e, xi) => {
         const where = `Week ${wi + 1}, ${d.name}, ${e.name}`;
         // A member names their own exercises (the gym's library or typed in); library programs use the canonical list.
         if (t.engine.key !== "own_rules" && !isCanonical(e.name)) errors.push(`${where}: not in the exercise list.`);
+        // A rule changes the state key, which would orphan the weights stored for a platform program.
+        if (t.engine.key !== "own_rules" && e.rule) errors.push(`Week ${wi + 1}, ${d.name}, exercise ${xi + 1}: rules are only for programs you build yourself.`);
         for (const s of [...e.sets, ...(e.stages ?? []).flat()]) {
           if (s.kind !== "pct" && s.kind !== "amrap") continue;
           if (s.pct < 0.3 || s.pct > 1.1) errors.push(`${where}: ${Math.round(s.pct * 1000) / 10}% is outside 30% to 110%.`);

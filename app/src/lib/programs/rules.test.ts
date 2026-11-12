@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 
 import { planExercise, planSession, stateKey } from "./planner";
 import { emptyState, type ExerciseRx, type ProgramTemplate } from "./types";
-import { parseTemplate, validateTemplate } from "./validate";
+import { parseTemplate, templateErrors, validateTemplate } from "./validate";
 
 const bench: ExerciseRx = { name: "Bench press", sets: [{ kind: "fixed", reps: 5, rest: 120 }], rule: { kind: "linear", incKg: 2.5, deloadAfter: 3 } };
 const curl: ExerciseRx = { name: "Cable curl", sets: [{ kind: "fixed", reps: { min: 10, max: 15 }, rest: 60 }], rule: { kind: "range" } };
@@ -49,7 +49,7 @@ assert.ok(validateTemplate(own([bench, curl])).ok, "own rules with a name outsid
 const ownPlan = planSession(own([bench, curl]), emptyState(), { stepKg: 2.5 })!;
 assert.equal(ownPlan.exercises[1].rule?.kind, "range");
 
-const libraryStyle = { ...own([curl]), engine: { key: "double_progression" as const } };
+const libraryStyle = { ...own([{ name: curl.name, sets: curl.sets }]), engine: { key: "double_progression" as const } };
 const notListed = validateTemplate(libraryStyle);
 assert.equal(notListed.ok, false);
 assert.deepEqual(!notListed.ok && notListed.errors, ["Week 1, Push A, Cable curl: not in the exercise list."]);
@@ -76,5 +76,17 @@ assert.deepEqual(badKind, ["Week 1, Push A, exercise 1: pick a rule."]);
 const longDay = own([bench]);
 longDay.weeks[0].days[0].name = "x".repeat(80);
 assert.ok(parseTemplate(longDay).ok, "day names take up to 80 characters");
+
+// ── a platform program may not carry a rule (it would orphan stored weights) ──
+const ruled = { ...own([bench]), engine: { key: "double_progression" as const }, weeks: [{ days: [{ name: "Workout A", exercises: [{ name: "Back squat", sets: bench.sets }, bench] }] }] };
+assert.ok(
+  templateErrors(ruled).includes("Week 1, Workout A, exercise 2: rules are only for programs you build yourself."),
+  JSON.stringify(templateErrors(ruled)),
+);
+
+// ── library exercises without a rule keep exactly the keys live members' weights are stored under ──
+assert.equal(stateKey({ name: "Back Squat", tier: "t1", sets: [{ kind: "fixed", reps: 3, rest: 180 }] }), "t1:back squat");
+assert.equal(stateKey({ name: "Incline  Dumbbell Press", sets: [{ kind: "fixed", reps: { min: 8, max: 12 }, rest: 90 }] }), "incline dumbbell press@8-12");
+assert.equal(stateKey({ name: "Back squat", tier: "t2", sets: [{ kind: "fixed", reps: { min: 6, max: 8 }, rest: 90 }] }), "t2:back squat@6-8");
 
 console.log("programs/rules: ok");
