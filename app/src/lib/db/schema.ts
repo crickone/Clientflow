@@ -22,6 +22,12 @@ export const clients = sqliteTable("clients", {
   emergencyContactPhone: text("emergency_contact_phone"),
   gdprConsent: integer("gdpr_consent", { mode: "boolean" }).default(false),
   gdprConsentDate: integer("gdpr_consent_date", { mode: "timestamp_ms" }),
+  /** "coach" (the default) or "diy": a DIY member can run library programs on their own. */
+  trainingMode: text("training_mode", { enum: ["coach", "diy"] }).notNull().default("coach"),
+  /** The member's display unit. Weights are always stored in kg. */
+  weightUnit: text("weight_unit", { enum: ["kg", "lb"] }).notNull().default("kg"),
+  /** Their smallest jump in kg: 2.5, 1.25, or 2.26796 (5 lb). */
+  plateStepKg: real("plate_step_kg").notNull().default(2.5),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
@@ -3521,6 +3527,8 @@ export const workoutSessions = sqliteTable("workout_sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   programId: integer("program_id").references(() => workoutPrograms.id, { onDelete: "set null" }),
+  /** The DIY program enrolment this session belongs to (lib/programs/enrolments.ts). */
+  enrolmentId: integer("enrolment_id"),
   dayPosition: integer("day_position").notNull().default(0),
   programTitle: text("program_title").notNull(),
   dayName: text("day_name").notNull(),
@@ -3543,6 +3551,8 @@ export const workoutSessionExercises = sqliteTable("workout_session_exercises", 
   notes: text("notes"),
   /** Copied from the programme: done back to back with the exercise above. */
   joined: integer("joined", { mode: "boolean" }).notNull().default(false),
+  /** A program session's planned sets for this exercise (PlannedExercise JSON). */
+  rxJson: text("rx_json"),
 });
 
 export const workoutSetLogs = sqliteTable("workout_set_logs", {
@@ -3552,6 +3562,10 @@ export const workoutSetLogs = sqliteTable("workout_set_logs", {
   weightKg: real("weight_kg"),
   reps: integer("reps"),
   done: integer("done", { mode: "boolean" }).notNull().default(false),
+  /** The weight the program planned for this set (kg). */
+  targetWeightKg: real("target_weight_kg"),
+  /** How hard the set felt, 1 to 10, if the member said. */
+  rpe: real("rpe"),
 });
 
 /**
@@ -3658,4 +3672,68 @@ export const jevTriageTrial = sqliteTable("jev_triage_trial", {
   jevMs: integer("jev_ms"),
   error: text("error"),
   createdAt: integer("created_at").notNull(),
+});
+
+/** A gym's own version of a platform program (lib/programs/library.ts). */
+export const programTemplates = sqliteTable("program_templates", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  /** The platform program key it was copied from. */
+  basedOn: text("based_on").notNull(),
+  engine: text("engine").notNull(),
+  name: text("name").notNull(),
+  templateJson: text("template_json").notNull(),
+  createdBy: integer("created_by"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+/** A platform program the gym hid from its members. */
+export const programLibraryHidden = sqliteTable("program_library_hidden", {
+  programKey: text("program_key").primaryKey(),
+  hiddenBy: integer("hidden_by"),
+  hiddenAt: integer("hidden_at").notNull(),
+});
+
+/** A member running a library program. One active or paused per member. */
+export const programEnrolments = sqliteTable("program_enrolments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clientId: integer("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  /** Platform program key; null for a gym copy. */
+  programKey: text("program_key"),
+  copyId: integer("copy_id").references(() => programTemplates.id, { onDelete: "set null" }),
+  /** The template as it was when the member started. */
+  templateJson: text("template_json").notNull(),
+  maxesJson: text("maxes_json").notNull().default("{}"),
+  tmsJson: text("tms_json").notNull().default("{}"),
+  week: integer("week").notNull().default(0),
+  day: integer("day").notNull().default(0),
+  /** The rest of the engine state (weights, misses, stages, cycle, finished...). */
+  stateJson: text("state_json").notNull().default("{}"),
+  status: text("status", { enum: ["active", "paused", "ended"] }).notNull().default("active"),
+  /** YYYY-MM-DD. */
+  startDate: text("start_date").notNull(),
+  /** Training weekdays, "1,3,5" (1 = Monday). */
+  weekdays: text("weekdays").notNull().default(""),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  endedAt: integer("ended_at"),
+});
+
+/** Every change to an enrolment, with who made it and why. */
+export const programEnrolmentEvents = sqliteTable("program_enrolment_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  enrolmentId: integer("enrolment_id")
+    .notNull()
+    .references(() => programEnrolments.id, { onDelete: "cascade" }),
+  at: integer("at").notNull(),
+  /** "engine", "member" or "staff:<userId>". */
+  actor: text("actor").notNull(),
+  actorName: text("actor_name"),
+  kind: text("kind").notNull(),
+  reason: text("reason").notNull(),
+  beforeJson: text("before_json"),
+  afterJson: text("after_json"),
+  sessionId: integer("session_id"),
 });

@@ -3149,6 +3149,74 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] leads.lead_score migration failed:", err);
   }
 
+  // DIY training and the program library (lib/programs). Gym copies of
+  // platform programs, platform programs a gym hid, member enrolments (each
+  // with a snapshot of the template it started from) and their change log.
+  // Additive; idempotent.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS program_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      based_on TEXT NOT NULL,
+      engine TEXT NOT NULL,
+      name TEXT NOT NULL,
+      template_json TEXT NOT NULL,
+      created_by INTEGER,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS program_library_hidden (
+      program_key TEXT PRIMARY KEY,
+      hidden_by INTEGER,
+      hidden_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS program_enrolments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      program_key TEXT,
+      copy_id INTEGER REFERENCES program_templates(id) ON DELETE SET NULL,
+      template_json TEXT NOT NULL,
+      maxes_json TEXT NOT NULL DEFAULT '{}',
+      tms_json TEXT NOT NULL DEFAULT '{}',
+      week INTEGER NOT NULL DEFAULT 0,
+      day INTEGER NOT NULL DEFAULT 0,
+      state_json TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL DEFAULT 'active',
+      start_date TEXT NOT NULL,
+      weekdays TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      ended_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_program_enrolments_client ON program_enrolments(client_id, status);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_program_enrolments_live ON program_enrolments(client_id) WHERE status IN ('active', 'paused');
+    CREATE TABLE IF NOT EXISTS program_enrolment_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      enrolment_id INTEGER NOT NULL REFERENCES program_enrolments(id) ON DELETE CASCADE,
+      at INTEGER NOT NULL,
+      actor TEXT NOT NULL,
+      actor_name TEXT,
+      kind TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      before_json TEXT,
+      after_json TEXT,
+      session_id INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_program_events_enrolment ON program_enrolment_events(enrolment_id, at);
+  `);
+  {
+    const addColumn = (table: string, column: string, ddl: string) => {
+      const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+      if (cols.length && !cols.some((c) => c.name === column)) sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+    };
+    addColumn("clients", "training_mode", "training_mode TEXT NOT NULL DEFAULT 'coach'");
+    addColumn("clients", "weight_unit", "weight_unit TEXT NOT NULL DEFAULT 'kg'");
+    addColumn("clients", "plate_step_kg", "plate_step_kg REAL NOT NULL DEFAULT 2.5");
+    addColumn("workout_sessions", "enrolment_id", "enrolment_id INTEGER");
+    addColumn("workout_session_exercises", "rx_json", "rx_json TEXT");
+    addColumn("workout_set_logs", "target_weight_kg", "target_weight_kg REAL");
+    addColumn("workout_set_logs", "rpe", "rpe REAL");
+  }
+
   // Dashboard slice 2: stamp each event recorder's start date once.
   try {
     sqlite.exec(RECORDER_START_SQL);
