@@ -29,6 +29,7 @@ assert.deepEqual(keys(schedulerAlerts(sched, "2026-11-11")), ["scheduler:backup_
 assert.equal(schedulerAlerts(sched, "2026-11-11")[0].level, "bad", "three days late is bad");
 assert.equal(schedulerAlerts([{ key: "a", label: "A", lastRun: "2026-11-09" }], "2026-11-11")[0].level, "warn", "two days late warns");
 assert.deepEqual(schedulerAlerts([{ key: "a", label: "A", lastRun: "2026-11-10" }], "2026-11-11"), [], "yesterday is fine");
+assert.equal(schedulerAlerts([{ key: "n", label: "Never", lastRun: null }], "2026-11-11")[0].level, "warn", "a scheduler that has never run warns, not bad");
 
 const runs = [
   { id: 1, key: "nightly_backup", label: "Nightly backup", startedAt: 1, finishedAt: 2, ok: false, error: "disk", durationMs: 1, detail: null },
@@ -69,4 +70,7 @@ assert.match(jobAlerts(runs)[0].title, /disk/);
     for (const sl of slugs) controlSqlite.prepare("DELETE FROM tenants WHERE slug = ?").run(sl);
   }
   console.log("alertSources.test.ts: ok");
-})();
+})().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

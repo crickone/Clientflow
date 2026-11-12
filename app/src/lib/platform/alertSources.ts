@@ -81,7 +81,7 @@ export function schedulerAlerts(schedulers: { key: string; label: string; lastRu
     out.push({
       tenantId: null,
       key: `scheduler:${s.key}`,
-      level: late >= 3 ? "bad" : "warn",
+      level: s.lastRun !== null && late >= 3 ? "bad" : "warn",
       title: s.lastRun ? `${s.label} last ran ${s.lastRun}, ${late} days ago` : `${s.label} has never run`,
       href: "/jobs",
     });
