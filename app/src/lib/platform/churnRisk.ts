@@ -29,9 +29,11 @@ export function churnRisk(f: RiskFacts): Risk {
   const reasons: string[] = [];
   const add = (n: number, why: string) => { score += n; reasons.push(why); };
 
-  const idle = f.daysSinceLastLogin === null ? Math.max(30, f.ageDays) : f.daysSinceLastLogin;
-  if (idle >= 30) add(40, f.daysSinceLastLogin === null ? "Nobody has ever signed in" : `No sign-in for ${idle} days`);
-  else if (idle >= 14) add(25, `No sign-in for ${idle} days`);
+  // A business that has never been signed into only counts once it is a week old; before that, nobody is expected yet.
+  if (f.daysSinceLastLogin === null) {
+    if (f.ageDays >= 7) add(40, "Nobody has ever signed in");
+  } else if (f.daysSinceLastLogin >= 30) add(40, `No sign-in for ${f.daysSinceLastLogin} days`);
+  else if (f.daysSinceLastLogin >= 14) add(25, `No sign-in for ${f.daysSinceLastLogin} days`);
 
   if (f.hitsPrev30 > 0 && f.hits30 < f.hitsPrev30 / 2) add(20, `Usage down ${Math.round((1 - f.hits30 / f.hitsPrev30) * 100)}% on the previous month`);
 
@@ -55,7 +57,7 @@ export function riskFacts(tenantId: number, setup: { requiredDone: number; requi
   const tenant = controlSqlite.prepare("SELECT created_at FROM tenants WHERE id = ?").get(tenantId) as { created_at: number } | undefined;
   const billing = controlSqlite.prepare("SELECT status, billing_exempt, failed_attempts FROM tenant_billing WHERE tenant_id = ?").get(tenantId) as { status: string; billing_exempt: number; failed_attempts: number } | undefined;
   const reconnects = (controlSqlite.prepare("SELECT (SELECT count(*) FROM facebook_pages WHERE tenant_id = ? AND needs_reconnect_at IS NOT NULL AND revoked_at IS NULL) + (SELECT count(*) FROM meta_grants WHERE tenant_id = ? AND needs_reconnect_at IS NOT NULL) AS n").get(tenantId, tenantId) as { n: number }).n;
-  const badAlerts = (controlSqlite.prepare("SELECT count(*) AS n FROM platform_alerts WHERE tenant_id = ? AND resolved_at IS NULL AND level = 'bad'").get(tenantId) as { n: number }).n;
+  const badAlerts = (controlSqlite.prepare("SELECT count(*) AS n FROM platform_alerts WHERE tenant_id = ? AND resolved_at IS NULL AND level = 'bad' AND key NOT LIKE 'task:%' AND key NOT LIKE 'churn:%'").get(tenantId) as { n: number }).n;
   const usage = usageByModule(tenantId, 30, now);
   return {
     daysSinceLastLogin: login.last ? Math.floor((now - login.last) / 86400000) : null,

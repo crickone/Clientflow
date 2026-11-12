@@ -15,6 +15,10 @@ assert.match(quiet.reasons[0], /20 days/);
 
 assert.equal(churnRisk({ ...healthy, daysSinceLastLogin: 45 }).score, 40);
 assert.equal(churnRisk({ ...healthy, daysSinceLastLogin: null, ageDays: 30 }).score, 40, "never logged in counts as 30+");
+assert.deepEqual(churnRisk({ ...healthy, daysSinceLastLogin: null, ageDays: 1 }), { score: 0, level: "low", reasons: [] }, "a business on day one is not at risk for never signing in");
+const tenDays = churnRisk({ ...healthy, daysSinceLastLogin: null, ageDays: 10 });
+assert.equal(tenDays.score, 40);
+assert.equal(tenDays.reasons[0], "Nobody has ever signed in");
 assert.equal(churnRisk({ ...healthy, hits30: 40, hitsPrev30: 100 }).score, 20);
 assert.equal(churnRisk({ ...healthy, hits30: 0, hitsPrev30: 0 }).score, 0, "no usage either side is not a drop");
 assert.equal(churnRisk({ ...healthy, billingStatus: "past_due", failedAttempts: 1 }).score, 20);
