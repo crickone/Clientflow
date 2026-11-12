@@ -4,6 +4,7 @@ import { z } from "zod";
 import { guardPlatform } from "@/lib/platform/auth";
 import { recordAudit, requestIp } from "@/lib/platform/audit";
 import { clearStuckGenerations, getTenantHealth, retryFailedQueue, type HealthActionResult } from "@/lib/platform/health";
+import { listAlertHistory, listHealthHistory, listOpenAlerts } from "@/lib/platform/healthHistory";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,15 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
   if (!Number.isInteger(tenantId) || tenantId <= 0) {
     return NextResponse.json({ error: "Unknown business" }, { status: 404 });
   }
-  return NextResponse.json(getTenantHealth(tenantId, { deep: true }));
+  const days = Number(req.nextUrl.searchParams.get("history")) || 0;
+  const health = getTenantHealth(tenantId, { deep: true });
+  return NextResponse.json({
+    ...health,
+    history: days > 0 ? listHealthHistory(tenantId, Date.now() - days * 86400000) : [],
+    alerts: health.alerts,
+    openAlerts: listOpenAlerts({ tenantId, includeSnoozed: true }),
+    alertHistory: listAlertHistory(tenantId, 30),
+  });
 }
 
 const bodySchema = z.discriminatedUnion("op", [
