@@ -191,14 +191,14 @@ export default async function DashboardPage() {
         <h2>Twelve months</h2>
         <div className="chart-grid-2">
           <LineChart title="Businesses on the platform" labels={growthLabels} series={[{ label: "Total", values: growth, accent: true }]} />
-          <LineChart title="Subscription revenue collected" labels={growthLabels} series={[{ label: "Collected", values: collected.map((c) => c / 100), accent: true }]} format={(v) => `€${Math.round(v)}`} />
-          <LineChart title="AI spend across businesses" labels={growthLabels} series={[{ label: "Spend", values: aiSpend, accent: true }]} format={(v) => `€${Math.round(v)}`} />
+          <LineChart title="Subscription revenue collected" labels={growthLabels} series={[{ label: "Collected", values: collected.map((c) => c / 100), accent: true }]} unit="eur" />
+          <LineChart title="AI spend across businesses" labels={growthLabels} series={[{ label: "Spend", values: aiSpend, accent: true }]} unit="eur" />
           <LineChart title="Emails sent" labels={growthLabels} series={[{ label: "Sent", values: emailSent, accent: true }]} />
         </div>
         <BarChart
           title="MRR movements"
           groups={mrrMovements.map((m) => ({ label: fmtMonthShort(m.month), up: (m.newCents + m.expansionCents + m.reactivationCents) / 100, down: (m.churnCents + m.contractionCents) / 100, net: m.netCents / 100 }))}
-          format={(v) => `€${Math.round(v)}`}
+          unit="eur"
         />
       </section>
 

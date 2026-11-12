@@ -1,7 +1,7 @@
 // Run: npm test -- src/lib/chart.test.ts
 import assert from "node:assert/strict";
 
-import { niceRange, niceTicks, scale, scaleDomain } from "./chart";
+import { formatUnit, niceRange, niceTicks, scale, scaleDomain } from "./chart";
 
 assert.deepEqual(niceTicks(0), [0]);
 assert.deepEqual(niceTicks(7), [0, 2, 4, 6, 8]);
@@ -42,3 +42,8 @@ assert.equal(d(0), 50);
 assert.equal(d(150), 200);
 assert.equal(scaleDomain(0, 0, 100)(3), 0);
 console.log("chart.test.ts: ok");
+
+assert.equal(formatUnit("count", 12345), "12,345");
+assert.equal(formatUnit("eur", 199.6), "€200");
+assert.equal(formatUnit("eur", -12), "-€12");
+assert.equal(formatUnit("mb", 3.456), "3.5 MB");

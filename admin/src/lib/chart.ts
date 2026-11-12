@@ -39,3 +39,15 @@ export function scaleDomain(domainMin: number, domainMax: number, range: number)
   if (!Number.isFinite(span) || span <= 0) return () => 0;
   return (v) => ((v - domainMin) / span) * range;
 }
+
+export type ChartUnit = "count" | "eur" | "mb";
+
+/** Serialisable formatter: server pages name a unit instead of passing a function to a client chart. */
+export function formatUnit(unit: ChartUnit, v: number): string {
+  if (unit === "eur") {
+    const r = Math.round(v) || 0;
+    return `${r < 0 ? "-" : ""}€${Math.abs(r).toLocaleString("en-IE")}`;
+  }
+  if (unit === "mb") return `${v.toFixed(1)} MB`;
+  return (Math.round(v) || 0).toLocaleString("en-IE");
+}

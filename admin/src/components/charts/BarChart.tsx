@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { niceTicks, scale } from "@/lib/chart";
+import { formatUnit, type ChartUnit, niceTicks, scale } from "@/lib/chart";
 
 /**
  * Up (gains) above the line in the accent, down (losses) below in grey, a dot for net. For MRR movements.
@@ -13,13 +13,16 @@ export function BarChart({
   title,
   groups,
   height = 200,
-  format = (v) => String(v),
+  unit = "count",
+  format: formatProp,
 }: {
   title: string;
   groups: { label: string; up: number; down: number; net: number }[];
   height?: number;
+  unit?: ChartUnit;
   format?: (v: number) => string;
 }) {
+  const format = formatProp ?? ((v: number) => formatUnit(unit, v));
   const safe = (v: number) => (Number.isFinite(v) ? v : 0);
   groups = groups.map((g) => ({ ...g, up: Math.max(0, safe(g.up)), down: Math.max(0, safe(g.down)), net: safe(g.net) }));
   const [hover, setHover] = useState<number | null>(null);

@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 
-import { niceRange, scaleDomain } from "@/lib/chart";
+import { formatUnit, type ChartUnit, niceRange, scaleDomain } from "@/lib/chart";
 
 /**
  * Inline SVG line chart. One accent series (the metal gradient already used
@@ -16,14 +16,17 @@ export function LineChart({
   series,
   labels,
   height = 180,
-  format = (v) => String(v),
+  unit = "count",
+  format: formatProp,
 }: {
   title: string;
   series: { label: string; values: number[]; accent?: boolean }[];
   labels: string[];
   height?: number;
+  unit?: ChartUnit;
   format?: (v: number) => string;
 }) {
+  const format = formatProp ?? ((v: number) => formatUnit(unit, v));
   const id = useId();
   const [hover, setHover] = useState<number | null>(null);
   const width = 600;
