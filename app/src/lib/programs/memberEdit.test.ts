@@ -33,6 +33,8 @@ function program(weeks: ExerciseRx[][][]): ProgramTemplate {
 }
 const edit = (before: ProgramTemplate, after: ProgramTemplate, state: EngineState, weekOrigins?: (number | null)[]) =>
   rebaseEdit({ before, after, state, weekOrigins: weekOrigins ?? after.weeks.map((_, i) => (i < before.weeks.length ? i : null)), stepKg: 2.5, unit: "kg" });
+const noOrigins = (before: ProgramTemplate, after: ProgramTemplate, state: EngineState) =>
+  rebaseEdit({ before, after, state, weekOrigins: undefined as unknown as (number | null)[], stepKg: 2.5, unit: "kg" });
 
 const before = program([[[bench, curl], [row]]]);
 const running: EngineState = { ...initState(before, {}, 2.5), day: 1, cycle: 2, weights: { "linear:bench press": 72.5, "range:cable row@8-12": 55, "manual:hammer curl": 15 }, misses: { "linear:bench press": 2 } };
@@ -52,7 +54,7 @@ const b = edit(before, program([[[benchRange, curl], [row]]]), running);
 assert.equal(b.state.weights["linear:bench press"], undefined);
 assert.equal(b.state.weights["range:bench press@6-10"], undefined, "no start weight: last session's weight is planned");
 assert.equal(b.state.misses["linear:bench press"], undefined);
-assert.deepEqual(b.lines, ["Bench press now uses rep range. It starts again from the new rule."]);
+assert.deepEqual(b.lines, ["Bench press now goes up through a rep range. It starts again from the new rule."]);
 const rowNarrow: ExerciseRx = { ...row, sets: [{ kind: "fixed", reps: { min: 6, max: 10 }, rest: 90 }] };
 assert.deepEqual(edit(before, program([[[bench, curl], [rowNarrow]]]), running).lines, ["Cable row has a new rep range. It starts again from there."]);
 
@@ -85,7 +87,7 @@ assert.equal(moved.state.week, 0, "week 3 moved to the front");
 const three = program([[[bench]], [[bench]], [[bench]]]);
 const removed = edit(four, three, onWeek3, [0, 1, 3]);
 assert.deepEqual([removed.state.week, removed.state.day], [1, 0]);
-assert.deepEqual(removed.lines, ["Weeks: 4 to 3.", "Week 3 was removed, so you're on week 2 now."]);
+assert.deepEqual(removed.lines, ["Weeks: 4 to 3.", "The week you were on was removed, so you're now on week 2."]);
 const firstGone = edit(four, three, { ...onWeek3, week: 0 }, [1, 2, 3]);
 assert.equal(firstGone.state.week, 0, "no earlier week: the first one");
 
@@ -94,5 +96,80 @@ assert.deepEqual(normaliseOrigins([0, 0], 2, 2), [0, 1]);
 assert.deepEqual(normaliseOrigins("x", 2, 3), [0, 1, null]);
 assert.deepEqual(normaliseOrigins([1, null, 0], 2, 3), [1, null, 0]);
 assert.deepEqual(normaliseOrigins([5], 2, 1), [0]);
+
+// ── fix wave ──
+const dayProg = (names: string[], ex: ExerciseRx[] = [bench]) => ({
+  ...program([[ex]]),
+  weeks: [{ days: names.map((name) => ({ name, exercises: ex })) }],
+});
+
+// 1. repeated day names: an unchanged save stays on the same day
+const ul = dayProg(["Upper", "Lower", "Upper", "Lower"]);
+const onThird: EngineState = { ...initState(ul, {}, 2.5), day: 2 };
+assert.equal(edit(ul, { ...ul, name: "Renamed" }, onThird).state.day, 2, "stays on index 2");
+const ulMoved = dayProg(["Lower", "Upper", "Upper", "Lower"]);
+assert.equal(edit(ul, ulMoved, onThird).state.day, 2, "same index with the same name is kept");
+assert.equal(edit(ul, dayProg(["Lower", "Upper"]), onThird).state.day, 1, "else the first day with that name");
+
+// 2. no-op edits
+const noop = edit(before, before, running);
+assert.deepEqual(noop.lines, []);
+assert.deepEqual(noop.state, running);
+const finishedState: EngineState = { ...running, finished: true };
+assert.equal(edit(before, before, finishedState).state.finished, true, "a no-op does not reopen a finished program");
+const pctProg = program([[[bench, squat]]]);
+assert.deepEqual(edit(pctProg, pctProg, initState(pctProg, {}, 2.5)).lines, [], "no max line on a no-op");
+const pctEdited = program([[[{ ...bench, notes: "x" }, squat]]]);
+assert.deepEqual(edit(pctProg, pctEdited, initState(pctProg, {}, 2.5)).lines, ["Sets, reps or notes changed."], "an old percent lift without a max is not asked again");
+
+// 3. a start weight that rounds to 0 stores nothing
+const benchAt1: ExerciseRx = { ...bench, rule: { kind: "linear", incKg: 2.5, deloadAfter: 3, startKg: 1 } };
+const zero = edit(before, program([[[benchAt1, curl], [row]]]), running);
+assert.equal(zero.state.weights["linear:bench press"], undefined);
+assert.ok(!zero.lines.some((l) => l.includes("0 kg")));
+
+// 4. rule-change wording
+const rule = (r: ExerciseRx["rule"]) => edit(before, program([[[{ ...bench, rule: r }, curl], [row]]]), running).lines[0];
+assert.equal(rule({ kind: "manual" }), "Bench press now uses weights you set yourself. It starts again from the new rule.");
+assert.equal(rule({ kind: "percent" }), "Bench press now uses a percent of your max. It starts again from the new rule.");
+assert.equal(rule({ kind: "rpe", rpe: 8 } as ExerciseRx["rule"]), "Bench press now goes by RPE. It starts again from the new rule.");
+const benchManual: ExerciseRx = { ...bench, rule: { kind: "manual" } };
+assert.equal(edit(program([[[benchManual, curl], [row]]]), before, { ...running, weights: {}, misses: {} }).lines[0], "Bench press now adds weight each session. It starts again from the new rule.");
+
+// 5. the first week removed
+const firstGone2 = edit(four, three, { ...onWeek3, week: 0 }, [1, 2, 3]);
+assert.equal(firstGone2.state.week, 0);
+assert.ok(firstGone2.lines.includes("The week you were on was removed, so you're now on week 1."));
+
+// 6. change log accuracy
+const reordered = edit(four, four, onWeek3, [1, 0, 2, 3]);
+assert.ok(reordered.lines.includes("Weeks reordered."));
+const twoBench = program([[[bench, benchManual]]]);
+const oneBench = program([[[bench]]]);
+assert.deepEqual(edit(twoBench, oneBench, initState(twoBench, {}, 2.5)).lines, ["Removed: Bench press (weights you set yourself)."]);
+const weekA = [{ name: "Push", exercises: [bench] }, { name: "Pull", exercises: [curl] }];
+const twoWeeks: ProgramTemplate = { ...before, weeks: [{ days: weekA }, { days: weekA }] };
+const oneDayLess: ProgramTemplate = { ...twoWeeks, weeks: [{ days: weekA }, { days: [weekA[0]] }] };
+assert.deepEqual(edit(twoWeeks, oneDayLess, initState(twoWeeks, {}, 2.5)).lines, ["Week 2: removed Pull."]);
+
+// 7. the log is capped at 8 lines
+const many = (n: number) => Array.from({ length: n }, (_, i) => ({ ...bench, name: `Move ${i}` }));
+const manyBefore = program([[many(12).map((e) => ({ ...e, rule: { kind: "linear", incKg: 2.5, deloadAfter: 3, startKg: 40 } as ExerciseRx["rule"] }))]]);
+const manyAfter = program([[many(12).map((e) => ({ ...e, rule: { kind: "linear", incKg: 2.5, deloadAfter: 3, startKg: 50 } as ExerciseRx["rule"] }))]]);
+const cap = edit(manyBefore, manyAfter, initState(manyBefore, {}, 2.5));
+assert.equal(cap.lines.length, 9);
+assert.equal(cap.lines[8], "and 4 more changes.");
+
+// 8. lb weight line; a week added before the current one
+const lb = rebaseEdit({ before, after: program([[[benchAt75, curl], [row]]]), state: running, weekOrigins: [0], stepKg: 2.26796, unit: "lb" });
+assert.deepEqual(lb.lines, ["Bench press: 165 lb from the next session."]);
+const aB = program([[[bench]], [[bench, curl]]]);
+const onB: EngineState = { ...initState(aB, {}, 2.5), week: 1 };
+const nWeek = program([[[row]], [[bench]], [[bench, curl]]]);
+assert.equal(edit(aB, nWeek, onB, [null, 0, 1]).state.week, 2, "with origins the member stays on their week");
+assert.equal(noOrigins(aB, nWeek, onB).state.week, 2, "no origins: the identical week is found by content");
+const nWeekEdited = program([[[row]], [[bench]], [[bench, curl, row]]]);
+assert.equal(noOrigins(aB, nWeekEdited, onB).state.week, 1, "no origins and no identical week: the same index");
+assert.deepEqual(normaliseOrigins(undefined, 2, 2), [0, 1]);
 
 console.log("programs/memberEdit: ok");

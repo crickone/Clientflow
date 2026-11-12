@@ -86,6 +86,18 @@ function ownStartKg(ex: ExerciseRx): number | undefined {
   return r.startKg !== undefined && r.startKg > 0 ? r.startKg : undefined;
 }
 
+/**
+ * A member-built exercise's starting weight rounded to the member's step, or
+ * undefined when it has none or it rounds to 0. One rule for the first session
+ * (initState) and for an edit (memberEdit), so the two cannot drift.
+ */
+export function ownStartWeight(ex: ExerciseRx | undefined, stepKg: number): number | undefined {
+  const own = ex ? ownStartKg(ex) : undefined;
+  if (own === undefined) return undefined;
+  const w = roundToStep(own, stepKg);
+  return w > 0 ? w : undefined;
+}
+
 /** The state a member starts a program with, from their maxes. */
 export function initState(t: ProgramTemplate, maxes: Partial<Record<LiftKey, number>>, stepKg: number): EngineState {
   const s = emptyState();
@@ -103,10 +115,9 @@ export function initState(t: ProgramTemplate, maxes: Partial<Record<LiftKey, num
       for (const ex of d.exercises) {
         const key = stateKey(ex);
         if (key in s.weights || !progresses(ex)) continue;
-        const own = ownStartKg(ex);
-        if (own !== undefined) {
-          const w = roundToStep(own, stepKg);
-          if (w > 0) s.weights[key] = w;
+        if (ownStartKg(ex) !== undefined) {
+          const w = ownStartWeight(ex, stepKg);
+          if (w !== undefined) s.weights[key] = w;
           continue;
         }
         if (!ex.lift) continue;
