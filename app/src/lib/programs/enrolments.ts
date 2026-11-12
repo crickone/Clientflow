@@ -1,6 +1,6 @@
 // app/src/lib/programs/enrolments.ts
 import "server-only";
-import { and, count, desc, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, max } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { clients, programEnrolmentEvents, programEnrolments, workoutSessionExercises, workoutSessions, workoutSetLogs } from "@/lib/db/schema";
@@ -222,10 +222,17 @@ export function enrolmentEvents(enrolmentId: number, limit = 50): EnrolmentEvent
 
 /** Sessions finished and skipped on this enrolment, from its change log. */
 export function enrolmentCounts(enrolmentId: number): { done: number; skipped: number } {
+  // A restart begins a new round, so only events since the latest restart count.
+  const lastRestart =
+    db
+      .select({ id: max(programEnrolmentEvents.id) })
+      .from(programEnrolmentEvents)
+      .where(and(eq(programEnrolmentEvents.enrolmentId, enrolmentId), eq(programEnrolmentEvents.kind, "restart")))
+      .get()?.id ?? 0;
   const rows = db
     .select({ kind: programEnrolmentEvents.kind, n: count() })
     .from(programEnrolmentEvents)
-    .where(and(eq(programEnrolmentEvents.enrolmentId, enrolmentId), inArray(programEnrolmentEvents.kind, ["progress", "skip"])))
+    .where(and(eq(programEnrolmentEvents.enrolmentId, enrolmentId), gt(programEnrolmentEvents.id, lastRestart), inArray(programEnrolmentEvents.kind, ["progress", "skip"])))
     .groupBy(programEnrolmentEvents.kind)
     .all();
   return { done: rows.find((r) => r.kind === "progress")?.n ?? 0, skipped: rows.find((r) => r.kind === "skip")?.n ?? 0 };

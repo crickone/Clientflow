@@ -537,6 +537,16 @@ const requireLocal = createRequire(import.meta.url);
     assert.deepEqual(en.enrolmentCounts(otherId), { done: 0, skipped: 0 }, "counts are per enrolment");
   });
 
+  test("a restart starts the session counts again", () => {
+    const clientId = newMember();
+    const id = enrolIn(clientId, "smolov-base", maxes);
+    for (let i = 0; i < 40 && !en.liveEnrolment(clientId)!.state.finished; i++) runNext(clientId);
+    assert.ok(en.liveEnrolment(clientId)!.state.finished, "the block finishes");
+    assert.ok(en.enrolmentCounts(id).done > 0);
+    assert.deepEqual(en.restartFromTest(clientId, { squat: 150 }), { ok: true });
+    assert.deepEqual(en.enrolmentCounts(id), { done: 0, skipped: 0 });
+  });
+
   test("a live enrolment survives deleting the gym copy it started from", () => {
     const clientId = newMember();
     const copyId = lib.makeCopy("stronglifts-5x5", 1);
