@@ -266,6 +266,60 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(progressEvents(id, first), 1);
   });
 
+  test("a noted session cannot move the program after the cycle wraps", () => {
+    const clientId = newMember();
+    const id = enrolIn(clientId, "german-volume-training", { bench: 100, squat: 140 });
+    const old = logNext(clientId, true);
+    assert.equal(en.skipEnrolmentSession(clientId).ok, true);
+    const noted = en.finishEnrolmentSession(clientId, old);
+    assert.ok(noted, "the off-position finish wrote a note");
+    assert.equal(en.enrolmentEvents(id, 500).filter((x) => x.kind === "note" && x.sessionId === old).length, 1);
+    runNext(clientId);
+    runNext(clientId);
+    const v = en.liveEnrolment(clientId)!;
+    assert.equal(v.state.day, 0, "the cycle wrapped back to position 0");
+    const before = stateOf(clientId);
+    const count = en.enrolmentEvents(id, 500).length;
+    assert.equal(en.finishEnrolmentSession(clientId, old), null);
+    assert.equal(stateOf(clientId), before);
+    assert.equal(en.enrolmentEvents(id, 500).length, count, "no second note and no progress");
+  });
+
+  test("skip refuses while an open session has ticked sets", () => {
+    const clientId = newMember();
+    const id = enrolIn(clientId, "stronglifts-5x5", maxes);
+    const s = en.startEnrolmentSession(clientId);
+    assert.ok(s.ok);
+    const v = log.getSession(clientId, s.sessionId)!;
+    log.saveSessionSets(clientId, v.id, [{ id: v.exercises[0].id, sets: [{ weightKg: 50, reps: 5, done: true }] }]);
+    const before = stateOf(clientId);
+    assert.deepEqual(en.skipEnrolmentSession(clientId), { ok: false, error: "Finish or discard your open workout first." });
+    assert.equal(stateOf(clientId), before);
+    assert.ok(log.getSession(clientId, v.id), "the open session is kept");
+    assert.equal(en.enrolmentEvents(id, 500).filter((x) => x.kind === "skip").length, 0);
+  });
+
+  test("skip deletes an open session that has no ticked sets", () => {
+    const clientId = newMember();
+    enrolIn(clientId, "stronglifts-5x5", maxes);
+    const s = en.startEnrolmentSession(clientId);
+    assert.ok(s.ok);
+    assert.deepEqual(en.skipEnrolmentSession(clientId), { ok: true });
+    assert.equal(log.getSession(clientId, s.sessionId), null);
+    assert.equal(log.openSession(clientId), null);
+    assert.equal(en.liveEnrolment(clientId)!.state.day, 1);
+  });
+
+  test("programWeek maps second-cycle positions back into the cycle", () => {
+    const clientId = newMember();
+    enrolIn(clientId, "german-volume-training", { bench: 100, squat: 140 }, [1, 2, 3, 4, 5, 6, 7]);
+    const v = en.liveEnrolment(clientId)!;
+    const days = en.programWeek(v, new Date(2026, 10, 16, 8).getTime());
+    const planned = days.filter((d) => d.dayPosition !== null);
+    assert.equal(planned.length, 7, "a Monday with seven training days has every day ahead");
+    assert.deepEqual(planned.map((d) => d.dayPosition), [0, 1, 2, 0, 1, 2, 0], "positions 3 to 6 are the second cycle, mapped back");
+  });
+
   // ── 2. every change and its event are written in one transaction ──
   test("finish writes state and event together; a retry works", () => {
     const clientId = newMember();

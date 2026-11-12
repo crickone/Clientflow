@@ -1,6 +1,6 @@
 // app/src/lib/programs/enrolments.ts
 import "server-only";
-import { and, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { clients, programEnrolmentEvents, programEnrolments, workoutSessionExercises, workoutSessions, workoutSetLogs } from "@/lib/db/schema";
@@ -124,12 +124,12 @@ function unchanged(tx: Tx, view: EnrolmentView, statuses: EnrolmentStatus[] = ["
   return !!r && statuses.includes(r.status) && r.week === view.state.week && r.day === view.state.day;
 }
 
-/** A finished session has already moved its program on. */
+/** A session that already moved the program, or was noted as not moving it, is counted. */
 function progressed(tx: Tx, sessionId: number): boolean {
   return !!tx
     .select({ id: programEnrolmentEvents.id })
     .from(programEnrolmentEvents)
-    .where(and(eq(programEnrolmentEvents.sessionId, sessionId), eq(programEnrolmentEvents.kind, "progress")))
+    .where(and(eq(programEnrolmentEvents.sessionId, sessionId), inArray(programEnrolmentEvents.kind, ["progress", "note"])))
     .get();
 }
 
@@ -360,13 +360,31 @@ export function skipEnrolmentSession(clientId: number): Result {
   const d = dayAt(view.template, view.state.week, view.state.day);
   const out = skipSession(view.template, view.state, view.unit);
   const what = `Skipped ${d ? `${d.name}, week ${weekNumber(view.template, view.state)}` : "a session"}.`;
-  const done = db.transaction((tx) => {
-    if (!unchanged(tx, view)) return false;
+  const done = db.transaction((tx): "ok" | "stale" | "open" => {
+    if (!unchanged(tx, view)) return "stale";
+    // An open session of this program would be resumed by position later, so it goes now.
+    const open = tx
+      .select({ id: workoutSessions.id })
+      .from(workoutSessions)
+      .where(and(eq(workoutSessions.clientId, clientId), eq(workoutSessions.enrolmentId, view.id), isNull(workoutSessions.finishedAt)))
+      .all()
+      .map((r) => r.id);
+    if (open.length) {
+      const ticked = tx
+        .select({ id: workoutSetLogs.id })
+        .from(workoutSetLogs)
+        .innerJoin(workoutSessionExercises, eq(workoutSetLogs.sessionExerciseId, workoutSessionExercises.id))
+        .where(and(inArray(workoutSessionExercises.sessionId, open), eq(workoutSetLogs.done, true)))
+        .get();
+      if (ticked) return "open";
+      tx.delete(workoutSessions).where(inArray(workoutSessions.id, open)).run();
+    }
     saveState(tx, view.id, out.state);
     logEvent(tx, view.id, { kind: "member" }, "skip", [what, ...out.reasons].join("\n"), view.state, out.state);
-    return true;
+    return "ok";
   });
-  return done ? { ok: true } : { ok: false, error: "There's no session to skip." };
+  if (done === "open") return { ok: false, error: "Finish or discard your open workout first." };
+  return done === "ok" ? { ok: true } : { ok: false, error: "There's no session to skip." };
 }
 
 /** End the live program. Its sessions and change log are kept. */
