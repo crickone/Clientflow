@@ -5749,3 +5749,16 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 
 /* Program sessions in the logger: a Plan column and an optional RPE box. */
 .wl-grid--rpe { grid-template-columns: 22px minmax(0, 1fr) 58px 46px 42px 44px; gap: 6px; }
+
+/* Member app: the program library (Programs tab). Tenant brand tokens. */
+.pg-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pg-chip { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-secondary); font: inherit; font-size: 13px; cursor: pointer; }
+.pg-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.pg-tag { flex-shrink: 0; align-self: flex-start; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--text-tertiary); font-size: 11.5px; }
+.pg-warning { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; line-height: 1.4; color: var(--text-secondary); }
+.pg-warning svg { flex-shrink: 0; margin-top: 2px; color: var(--danger); }
+.pg-input { width: 100%; height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--hairline); background-color: var(--surface-2); color: var(--text-primary); font: inherit; font-size: 15px; }
+select.pg-input { padding-right: 36px; }
+.pg-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.pg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pg-cta { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 18px; border-radius: var(--radius); background: var(--accent); color: var(--accent-contrast); font-size: 15px; font-weight: 600; text-decoration: none; }
