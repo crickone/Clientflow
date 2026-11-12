@@ -1093,3 +1093,22 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.45; c
 .palette-title { color: var(--text-primary); }
 .palette-sub { margin-left: auto; color: var(--text-tertiary); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
 .palette-empty { color: var(--text-tertiary); padding: 14px 10px; cursor: default; }
+
+/* ── DataTable (components/ui/DataTable.tsx) ────────────────────────────── */
+.dt { display: flex; flex-direction: column; gap: 10px; }
+.dt-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dt-count { font-family: var(--font-mono), ui-monospace, monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
+.dt-tools { display: flex; gap: 4px; }
+.dt-picker {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; min-width: 200px;
+  display: flex; flex-direction: column; gap: 2px; padding: 8px;
+  background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 10px;
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+}
+.dt-picker label { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.dt-picker label:hover { background: var(--surface-3); }
+.dt-sort { display: inline-flex; align-items: center; gap: 4px; background: none; border: 0; padding: 0; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
+.dt-sort:hover { color: var(--text-primary); }
+.dt-empty { margin: 8px 0; color: var(--text-secondary); font-size: 13.5px; }
+.dt-pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 12.5px; color: var(--text-secondary); }
+.tbl tr.is-selected td { background: rgba(255, 255, 255, 0.03); }
