@@ -79,6 +79,7 @@ export interface AuditRow {
 }
 
 export interface AuditQuery {
+  id?: number;
   tenantId?: number | null;
   actorUserId?: number;
   actorEmail?: string;
@@ -96,6 +97,7 @@ export interface AuditQuery {
 function whereFor(query: AuditQuery): { sql: string; args: unknown[] } {
   const where: string[] = [];
   const args: unknown[] = [];
+  if (query.id != null) { where.push("a.id = ?"); args.push(query.id); }
   if (query.tenantId != null) { where.push("a.tenant_id = ?"); args.push(query.tenantId); }
   if (query.actorUserId != null) { where.push("a.actor_user_id = ?"); args.push(query.actorUserId); }
   if (query.actorEmail) { where.push("a.actor_email = ?"); args.push(query.actorEmail); }
@@ -115,8 +117,9 @@ function whereFor(query: AuditQuery): { sql: string; args: unknown[] } {
 /** Most recent first. The tenant name is joined in so the log reads without a second lookup. */
 export function listAudit(query: AuditQuery = {}): AuditRow[] {
   const { sql, args } = whereFor(query);
-  const limit = Math.min(500, Math.max(1, query.limit ?? 100));
-  const offset = Math.max(0, query.offset ?? 0);
+  const safeInt = (v: number | undefined, fallback: number) => (v !== undefined && Number.isFinite(v) ? Math.floor(v) : fallback);
+  const limit = Math.min(500, Math.max(1, safeInt(query.limit, 100)));
+  const offset = Math.max(0, safeInt(query.offset, 0));
   const rows = controlSqlite
     .prepare(
       `SELECT a.id, a.actor_user_id, a.actor_email, a.actor_role, a.tenant_id, t.name AS tenant_name,

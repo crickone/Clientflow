@@ -28,3 +28,20 @@ export function bytes(n: number): string {
   const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)));
   return `${(n / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
+
+/** UTC ms of 00:00 Europe/Dublin on the given "YYYY-MM-DD" day. NaN for an invalid date. */
+export function dublinDayStartMs(day: string): number {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!m) return NaN;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const naive = Date.UTC(y, mo - 1, d);
+  if (new Date(naive).getUTCDate() !== d) return NaN;
+  const offsetAt = (ms: number) => {
+    const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Dublin", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(new Date(ms));
+    const g = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+    return Date.UTC(g("year"), g("month") - 1, g("day"), g("hour"), g("minute"), g("second")) - ms;
+  };
+  let t = naive - offsetAt(naive);
+  t = naive - offsetAt(t);
+  return t;
+}

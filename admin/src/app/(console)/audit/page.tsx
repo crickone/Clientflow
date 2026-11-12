@@ -6,13 +6,14 @@ import { SaveViewButton } from "@/components/SaveViewButton";
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AuditTable } from "@/components/AuditTable";
-import type { AuditResponse, FleetResponse, StaffResponse } from "@/lib/types";
+import { dublinDayStartMs } from "@/lib/format";
+import type { AuditEntry, AuditResponse, FleetResponse, StaffResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 const PAGE = 100;
 
-type Params = { tenantId?: string; action?: string; actorEmail?: string; ok?: string; from?: string; to?: string; q?: string; offset?: string; id?: string };
+type Params = { tenantId?: string; action?: string; actorEmail?: string; ok?: string; from?: string; to?: string; q?: string; offset?: string; id?: string; actorUserId?: string };
 
 /**
  * Every action taken from this console, newest first, across all businesses.
@@ -22,15 +23,26 @@ type Params = { tenantId?: string; action?: string; actorEmail?: string; ok?: st
 export default async function AuditPage(props: { searchParams: Promise<Params> }) {
   const sp = await props.searchParams;
   const qs = new URLSearchParams({ limit: String(PAGE) });
-  for (const k of ["tenantId", "action", "actorEmail", "ok", "q", "offset"] as const) if (sp[k]) qs.set(k, sp[k]!);
-  if (sp.from) qs.set("from", String(Date.parse(sp.from)));
-  if (sp.to) qs.set("to", String(Date.parse(sp.to) + 86400000 - 1));
+  for (const k of ["tenantId", "action", "actorEmail", "actorUserId", "ok", "q", "offset"] as const) if (sp[k]) qs.set(k, sp[k]!);
+  const fromMs = sp.from ? dublinDayStartMs(sp.from) : NaN;
+  if (Number.isFinite(fromMs)) qs.set("from", String(fromMs));
+  const toStart = sp.to ? dublinDayStartMs(sp.to) : NaN;
+  // Next Dublin midnight, found from noon the next day so DST changes cannot skip it.
+  if (Number.isFinite(toStart)) qs.set("to", String(dublinDayStartMs(new Date(toStart + 36 * 3600000).toISOString().slice(0, 10)) - 1));
 
   const [{ entries, total, actions }, fleet, staff] = await Promise.all([
     api<AuditResponse>(`/audit?${qs.toString()}`),
     api<FleetResponse>("/fleet", { revalidate: 30, tags: ["fleet"] }),
     api<StaffResponse>("/staff", { revalidate: 30, tags: ["fleet"] }),
   ]);
+  const openId = sp.id && Number(sp.id) > 0 ? Number(sp.id) : null;
+  let linked: AuditEntry | null = null;
+  let linkedMissing = false;
+  if (openId && !entries.some((e) => e.id === openId)) {
+    const one = await api<AuditResponse>(`/audit?id=${openId}&limit=1`);
+    linked = one.entries[0] ?? null;
+    linkedMissing = !linked;
+  }
   const offset = Number(sp.offset) || 0;
   const filtered = Boolean(sp.tenantId || sp.action || sp.actorEmail || sp.ok || sp.from || sp.to || sp.q);
   const olderQs = new URLSearchParams(Object.entries(sp).filter(([k, v]) => v && k !== "id" && k !== "offset") as [string, string][]);
@@ -68,11 +80,24 @@ export default async function AuditPage(props: { searchParams: Promise<Params> }
         </Suspense>
       </form>
 
+      {openId && (
+        <Card style={{ padding: "20px 26px 16px" }}>
+          <h2 style={{ margin: "0 0 10px", fontSize: 14 }}>Linked entry</h2>
+          {linked ? (
+            <Suspense fallback={null}><AuditTable key={`linked-${openId}`} entries={[linked]} openId={openId} /></Suspense>
+          ) : linkedMissing ? (
+            <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13.5 }}>That audit entry does not exist.</p>
+          ) : (
+            <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13.5 }}>Shown expanded in the list below.</p>
+          )}
+        </Card>
+      )}
+
       <Card style={{ padding: "20px 26px 16px" }}>
         {entries.length === 0 ? (
           <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13.5 }}>{filtered ? "Nothing matches that filter." : "No console actions recorded yet."}</p>
         ) : (
-          <AuditTable entries={entries} openId={sp.id ? Number(sp.id) : null} />
+          <Suspense fallback={null}><AuditTable key={openId ?? "none"} entries={entries} openId={openId} /></Suspense>
         )}
         {offset + entries.length < total && (
           <div style={{ marginTop: 14 }}>

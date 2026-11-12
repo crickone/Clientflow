@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { fmtDate } from "@/lib/format";
@@ -10,6 +11,15 @@ import type { AuditEntry } from "@/lib/types";
 /** Rows expand to the full detail; `?id=` opens one row expanded (deep link). */
 export function AuditTable({ entries, openId }: { entries: AuditEntry[]; openId: number | null }) {
   const [open, setOpen] = useState<Set<number>>(() => new Set(openId ? [openId] : []));
+  const sp = useSearchParams();
+  const linkFor = (id: number) => {
+    const n = new URLSearchParams(sp.toString());
+    n.set("id", String(id));
+    return `/audit?${n.toString()}`;
+  };
+  useEffect(() => {
+    if (openId) document.getElementById("audit-" + openId)?.scrollIntoView({ block: "center" });
+  }, [openId]);
   const toggle = (id: number) => setOpen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   return (
     <table className="tbl">
@@ -34,7 +44,7 @@ export function AuditTable({ entries, openId }: { entries: AuditEntry[]; openId:
                 </button>
               </td>
               <td style={{ whiteSpace: "nowrap" }}>
-                <Link href={`/audit?id=${e.id}`} style={{ color: "inherit" }} title="Link to this entry">{fmtDate(e.createdAt)}</Link>
+                <Link href={linkFor(e.id)} style={{ color: "inherit" }} title="Link to this entry">{fmtDate(e.createdAt)}</Link>
               </td>
               <td style={{ color: e.ok ? undefined : "var(--red)" }}>
                 {e.action}

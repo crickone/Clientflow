@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
   };
   const okRaw = sp.get("ok");
   const query = {
+    id: num("id"),
     tenantId: num("tenantId") ?? null,
     actorUserId: num("actorUserId"),
     actorEmail: sp.get("actorEmail") || undefined,
