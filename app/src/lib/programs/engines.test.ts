@@ -523,7 +523,8 @@ const fixChecks: [string, () => void][] = [
       const m = runWith(lin, o.state, missSet4, { stepKg: step, unit: "lb" });
       assert.ok(m.reasons.includes("Back squat stays at 115 lb. You got 3 of 5 on set 4. Try it again next time."));
       const tmLb = runWith(tex, x0, asPlanned, { stepKg: step, unit: "lb" });
-      assert.ok(tmLb.reasons.includes("Squat training max goes up to 226 lb. You got all 5 reps on your top set."));
+      assert.ok(tmLb.reasons.includes("Squat training max goes up to 225 lb. You got all 5 reps on your top set."));
+      assert.equal(tmLb.state.tms.squat, Math.round((x0.tms.squat! + 2.268) * 100) / 100, "a pounds member's training max goes up 5 lb, not 2.5 kg");
     },
   ],
   [

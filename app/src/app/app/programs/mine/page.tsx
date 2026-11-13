@@ -13,7 +13,7 @@ import { memberKey, parseMemberKey } from "@/lib/programs/memberTemplate";
 import { weightWhy } from "@/lib/programs/outline";
 import { sessionCount, summarisePlanned, weekLabel } from "@/lib/programs/planner";
 import { LIFT_LABEL } from "@/lib/programs/types";
-import { formatWeight } from "@/lib/programs/units";
+import { formatMax } from "@/lib/programs/units";
 import { dateKey } from "@/lib/trainingProgress";
 import { openSession } from "@/lib/workoutLog";
 import { PhaseBar, PkCard, PkHeader, PkSection, StatTiles, Timeline, Warn } from "@/components/clientapp/programs/kit";
@@ -59,7 +59,6 @@ export default async function MyProgramPage() {
   const today = dateKey(Date.now());
   const week = active && !view.state.finished ? programWeek(view) : [];
   const next = week.find((d) => d.status === "today" || d.status === "planned");
-  const fmt = (kg: number) => formatWeight(kg, view.unit);
   const phase = view.state.finished ? null : currentPhase(content, t, view.state);
   const startsLater = view.startDate > today ? ` · Starts ${new Date(`${view.startDate}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}` : "";
   const where = view.state.finished ? "Program done" : `${weekLabel(t, view.state)}${phase !== null ? ` · ${content.phases[phase].name}` : ""}${startsLater}`;
@@ -113,8 +112,8 @@ export default async function MyProgramPage() {
           tiles={[
             ...t.lifts.map((l) => ({
               label: `${LIFT_LABEL[l]} max`,
-              value: view.state.maxes[l] !== undefined ? fmt(view.state.maxes[l]!) : "-",
-              sub: t.tmPct !== 1 && view.state.tms[l] !== undefined ? `Training max ${fmt(view.state.tms[l]!)}` : undefined,
+              value: view.state.maxes[l] !== undefined ? formatMax(view.state.maxes[l]!, view.unit) : "-",
+              sub: t.tmPct !== 1 && view.state.tms[l] !== undefined ? `Training max ${formatMax(view.state.tms[l]!, view.unit)}` : undefined,
             })),
             {
               label: "Sessions",

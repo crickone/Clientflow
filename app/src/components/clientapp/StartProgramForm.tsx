@@ -11,7 +11,7 @@ import { startProgramAction } from "@/app/app/programs/actions";
 import { firstSets, firstWeek, shortDate, trainingDates, weightsMoveBetweenSessions, type PlanExtra } from "@/lib/programs/outline";
 import { STEP_TITLE, initialStart, maxEntries, maxesKg, reduceStart, rowMaxKg, startSteps, stepBlocker, stepForError, type StartLift } from "@/lib/programs/startFlow";
 import type { ProgramTemplate, WeightUnit } from "@/lib/programs/types";
-import { STEP_OPTIONS, formatWeight, kgToUnit, stepFromKey, trainingMax, type StepKey } from "@/lib/programs/units";
+import { STEP_OPTIONS, formatMax, formatWeight, kgToUnit, stepFromKey, trainingMax, type StepKey } from "@/lib/programs/units";
 import { WEEKDAY_SHORT } from "@/lib/trainingProgress";
 
 /**
@@ -215,8 +215,8 @@ export function StartProgramForm({
                 )}
                 {est !== null ? (
                   <span className="pk-muted">
-                    Max about {fmt(est)}
-                    {template.tmPct !== 1 ? `. Training max ${fmt(trainingMax(est, template.tmPct))}.` : "."}
+                    Max about {formatMax(est, s.unit)}
+                    {template.tmPct !== 1 ? `. Training max ${formatMax(trainingMax(est, template.tmPct), s.unit)}.` : "."}
                     {preview ? ` Your first sets: ${preview}.` : ""}
                   </span>
                 ) : r.mode === "set" && Number(r.reps) > 10 ? (
@@ -255,7 +255,7 @@ export function StartProgramForm({
             {lifts.map((l) => (
               <div key={l.lift} className="pk-sum">
                 <span>{l.label} max</span>
-                <span>{maxes[l.lift] !== undefined ? fmt(maxes[l.lift]!) : "Not set"}</span>
+                <span>{maxes[l.lift] !== undefined ? formatMax(maxes[l.lift]!, s.unit) : "Not set"}</span>
               </div>
             ))}
             <div className="pk-sum">

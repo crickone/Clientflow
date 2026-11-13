@@ -43,6 +43,15 @@ export function roundToStep(kg: number, stepKg: number): number {
   return Number((Math.round(kg / stepKg + 1e-9) * stepKg).toFixed(3));
 }
 
+/**
+ * A training-max jump in the member's unit: as set in kg, or for pounds the
+ * nearest 5 lb (at least 5 lb), so 2.5 kg is 5 lb and 5 kg is 10 lb.
+ */
+export function tmJumpKg(kg: number, unit: WeightUnit): number {
+  if (unit !== "lb" || !(kg > 0)) return kg;
+  return unitToKg(Math.max(5, Math.round(kg / LB_TO_KG / 5) * 5), "lb");
+}
+
 export function kgToUnit(kg: number, unit: WeightUnit): number {
   return unit === "lb" ? Math.round((kg / LB_TO_KG) * 10) / 10 : Math.round(kg * 100) / 100;
 }
@@ -53,6 +62,12 @@ export function unitToKg(value: number, unit: WeightUnit): number {
 
 export function formatWeight(kg: number, unit: WeightUnit): string {
   return `${kgToUnit(kg, unit)} ${unit}`;
+}
+
+/** A max or training max for display, to the nearest 0.5 kg or 1 lb: 58.33 kg shows as 58.5 kg. Working weights use formatWeight. */
+export function formatMax(kg: number, unit: WeightUnit): string {
+  const v = unit === "lb" ? Math.round(kg / LB_TO_KG) : Math.round(kg * 2) / 2;
+  return `${v} ${unit}`;
 }
 
 /** A typed weight in the member's unit, to kg. Blank or nonsense is null. */

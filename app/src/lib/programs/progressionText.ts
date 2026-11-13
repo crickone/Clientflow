@@ -9,7 +9,7 @@ import { listText, weeksText } from "./content";
 import { barKg } from "./engines";
 import { progresses, schemeLabel } from "./planner";
 import { LIFT_LABEL, OWN_DELOAD_PCT, type ExerciseRx, type LiftKey, type ProgramTemplate, type SetRx, type WeightUnit } from "./types";
-import { formatWeight, roundToStep } from "./units";
+import { formatWeight, roundToStep, tmJumpKg } from "./units";
 
 const WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 const word = (n: number) => WORDS[n] ?? String(n);
@@ -156,7 +156,7 @@ function linearLines(t: ProgramTemplate, e: Extract<ProgramTemplate["engine"], {
 
 function tmLines(t: ProgramTemplate, e: Extract<ProgramTemplate["engine"], { key: "tm_cycle" }>, unit: WeightUnit, stepKg: number): string[] {
   const lines: string[] = [];
-  const raw = (kg: number) => (kg > 0 ? formatWeight(kg, unit) : null);
+  const raw = (kg: number) => (kg > 0 ? formatWeight(tmJumpKg(kg, unit), unit) : null);
   const driveReps = unique(exercises(t).flatMap((ex) => ex.sets.flatMap((s) => ((s.kind === "pct" || s.kind === "amrap") && s.drives ? [s.reps] : []))));
   // Texas Method: a training max of 6/7 of the max is the Epley 5-rep max.
   const repMax = e.rule === "drive_set" && driveReps.length === 1 && Math.abs(t.tmPct - 30 / (30 + driveReps[0])) < 0.005 ? driveReps[0] : null;
@@ -183,7 +183,7 @@ function tmLines(t: ProgramTemplate, e: Extract<ProgramTemplate["engine"], { key
       const parts = rows.map((row, i) => {
         const next = rows[i + 1];
         const reps = next ? (next.minReps - 1 === row.minReps ? `${row.minReps}` : `${row.minReps} to ${next.minReps - 1}`) : `${row.minReps} or more`;
-        return row.kg > 0 ? `${reps} reps adds ${formatWeight(row.kg, unit)}` : `${reps} reps changes nothing`;
+        return row.kg > 0 ? `${reps} reps adds ${formatWeight(tmJumpKg(row.kg, unit), unit)}` : `${reps} reps changes nothing`;
       });
       if (parts.length) lines.push(`The reps on the heavy + set move your training max: ${listText(parts)}.`);
       lines.push("If the + set isn't ticked or is more than one jump lighter than planned, the training max stays the same.");

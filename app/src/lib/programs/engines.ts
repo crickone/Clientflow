@@ -21,7 +21,7 @@ import {
   type TmCycleSettings,
   type WeightUnit,
 } from "./types";
-import { formatWeight, maxFromSet, roundToStep, trainingMax } from "./units";
+import { formatMax, formatWeight, maxFromSet, roundToStep, tmJumpKg, trainingMax } from "./units";
 
 export interface ProgressInput {
   template: ProgramTemplate;
@@ -235,7 +235,8 @@ function tableKg(table: { minReps: number; kg: number }[], reps: number): number
 
 function tmCycle(c: Ctx, s: TmCycleSettings): void {
   if (s.rule === "gzclp") return gzclp(c, s);
-  const inc = (lift: LiftKey) => s.increments?.[lift] ?? s.increment;
+  const inc = (lift: LiftKey) => tmJumpKg(s.increments?.[lift] ?? s.increment, c.unit);
+  const tmText = (kg: number) => formatMax(kg, c.unit);
   for (const r of c.result.exercises) {
     const lift = r.planned.lift;
     if (!lift) continue;
@@ -260,30 +261,30 @@ function tmCycle(c: Ctx, s: TmCycleSettings): void {
       if (!p.drives || cur === undefined) return;
       if (s.rule === "amrap_table") {
         if (got === null) {
-          c.reasons.push(`${LIFT_LABEL[lift]} training max stays at ${c.fmt(cur)}. The ${p.reps}+ set wasn't logged.`);
+          c.reasons.push(`${LIFT_LABEL[lift]} training max stays at ${tmText(cur)}. The ${p.reps}+ set wasn't logged.`);
           return;
         }
         if (light) {
-          c.reasons.push(`${LIFT_LABEL[lift]} training max stays at ${c.fmt(cur)}. The ${p.reps}+ set was lighter than planned.`);
+          c.reasons.push(`${LIFT_LABEL[lift]} training max stays at ${tmText(cur)}. The ${p.reps}+ set was lighter than planned.`);
           return;
         }
-        const kg = tableKg(s.amrapTable ?? [], got);
+        const kg = tmJumpKg(tableKg(s.amrapTable ?? [], got), c.unit);
         if (kg > 0) {
           const next = round2(cur + kg);
           c.state.tms[lift] = next;
-          c.reasons.push(`${LIFT_LABEL[lift]} training max goes up to ${c.fmt(next)}. You got ${got} on the ${p.reps}+ set.`);
+          c.reasons.push(`${LIFT_LABEL[lift]} training max goes up to ${tmText(next)}. You got ${got} on the ${p.reps}+ set.`);
         } else {
-          c.reasons.push(`${LIFT_LABEL[lift]} training max stays at ${c.fmt(cur)}. You got ${got} on the ${p.reps}+ set.`);
+          c.reasons.push(`${LIFT_LABEL[lift]} training max stays at ${tmText(cur)}. You got ${got} on the ${p.reps}+ set.`);
         }
       } else if (s.rule === "drive_set") {
         if (got !== null && light) {
-          c.reasons.push(`${LIFT_LABEL[lift]} training max stays at ${c.fmt(cur)}. The top set was lighter than planned.`);
+          c.reasons.push(`${LIFT_LABEL[lift]} training max stays at ${tmText(cur)}. The top set was lighter than planned.`);
         } else if (got !== null && got >= p.reps) {
           const next = round2(cur + inc(lift));
           c.state.tms[lift] = next;
-          c.reasons.push(`${LIFT_LABEL[lift]} training max goes up to ${c.fmt(next)}. You got all ${p.reps} reps on your top set.`);
+          c.reasons.push(`${LIFT_LABEL[lift]} training max goes up to ${tmText(next)}. You got all ${p.reps} reps on your top set.`);
         } else {
-          c.reasons.push(`${LIFT_LABEL[lift]} training max stays at ${c.fmt(cur)}. You got ${got ?? 0} of ${p.reps} on your top set.`);
+          c.reasons.push(`${LIFT_LABEL[lift]} training max stays at ${tmText(cur)}. You got ${got ?? 0} of ${p.reps} on your top set.`);
         }
       }
     });
@@ -301,7 +302,8 @@ const SHORT_TEXT: Record<number, string> = {
  * by its increment, then `short` is cleared for the new cycle. Runs whether the
  * last session was finished or skipped. Changes `state` in place.
  */
-function endOfCycle(t: ProgramTemplate, state: EngineState, fmt: (kg: number) => string): string[] {
+function endOfCycle(t: ProgramTemplate, state: EngineState, unit: WeightUnit): string[] {
+  const fmt = (kg: number) => formatMax(kg, unit);
   const e = t.engine;
   if (e.key !== "tm_cycle" || e.rule !== "cycle") return [];
   const reasons: string[] = [];
@@ -312,7 +314,7 @@ function endOfCycle(t: ProgramTemplate, state: EngineState, fmt: (kg: number) =>
       const why = SHORT_TEXT[state.misses[shortKey(lift)] ?? SHORT_REPS] ?? SHORT_TEXT[SHORT_REPS];
       reasons.push(`${LIFT_LABEL[lift]} training max stays at ${fmt(tm)}. ${why}`);
     } else {
-      const next = round2(tm + (e.increments?.[lift] ?? e.increment));
+      const next = round2(tm + tmJumpKg(e.increments?.[lift] ?? e.increment, unit));
       state.tms[lift] = next;
       reasons.push(`${LIFT_LABEL[lift]} training max goes up to ${fmt(next)} for the next cycle.`);
     }
@@ -561,7 +563,7 @@ export function progress(input: ProgressInput): ProgressOutput {
       ownRules(c);
       break;
   }
-  if (c.atCycleEnd) c.reasons.push(...endOfCycle(t, c.state, c.fmt));
+  if (c.atCycleEnd) c.reasons.push(...endOfCycle(t, c.state, input.unit));
   if (e.key === "fixed_block" && c.atCycleEnd) {
     c.state.finished = true;
     return { state: c.state, reasons: c.reasons };
@@ -585,7 +587,7 @@ export function skipSession(t: ProgramTemplate, state: EngineState, unit: Weight
     next.finished = true;
     return { state: next, reasons: [] };
   }
-  const reasons = last ? endOfCycle(t, next, (kg) => formatWeight(kg, unit)) : [];
+  const reasons = last ? endOfCycle(t, next, unit) : [];
   const a = advance(t, state);
   next.week = a.week;
   next.day = a.day;

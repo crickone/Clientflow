@@ -114,7 +114,7 @@ assert.deepEqual(howWeightsMove(get("531-bbb"), "kg", 2.5), [
   assert.deepEqual(plusWeeks, [true, true, true, false]);
 }
 // A training max moves by the raw amount, shown in pounds.
-assert.ok(howWeightsMove(get("531-bbb"), "lb", STEP_5LB_KG).includes("After each four-week cycle, your training max goes up 5.5 lb, or 11 lb on the deadlift and squat."));
+assert.ok(howWeightsMove(get("531-bbb"), "lb", STEP_5LB_KG).includes("After each four-week cycle, your training max goes up 5 lb, or 10 lb on the deadlift and squat."));
 
 const texas = howWeightsMove(get("texas-method"), "kg", 2.5);
 assert.equal(texas[0], "Your training max is your 5-rep max, about 86% of your max. Every percentage is taken from it.");

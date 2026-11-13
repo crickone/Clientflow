@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import {
   STEP_5LB_KG,
   convertTyped,
+  formatMax,
   formatSetIn,
   formatWeight,
   keyFromStep,
@@ -16,6 +17,7 @@ import {
   resolveMax,
   roundToStep,
   stepFromKey,
+  tmJumpKg,
   trainingMax,
   unitToKg,
   weightForRpe,
@@ -92,5 +94,18 @@ assert.equal(shownStepKg("kg", 1.25), 1.25);
 assert.equal(shownStepKg("kg", 2.5), 2.5);
 assert.equal(shownStepKg("kg", STEP_5LB_KG), 2.5);
 assert.equal(shownStepKg("kg", 0), 2.5);
+
+// A max shows to the nearest 0.5 kg or 1 lb, never with two decimals.
+assert.equal(formatMax(58.33, "kg"), "58.5 kg");
+assert.equal(formatMax(96.75, "kg"), "97 kg");
+assert.equal(formatMax(100, "kg"), "100 kg");
+assert.equal(formatMax(102.268, "lb"), "225 lb");
+
+// A training-max jump for a pounds member is a round 5 lb: 2.5 kg is 5 lb, 5 kg is 10 lb.
+assert.equal(tmJumpKg(2.5, "kg"), 2.5);
+assert.equal(tmJumpKg(2.5, "lb"), 2.268);
+assert.equal(tmJumpKg(5, "lb"), 4.536);
+assert.equal(tmJumpKg(1, "lb"), 2.268);
+assert.equal(tmJumpKg(0, "lb"), 0);
 
 console.log("programs/units: ok");
