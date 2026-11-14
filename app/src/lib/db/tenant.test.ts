@@ -95,6 +95,8 @@ const requireLocal = createRequire(import.meta.url);
     ["workout_session_exercises", "rx_json"],
     ["workout_set_logs", "target_weight_kg"],
     ["workout_set_logs", "rpe"],
+    ["program_enrolments", "assigned_by"],
+    ["program_enrolments", "assigned_at"],
   ] as const) {
     assert.ok(columns(table).includes(column), `${table}.${column} exists after the retry`);
   }

@@ -3203,6 +3203,8 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       status TEXT NOT NULL DEFAULT 'active',
       start_date TEXT NOT NULL,
       weekdays TEXT NOT NULL DEFAULT '',
+      assigned_by INTEGER,
+      assigned_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       ended_at INTEGER
@@ -3246,6 +3248,8 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     addColumn("workout_session_exercises", "rx_json", "rx_json TEXT");
     addColumn("workout_set_logs", "target_weight_kg", "target_weight_kg REAL");
     addColumn("workout_set_logs", "rpe", "rpe REAL");
+    addColumn("program_enrolments", "assigned_by", "assigned_by INTEGER");
+    addColumn("program_enrolments", "assigned_at", "assigned_at INTEGER");
   }
 
   // Dashboard slice 2: stamp each event recorder's start date once.

@@ -3716,6 +3716,9 @@ export const programEnrolments = sqliteTable("program_enrolments", {
   startDate: text("start_date").notNull(),
   /** Training weekdays, "1,3,5" (1 = Monday). */
   weekdays: text("weekdays").notNull().default(""),
+  /** The staff user who set this program for the member; null when the member chose it. */
+  assignedBy: integer("assigned_by"),
+  assignedAt: integer("assigned_at"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
   endedAt: integer("ended_at"),

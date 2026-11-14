@@ -43,6 +43,8 @@ export interface EnrolmentView {
   stepKg: number;
   createdAt: number;
   endedAt: number | null;
+  assignedBy: number | null;
+  assignedAt: number | null;
 }
 
 export interface EnrolmentEvent {
@@ -107,6 +109,8 @@ function toView(row: Row): EnrolmentView | null {
     ...unitsFor(row.clientId),
     createdAt: row.createdAt,
     endedAt: row.endedAt,
+    assignedBy: row.assignedBy ?? null,
+    assignedAt: row.assignedAt ?? null,
   };
 }
 
@@ -163,7 +167,7 @@ function logEvent(tx: Tx, enrolmentId: number, actor: Actor, kind: string, reaso
     .run();
 }
 
-function tmLine(t: ProgramTemplate, s: EngineState, unit: WeightUnit): string {
+export function tmLine(t: ProgramTemplate, s: EngineState, unit: WeightUnit): string {
   const parts = t.lifts.filter((l) => s.tms[l] !== undefined).map((l) => `${LIFT_LABEL[l]} ${formatWeight(s.tms[l]!, unit)}`);
   return parts.length ? ` Training maxes: ${parts.join(", ")}.` : "";
 }
@@ -250,10 +254,14 @@ export interface EnrolInput {
 type EnrolResult = { ok: true; id: number } | { ok: false; error: string };
 const BUSY = { ok: false as const, error: "End your current program before you start another." };
 
+export const COACH_SET = { ok: false as const, error: "Your coach set this program. Ask them to change it." };
+
 function enrolBlocked(clientId: number): EnrolResult | null {
+  const live = liveEnrolment(clientId);
+  if (live?.assignedBy) return COACH_SET;
   const member = db.select({ mode: clients.trainingMode }).from(clients).where(eq(clients.id, clientId)).get();
   if (member?.mode !== "diy") return { ok: false, error: "Programs are for DIY members. Switch this member to DIY first." };
-  if (liveEnrolment(clientId)) return BUSY;
+  if (live) return BUSY;
   return null;
 }
 
@@ -273,6 +281,33 @@ export interface EnrolSource {
   copyId: number | null;
 }
 
+/** Insert a live enrolment and its "start" event, in the caller's transaction. The member's unit and step are saved too. */
+export function insertEnrolment(tx: Tx, clientId: number, input: Omit<EnrolInput, "key">, src: EnrolSource, opts: { actor: Actor; reason: string; assignedBy: number | null }): number {
+  const t = src.template;
+  const state = initState(t, input.maxesKg, input.stepKg);
+  const now = Date.now();
+  tx.update(clients).set({ weightUnit: input.unit, plateStepKg: input.stepKg }).where(eq(clients.id, clientId)).run();
+  const [row] = tx
+    .insert(programEnrolments)
+    .values({
+      clientId,
+      programKey: src.programKey,
+      copyId: src.copyId,
+      templateJson: JSON.stringify(t),
+      ...stateColumns(state),
+      status: "active",
+      startDate: input.startDate,
+      weekdays: parseWeekdays(input.weekdays.join(",")).join(","),
+      assignedBy: opts.assignedBy,
+      assignedAt: opts.assignedBy === null ? null : now,
+      createdAt: now,
+    })
+    .returning({ id: programEnrolments.id })
+    .all();
+  logEvent(tx, row.id, opts.actor, "start", opts.reason, null, state);
+  return row.id;
+}
+
 /** Start a program from a template the caller has already found (and checked the member may run). */
 export function enrolTemplate(clientId: number, input: Omit<EnrolInput, "key">, src: EnrolSource): EnrolResult {
   const blocked = enrolBlocked(clientId);
@@ -280,30 +315,15 @@ export function enrolTemplate(clientId: number, input: Omit<EnrolInput, "key">, 
   const t = src.template;
   const problem = maxesProblem(t, input.maxesKg);
   if (problem) return { ok: false, error: problem };
-  const state = initState(t, input.maxesKg, input.stepKg);
-  const now = Date.now();
   let id: number;
   try {
-    id = db.transaction((tx) => {
-      tx.update(clients).set({ weightUnit: input.unit, plateStepKg: input.stepKg }).where(eq(clients.id, clientId)).run();
-      const [row] = tx
-        .insert(programEnrolments)
-        .values({
-          clientId,
-          programKey: src.programKey,
-          copyId: src.copyId,
-          templateJson: JSON.stringify(t),
-          ...stateColumns(state),
-          status: "active",
-          startDate: input.startDate,
-          weekdays: parseWeekdays(input.weekdays.join(",")).join(","),
-          createdAt: now,
-        })
-        .returning({ id: programEnrolments.id })
-        .all();
-      logEvent(tx, row.id, { kind: "member" }, "start", `Started ${t.name}.${tmLine(t, state, input.unit)}`, null, state);
-      return row.id;
-    });
+    id = db.transaction((tx) =>
+      insertEnrolment(tx, clientId, input, src, {
+        actor: { kind: "member" },
+        reason: `Started ${t.name}.${tmLine(t, initState(t, input.maxesKg, input.stepKg), input.unit)}`,
+        assignedBy: null,
+      }),
+    );
   } catch (err) {
     // The partial unique index allows one live enrolment per member.
     if (String(err).includes("UNIQUE")) return BUSY;
@@ -478,6 +498,7 @@ export function skipEnrolmentSession(clientId: number): Result {
 export function endEnrolment(clientId: number, actor: Actor): boolean {
   const view = liveEnrolment(clientId);
   if (!view) return false;
+  if (actor.kind === "member" && view.assignedBy) return false;
   const now = Date.now();
   return db.transaction((tx) => {
     const r = tx
@@ -503,12 +524,12 @@ export function setTrainingMode(clientId: number, mode: "coach" | "diy", actor: 
     let paused = false;
     let resumed = false;
     const live = tx
-      .select({ id: programEnrolments.id, status: programEnrolments.status })
+      .select({ id: programEnrolments.id, status: programEnrolments.status, assignedBy: programEnrolments.assignedBy })
       .from(programEnrolments)
       .where(and(eq(programEnrolments.clientId, clientId), inArray(programEnrolments.status, ["active", "paused"])))
       .orderBy(desc(programEnrolments.id))
       .get();
-    if (live && mode === "coach" && live.status === "active") {
+    if (live && mode === "coach" && live.status === "active" && !live.assignedBy) {
       tx.update(programEnrolments).set({ status: "paused", updatedAt: Date.now() }).where(eq(programEnrolments.id, live.id)).run();
       logEvent(tx, live.id, actor, "pause", "Paused: switched to coach guided.", null, null);
       paused = true;
@@ -536,6 +557,7 @@ export function setEnrolmentDays(clientId: number, weekdays: number[]): boolean 
 /** A finished block starts again from the member's new maxes. */
 export function restartFromTest(clientId: number, maxesKg: Partial<Record<LiftKey, number>>): Result {
   const view = liveEnrolment(clientId);
+  if (view?.assignedBy) return COACH_SET;
   if (!view || view.status !== "active" || !view.state.finished) return { ok: false, error: "Your program isn't at its end yet." };
   const problem = maxesProblem(view.template, maxesKg);
   if (problem) return { ok: false, error: problem };
@@ -595,6 +617,7 @@ export function writeTemplateEdit(
   reason: string | null,
   /** For each week of `template`, the week of the old template it came from; null for an added week. */
   weekOrigins: (number | null)[] | null = null,
+  actor: Actor = { kind: "member" },
 ): boolean {
   if (!unchanged(tx, view, ["active", "paused"])) return false;
   if (reason === null) {
@@ -634,7 +657,7 @@ export function writeTemplateEdit(
     if (empty.length) tx.delete(workoutSessions).where(inArray(workoutSessions.id, empty)).run();
     if (kept.length) tx.update(workoutSessions).set({ dayPosition: DETACHED_POSITION }).where(inArray(workoutSessions.id, kept)).run();
   }
-  logEvent(tx, view.id, { kind: "member" }, "edit", reason, view.state, state);
+  logEvent(tx, view.id, actor, "edit", reason, view.state, state);
   return true;
 }
 

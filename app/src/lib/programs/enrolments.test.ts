@@ -547,6 +547,30 @@ const requireLocal = createRequire(import.meta.url);
     assert.deepEqual(en.enrolmentCounts(id), { done: 0, skipped: 0 });
   });
 
+  const markCoachSet = (enrolmentId: number) =>
+    db.run(sql`UPDATE program_enrolments SET assigned_by = 1, assigned_at = ${Date.now()} WHERE id = ${enrolmentId}`);
+
+  test("a coach-set program locks the member out of end, restart and starting another", () => {
+    const c = newMember();
+    const id = enrolIn(c, "stronglifts-5x5", maxes);
+    markCoachSet(id);
+    assert.equal(en.liveEnrolment(c)!.assignedBy, 1);
+    assert.equal(en.endEnrolment(c, { kind: "member" }), false, "the member can't end it");
+    assert.deepEqual(en.enrol(c, input), en.COACH_SET, "nor start another");
+    assert.deepEqual(en.restartFromTest(c, maxes), en.COACH_SET);
+    assert.equal(en.skipEnrolmentSession(c).ok, true, "skip still works");
+    assert.equal(en.setEnrolmentDays(c, [2, 4]), true, "training days still work");
+    assert.equal(en.endEnrolment(c, staff), true, "a coach can end it");
+  });
+
+  test("switching to coach guided never pauses a coach-set program", () => {
+    const c = newMember();
+    const id = enrolIn(c, "stronglifts-5x5", maxes);
+    markCoachSet(id);
+    assert.deepEqual(en.setTrainingMode(c, "coach", staff), { paused: false, resumed: false });
+    assert.equal(en.liveEnrolment(c)!.status, "active");
+  });
+
   test("a live enrolment survives deleting the gym copy it started from", () => {
     const clientId = newMember();
     const copyId = lib.makeCopy("stronglifts-5x5", 1);
