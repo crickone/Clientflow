@@ -9,7 +9,7 @@ import { programByKey } from "./library";
 import { editReason, normaliseOrigins, rebaseEdit } from "./memberEdit";
 import { initState } from "./engines";
 import { LIFT_LABEL, type ProgramTemplate } from "./types";
-import { copyErrors, validateTemplate } from "./validate";
+import { copyErrors, parseTemplate, templateErrors } from "./validate";
 
 /**
  * A coach sets a library program for one member, edits that person's copy
@@ -23,12 +23,12 @@ export type AssignResult = { ok: true; id: number } | { ok: false; error: string
 
 /** The coach's draft of a person's copy, checked like a gym version: the template check plus every lift the original's engine needs. */
 export function checkPersonCopy(original: ProgramTemplate, raw: unknown): { ok: true; template: ProgramTemplate } | { ok: false; errors: string[] } {
-  const v = validateTemplate(raw);
-  if (!v.ok) return v;
-  // The engine is the original's, whatever the draft says.
-  const t: ProgramTemplate = { ...v.template, key: original.key, engine: original.engine, tmPct: original.tmPct, lifts: original.lifts };
-  const missing = copyErrors(original, t);
-  return missing.length ? { ok: false, errors: missing } : { ok: true, template: t };
+  const parsed = parseTemplate(raw);
+  if (!parsed.ok) return parsed;
+  // The engine is the original's, whatever the draft says; the rules are then checked against it.
+  const t: ProgramTemplate = { ...parsed.template, key: original.key, engine: original.engine, tmPct: original.tmPct, lifts: original.lifts };
+  const errors = [...copyErrors(original, t), ...templateErrors(t)];
+  return errors.length ? { ok: false, errors: [...new Set(errors)] } : { ok: true, template: t };
 }
 
 export function coachAssign(clientId: number, input: AssignInput, actor: StaffActor): AssignResult {
@@ -57,7 +57,7 @@ export function coachAssign(clientId: number, input: AssignInput, actor: StaffAc
           .set({ status: "ended", endedAt: Date.now(), updatedAt: Date.now() })
           .where(and(eq(programEnrolments.id, live.id), inArray(programEnrolments.status, ["active", "paused"])))
           .run();
-        if (r.changes > 0) logEnrolmentEvent(tx, live.id, actor, "end", `${actor.name} ended this program to set a new one.`);
+        if (r.changes > 0) logEnrolmentEvent(tx, live.id, actor, "end", `${actor.name} ended this program to set a new one.`, live.state);
       }
       return insertEnrolment(tx, clientId, input, { template: t, programKey: entry.copyId ? null : t.key, copyId: entry.copyId }, {
         actor,

@@ -96,9 +96,34 @@ const requireLocal = createRequire(import.meta.url);
     const t = structuredClone(reg.platformProgram("531-bbb")) as any;
     for (const w of t.weeks) for (const d of w.days) d.exercises = d.exercises.filter((x: { lift?: string }) => x.lift !== "press");
     for (const w of t.weeks) w.days = w.days.filter((d: { exercises: unknown[] }) => d.exercises.length > 0);
+    t.lifts = t.lifts.filter((l: string) => l !== "press");
     const r = cp.coachAssign(c, { ...base, template: t }, staff);
-    assert.ok(!r.ok && r.errors?.some((e) => /overhead press max/.test(e)), JSON.stringify(r));
+    assert.ok(!r.ok && r.errors?.some((e) => /overhead press max\. 5\/3\/1 Boring But Big needs one\.$/.test(e)), JSON.stringify(r));
     assert.equal(en.liveEnrolment(c), null, "nothing written");
+  });
+
+  test("a draft can't swap in own rules to skip the checks", () => {
+    const c = newMember(false);
+    const t = structuredClone(reg.platformProgram("531-bbb")) as any;
+    t.engine = { key: "own_rules" };
+    t.weeks[0].days[0].exercises[0].name = "Made up lift";
+    const r = cp.coachAssign(c, { ...base, template: t }, staff);
+    assert.ok(!r.ok && r.errors?.some((e) => /not in the exercise list/.test(e)), JSON.stringify(r));
+    assert.equal(en.liveEnrolment(c), null, "nothing written");
+  });
+
+  test("a coach edits a program set from a gym version", () => {
+    const lib = requireLocal("./library") as typeof import("./library");
+    const copyId = lib.makeCopy("531-bbb", 1)!;
+    assert.ok(copyId);
+    const c = newMember(false);
+    assert.ok(cp.coachAssign(c, { ...base, key: `copy-${copyId}` }, staff).ok);
+    const v = en.liveEnrolment(c)!;
+    assert.equal(v.copyId, copyId);
+    const t = structuredClone(v.template) as any;
+    t.weeks[0].days[0].exercises.push({ name: "Face pull", sets: [{ kind: "fixed", reps: 15, rest: 60 }], progress: false });
+    assert.deepEqual(cp.coachEditProgram(c, v.id, t, t.weeks.map((_: unknown, i: number) => i), staff), { ok: true });
+    assert.equal(en.liveEnrolment(c)!.template.engine.key, "tm_cycle");
   });
 
   test("a coach edits a running program; the training max survives", () => {

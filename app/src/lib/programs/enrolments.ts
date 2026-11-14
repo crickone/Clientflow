@@ -168,8 +168,8 @@ function logEvent(tx: Tx, enrolmentId: number, actor: Actor, kind: string, reaso
 }
 
 /** A change-log event in the caller's transaction, with no state snapshot. */
-export function logEnrolmentEvent(tx: Tx, enrolmentId: number, actor: Actor, kind: string, reason: string): void {
-  logEvent(tx, enrolmentId, actor, kind, reason, null, null);
+export function logEnrolmentEvent(tx: Tx, enrolmentId: number, actor: Actor, kind: string, reason: string, before: EngineState | null = null): void {
+  logEvent(tx, enrolmentId, actor, kind, reason, before, null);
 }
 
 export function tmLine(t: ProgramTemplate, s: EngineState, unit: WeightUnit): string {
