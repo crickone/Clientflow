@@ -3,6 +3,9 @@ import "server-only";
 import { redirect } from "next/navigation";
 
 import { requireClientPage, type CurrentClient } from "@/lib/clientAuth";
+import { db } from "@/lib/db";
+import { programEnrolments } from "@/lib/db/schema";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { isModuleOn } from "@/lib/features";
 import { getFeatureFlagsForTenant } from "@/lib/settings";
 
@@ -16,9 +19,19 @@ export function programsOn(tenantId: number): boolean {
   }
 }
 
-/** A member sees Programs only in DIY mode, and only where the module is on. */
-export function memberSeesPrograms(c: Pick<CurrentClient, "tenantId" | "client"> | null): boolean {
-  return !!c && c.client.trainingMode === "diy" && programsOn(c.tenantId);
+/** The member's live program was set by their coach. */
+function hasCoachSetProgram(clientId: number): boolean {
+  return !!db
+    .select({ id: programEnrolments.id })
+    .from(programEnrolments)
+    .where(and(eq(programEnrolments.clientId, clientId), inArray(programEnrolments.status, ["active", "paused"]), isNotNull(programEnrolments.assignedBy)))
+    .get();
+}
+
+/** A member sees Programs where the module is on, in DIY mode or while their coach has set them a program. */
+export function memberSeesPrograms(c: Pick<CurrentClient, "tenantId" | "client" | "clientId"> | null): boolean {
+  if (!c || !programsOn(c.tenantId)) return false;
+  return c.client.trainingMode === "diy" || hasCoachSetProgram(c.clientId);
 }
 
 /** Page guard for /app/programs: signed in, past the welcome steps, DIY, module on. */

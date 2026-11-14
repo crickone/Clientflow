@@ -31,7 +31,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ClientHome() {
   const { clientId, client, tenantId } = requireClientPage();
-  const programsVisible = memberSeesPrograms({ tenantId, client });
+  const programsVisible = memberSeesPrograms({ tenantId, client, clientId });
   const scansOn = bodyScansEnabled(tenantId);
   const scanConsent = scansOn ? getScanProfile(clientId).consentAt !== null : false;
   const scans = scanConsent ? listClientScans(clientId).filter((s) => Object.keys(s.metrics).length > 0) : [];

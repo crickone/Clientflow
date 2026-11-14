@@ -22,7 +22,7 @@ function when(ms: number) {
 
 export default async function ClientWorkoutsPage() {
   const { clientId, client, tenantId } = requireClientPage();
-  const programsVisible = memberSeesPrograms({ tenantId, client });
+  const programsVisible = memberSeesPrograms({ tenantId, client, clientId });
   const programs = assignedWorkoutPrograms(clientId);
   const t = trainingOverview(clientId);
   const recent = listSessions(clientId, 3);
