@@ -22,12 +22,11 @@ import { programByKey } from "@/lib/programs/library";
 import { enrolMemberProgram } from "@/lib/programs/memberPrograms";
 import { parseMemberKey } from "@/lib/programs/memberTemplate";
 import { stepFromKey } from "@/lib/programs/units";
-import { maxEntryZ, resolveMaxes, startZ, type MaxEntry, type StartProgramInput } from "@/lib/programs/startInput";
+import { maxEntryZ, resolveMaxes, startZ } from "@/lib/programs/startInput";
 
 // The member's own program. Every action takes the member from their client
 // session; lib/programs/enrolments only ever touches that member's enrolment.
 
-export type { MaxEntry, StartProgramInput };
 
 type Result = { ok: true } | { ok: false; error: string };
 const OFF = { ok: false as const, error: "Programs aren't switched on for you." };
