@@ -8,7 +8,6 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
-import { saveCopyAction } from "@/app/workout/library/actions";
 import { SET_KINDS, blankExercise, convertSet, mostDays, repsMax, repsMin, withReps } from "@/lib/programs/editing";
 import { CANONICAL_EXERCISES } from "@/lib/programs/exercises";
 import { schemeLabel, weekLabel } from "@/lib/programs/planner";
@@ -218,15 +217,21 @@ function ExerciseEditor({
  * Weeks, then days, then exercises, then set rows, in the style of the Detailed builder.
  * fullBlock: the original's weeks are its whole length, so the length is the number of weeks.
  */
+export type EditorSave = (t: ProgramTemplate, weekOrigins: (number | null)[]) => Promise<{ ok: true } | { ok: false; errors: string[] }>;
+
 export function ProgramCopyEditor({
-  id,
+  save: saveTemplate,
+  saveLabel,
+  savedMessage,
   initial,
   lifts,
   engineLabel,
   isBlock,
   fullBlock,
 }: {
-  id: number;
+  save: EditorSave;
+  saveLabel: string;
+  savedMessage: string;
   initial: ProgramTemplate;
   lifts: LiftKey[];
   engineLabel: string;
@@ -236,6 +241,8 @@ export function ProgramCopyEditor({
   const router = useRouter();
   const [t, setT] = useState<ProgramTemplate>(initial);
   const [wi, setWi] = useState(0);
+  // For each week of t, the index of the original week it came from; null for a copied week.
+  const [origins, setOrigins] = useState<(number | null)[]>(() => initial.weeks.map((_, i) => i));
   const [errors, setErrors] = useState<string[]>([]);
   const [pending, start] = useTransition();
   const w = Math.min(wi, t.weeks.length - 1);
@@ -251,7 +258,7 @@ export function ProgramCopyEditor({
 
   function save() {
     start(async () => {
-      const r = await saveCopyAction(id, t);
+      const r = await saveTemplate(t, origins);
       if (!r.ok) {
         setErrors(r.errors);
         toast.error("Not saved. See what needs fixing at the top.");
@@ -259,7 +266,8 @@ export function ProgramCopyEditor({
         return;
       }
       setErrors([]);
-      toast.success("Saved. Members who start this version from now on get these changes.");
+      toast.success(savedMessage);
+      setOrigins(t.weeks.map((_, i) => i));
       router.refresh();
     });
   }
@@ -332,6 +340,7 @@ export function ProgramCopyEditor({
           className="pe-tab"
           onClick={() => {
             edit((d) => void d.weeks.splice(w + 1, 0, structuredClone(d.weeks[w])));
+            setOrigins((o) => [...o.slice(0, w + 1), null, ...o.slice(w + 1)]);
             setWi(w + 1);
           }}
         >
@@ -343,6 +352,7 @@ export function ProgramCopyEditor({
             className="pe-tab"
             onClick={() => {
               edit((d) => void d.weeks.splice(w, 1));
+              setOrigins((o) => o.filter((_, i) => i !== w));
               setWi(Math.max(0, w - 1));
             }}
           >
@@ -401,7 +411,7 @@ export function ProgramCopyEditor({
 
       <div className="pe-save">
         <Button onClick={save} loading={pending}>
-          Save our version
+          {saveLabel}
         </Button>
       </div>
     </div>

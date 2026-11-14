@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ProgramCopyEditor } from "@/components/workout/ProgramCopyEditor";
+import { CopyEditorSave } from "@/components/workout/CopyEditorSave";
 import { isFullBlock } from "@/lib/programs/editing";
 import { getCopy } from "@/lib/programs/library";
 import { platformProgram } from "@/lib/programs/registry";
@@ -30,7 +30,7 @@ export default async function ProgramCopyPage(props: { params: Promise<{ id: str
         title={copy.name}
         subtitle="Change exercises, sets, reps, percentages, RPE, rest and notes, and add or remove days and weeks. Members already running it keep the version they started."
       />
-      <ProgramCopyEditor
+      <CopyEditorSave
         id={copy.id}
         initial={copy.template}
         lifts={original?.lifts ?? copy.template.lifts}
