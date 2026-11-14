@@ -33,6 +33,8 @@ function buildPanel(clientId: number): ProgramPanelData | null {
           state: live.state,
           unit: live.unit,
           basedOnName: live.copyId ? (getCopy(live.copyId)?.basedOnName ?? null) : null,
+          assignedAt: live.assignedAt,
+          assignedByName: live.assignedAt !== null ? assignedByName(live.id) : null,
           memberBuilt: !!live.programKey && parseMemberKey(live.programKey) !== null,
         }
       : null,
@@ -40,4 +42,10 @@ function buildPanel(clientId: number): ProgramPanelData | null {
     events: live ? enrolmentEvents(live.id, PANEL_EVENT_LIMIT) : [],
     past: past.map((p) => ({ name: p.template.name, endedAt: p.endedAt })),
   });
+}
+
+/** The coach who set the program: the newest start event logged by a staff member. */
+function assignedByName(enrolmentId: number): string {
+  const ev = enrolmentEvents(enrolmentId, 1000).find((e) => e.kind === "start" && e.actor.startsWith("staff:"));
+  return ev?.actorName ?? "a coach";
 }

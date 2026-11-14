@@ -4,7 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { clients, programEnrolments } from "@/lib/db/schema";
-import { MAX_KG, endEnrolment, getEnrolmentFor, insertEnrolment, liveEnrolment, logEnrolmentEvent, tmLine, writeTemplateEdit, type EnrolInput, type StaffActor } from "./enrolments";
+import { MAX_KG, endEnrolment, getEnrolmentFor, insertEnrolment, liveEnrolment, logEnrolmentEvent, tmLine, writeTemplateEdit, type EnrolInput, type EnrolmentView, type StaffActor } from "./enrolments";
 import { programByKey } from "./library";
 import { editReason, normaliseOrigins, rebaseEdit } from "./memberEdit";
 import { initState } from "./engines";
@@ -72,11 +72,16 @@ export function coachAssign(clientId: number, input: AssignInput, actor: StaffAc
   }
 }
 
+/** The library program a person's copy came from; the copy itself when the original is gone. */
+export function originalTemplate(view: Pick<EnrolmentView, "copyId" | "programKey" | "template">): ProgramTemplate {
+  return (view.copyId ? programByKey(`copy-${view.copyId}`)?.template : view.programKey ? programByKey(view.programKey, { includeHidden: true })?.template : null) ?? view.template;
+}
+
 export function coachEditProgram(clientId: number, enrolmentId: number, raw: unknown, weekOrigins: unknown, actor: StaffActor): { ok: true } | { ok: false; errors: string[] } {
   const view = getEnrolmentFor(clientId, enrolmentId);
   if (!view || view.status === "ended") return { ok: false, errors: ["That program has ended."] };
   if (!view.assignedBy) return { ok: false, errors: ["The member chose this program, so only they can change it."] };
-  const original = (view.copyId ? programByKey(`copy-${view.copyId}`)?.template : view.programKey ? programByKey(view.programKey, { includeHidden: true })?.template : null) ?? view.template;
+  const original = originalTemplate(view);
   const checked = checkPersonCopy(original, raw);
   if (!checked.ok) return checked;
   const t = checked.template;

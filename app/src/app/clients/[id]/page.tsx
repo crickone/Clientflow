@@ -262,6 +262,19 @@ export default async function ClientProfile(
         {showWorkoutLog && training && (
           <TabsContent value="workouts">
             {programPanel && <ClientProgramPanel clientId={id} data={programPanel} />}
+            {programsEnabled && !programPanel && (
+              <section className="dp" aria-label="Programs">
+                <div className="dp-eyebrow">Programs</div>
+                <p className="dp-sub">No program yet.</p>
+                <div className="dp-forms">
+                  <Link href={`/clients/${id}/program/assign`}>
+                    <Button type="button" variant="secondary">
+                      Set a program
+                    </Button>
+                  </Link>
+                </div>
+              </section>
+            )}
             <ClientWorkoutLog sessions={workoutSessions} records={lifts} open={openWorkout} overview={training} />
           </TabsContent>
         )}

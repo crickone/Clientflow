@@ -2,17 +2,22 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Input } from "@/components/ui/Input";
+import { coachEndProgramAction } from "@/app/clients/[id]/program/actions";
 import { coachMoveWeekAction, coachSetMaxAction } from "@/app/clients/[id]/programActions";
 import { PANEL_EVENT_LIMIT, type ProgramPanelData } from "@/lib/programs/panel";
 
 /** Staff view of a member's DIY program: where they are, their maxes, the next session, and every change with its reason. */
 export function ClientProgramPanel({ clientId, data }: { clientId: number; data: ProgramPanelData }) {
   const router = useRouter();
+  const confirm = useConfirm();
+  const [endPending, startEnd] = useTransition();
   const live = data.live;
   const [lift, setLift] = useState(live?.lifts[0]?.lift ?? "squat");
   const [value, setValue] = useState("");
@@ -35,6 +40,17 @@ export function ClientProgramPanel({ clientId, data }: { clientId: number; data:
     });
   }
 
+  function endProgram() {
+    if (!live) return;
+    startEnd(async () => {
+      if (!(await confirm({ title: `End ${live.name}?`, body: "Its history is kept.", confirmLabel: "End it", destructive: true }))) return;
+      const r = await coachEndProgramAction(clientId, live.enrolmentId);
+      if (!r.ok) return void toast.error(r.error);
+      toast.success("Program ended.");
+      router.refresh();
+    });
+  }
+
   function moveWeek(e: React.FormEvent) {
     e.preventDefault();
     if (!live) return;
@@ -53,13 +69,32 @@ export function ClientProgramPanel({ clientId, data }: { clientId: number; data:
         <>
           <div className="dp-head">
             <div>
-              <div className="dp-eyebrow">DIY program</div>
+              <div className="dp-eyebrow">{live.coachSet ? "Program set by coach" : "DIY program"}</div>
               <h3 className="dp-title">{live.name}</h3>
               <p className="dp-sub">{live.byline}</p>
+              {live.setBy && <p className="dp-sub">{live.setBy}</p>}
             </div>
             <span className="dp-status" data-status={live.status}>
               {live.status === "paused" ? "Paused" : live.finished ? "Finished" : "Active"}
             </span>
+          </div>
+
+          <div className="dp-forms">
+            {live.coachSet && (
+              <Link href={`/clients/${clientId}/program/edit`}>
+                <Button type="button" variant="secondary">
+                  Edit program
+                </Button>
+              </Link>
+            )}
+            <Button type="button" variant="secondary" loading={endPending} onClick={endProgram}>
+              End program
+            </Button>
+            <Link href={`/clients/${clientId}/program/assign`}>
+              <Button type="button" variant="secondary">
+                Set a new program
+              </Button>
+            </Link>
           </div>
 
           <div className="dp-tiles">
@@ -175,7 +210,16 @@ export function ClientProgramPanel({ clientId, data }: { clientId: number; data:
           </div>
         </>
       ) : (
-        <p className="dp-sub">No DIY program running.</p>
+        <>
+          <p className="dp-sub">No program running.</p>
+          <div className="dp-forms">
+            <Link href={`/clients/${clientId}/program/assign`}>
+              <Button type="button" variant="secondary">
+                Set a program
+              </Button>
+            </Link>
+          </div>
+        </>
       )}
 
       {data.past.length > 0 && (

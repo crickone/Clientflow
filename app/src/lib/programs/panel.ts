@@ -16,6 +16,9 @@ export interface PanelInput {
     basedOnName: string | null;
     /** A program the member built for themselves: staff see it read-only. */
     memberBuilt?: boolean;
+    /** When a coach set this program, else null. */
+    assignedAt?: number | null;
+    assignedByName?: string | null;
   } | null;
   plan: PlannedSession | null;
   events: { id: number; at: number; actor: string; actorName: string | null; kind: string; reason: string }[];
@@ -30,6 +33,10 @@ export interface ProgramPanelData {
     enrolmentId: number;
     name: string;
     byline: string;
+    /** A coach set this program for the member. */
+    coachSet: boolean;
+    /** "Set by Coach Ann on 14 Nov 2026", or null. */
+    setBy: string | null;
     status: "active" | "paused";
     finished: boolean;
     weekLine: string;
@@ -99,6 +106,8 @@ export function panelFrom(input: PanelInput): ProgramPanelData {
       enrolmentId: e.id,
       name: t.name,
       byline: e.memberBuilt ? MEMBER_AUTHOR : e.basedOnName ? `Our version, based on ${e.basedOnName}` : t.author,
+      coachSet: e.assignedAt != null,
+      setBy: e.assignedAt != null ? `Set by ${e.assignedByName ?? "a coach"} on ${dayText(e.assignedAt)}` : null,
       status: e.status,
       finished: e.state.finished,
       weekLine: e.state.finished ? "Block finished. Waiting for a new max." : weekLabel(t, e.state),
