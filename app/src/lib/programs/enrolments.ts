@@ -167,6 +167,11 @@ function logEvent(tx: Tx, enrolmentId: number, actor: Actor, kind: string, reaso
     .run();
 }
 
+/** A change-log event in the caller's transaction, with no state snapshot. */
+export function logEnrolmentEvent(tx: Tx, enrolmentId: number, actor: Actor, kind: string, reason: string): void {
+  logEvent(tx, enrolmentId, actor, kind, reason, null, null);
+}
+
 export function tmLine(t: ProgramTemplate, s: EngineState, unit: WeightUnit): string {
   const parts = t.lifts.filter((l) => s.tms[l] !== undefined).map((l) => `${LIFT_LABEL[l]} ${formatWeight(s.tms[l]!, unit)}`);
   return parts.length ? ` Training maxes: ${parts.join(", ")}.` : "";
