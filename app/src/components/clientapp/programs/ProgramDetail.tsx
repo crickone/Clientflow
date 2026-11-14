@@ -14,7 +14,7 @@ import { hasSessionTime, lengthTag, repeatNote, sessionMinutes, typicalWeek, who
 import { howWeightsMove } from "@/lib/programs/progressionText";
 import { FAMILY_LABEL, LEVEL_LABEL, LIFT_LABEL, type ProgramTemplate, type WeightUnit } from "@/lib/programs/types";
 
-export type DetailAction = { kind: "start"; href: string } | { kind: "continue" } | { kind: "busy"; runningName: string };
+export type DetailAction = { kind: "start"; href: string } | { kind: "continue" } | { kind: "busy"; runningName: string; coachSet?: boolean };
 
 /** How many exercises a typical-week day lists before "and N more". */
 const DAY_LINES = 3;
@@ -143,7 +143,9 @@ export function ProgramDetail({
 
       {action.kind === "busy" ? (
         <PkCard>
-          <span className="pk-muted">You&rsquo;re running {action.runningName}. End it on My program before you start another.</span>
+          <span className="pk-muted">
+            {action.coachSet ? "Your coach set your current program." : <>You&rsquo;re running {action.runningName}. End it on My program before you start another.</>}
+          </span>
           <Link href="/app/programs/mine" className="pk-ghost">
             Go to My program
           </Link>

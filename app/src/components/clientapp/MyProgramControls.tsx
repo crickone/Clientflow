@@ -11,7 +11,7 @@ import { Card } from "@/components/clientapp/ui";
 import { endProgramAction, setProgramDaysAction, skipProgramSessionAction } from "@/app/app/programs/actions";
 import { WEEKDAY_SHORT } from "@/lib/trainingProgress";
 
-export function MyProgramControls({ canSkip, weekdays }: { canSkip: boolean; weekdays: number[] }) {
+export function MyProgramControls({ canSkip, weekdays, canEnd = true }: { canSkip: boolean; weekdays: number[]; canEnd?: boolean }) {
   const router = useRouter();
   const confirm = useConfirm();
   const [days, setDays] = useState<number[]>(weekdays);
@@ -91,15 +91,17 @@ export function MyProgramControls({ canSkip, weekdays }: { canSkip: boolean; wee
           </Button>
         )}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: canSkip ? "1fr 1fr" : "1fr", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: canSkip && canEnd ? "1fr 1fr" : "1fr", gap: 8 }}>
         {canSkip && (
           <Button variant="secondary" onClick={skip} disabled={pending || asking}>
             Skip next session
           </Button>
         )}
-        <Button variant="secondary" onClick={end} disabled={pending || asking}>
-          End program
-        </Button>
+        {canEnd && (
+          <Button variant="secondary" onClick={end} disabled={pending || asking}>
+            End program
+          </Button>
+        )}
       </div>
     </Card>
   );

@@ -27,7 +27,7 @@ export default async function ProgramsPage() {
     <div className="pk">
       <PkHeader title="Programs" lead="Well-known programs, with your weights worked out." />
       <ProgramBrowser cards={cards}>
-        <BuiltProgramList current={current} programs={built} anyLive={!!live} />
+        <BuiltProgramList current={current} programs={built} anyLive={!!live} coachSet={!!live && live.assignedBy !== null} />
       </ProgramBrowser>
     </div>
   );

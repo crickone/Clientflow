@@ -49,7 +49,7 @@ export default async function ProgramDetailPage(props: { params: Promise<{ key: 
     running = !!live && (entry.copyId !== null ? live.copyId === entry.copyId : live.programKey === t.key);
     startHref = `/app/programs/${encodeURIComponent(t.key)}/start`;
   }
-  const action: DetailAction = running ? { kind: "continue" } : live ? { kind: "busy", runningName: live.template.name } : { kind: "start", href: startHref };
+  const action: DetailAction = running ? { kind: "continue" } : live ? { kind: "busy", runningName: live.template.name, coachSet: live.assignedBy !== null } : { kind: "start", href: startHref };
   const unit = running && live ? live.unit : client.weightUnit === "lb" ? "lb" : "kg";
   const stepKg = shownStepKg(unit, running && live ? live.stepKg : client.plateStepKg);
   return (
@@ -61,7 +61,7 @@ export default async function ProgramDetailPage(props: { params: Promise<{ key: 
       unit={unit}
       stepKg={stepKg}
       action={action}
-      editHref={ownId !== null ? `/app/programs/built/${ownId}` : undefined}
+      editHref={ownId !== null && !(running && live?.assignedBy) ? `/app/programs/built/${ownId}` : undefined}
     />
   );
 }

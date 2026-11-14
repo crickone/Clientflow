@@ -38,6 +38,8 @@ export default async function MyProgramPage() {
   const view = liveEnrolment(clientId);
   if (!view) redirect("/app/programs");
   const t = view.template;
+  // Set by the member's coach: the member follows it but cannot edit, end or restart it.
+  const coachSet = view.assignedBy !== null;
   // One of the member's own programs: they can edit it and set its maxes.
   const ownId = view.programKey ? parseMemberKey(view.programKey) : null;
   // The library entry it came from, for content a snapshot taken before programs had it, and for the link to the program page.
@@ -68,6 +70,8 @@ export default async function MyProgramPage() {
       <PkHeader title={t.name} lead={where}>
         <PhaseBar phases={content.phases} current={phase} />
       </PkHeader>
+
+      {coachSet && <span className="pk-small">Set by your coach. Ask them if you want to change it.</span>}
 
       {view.status === "paused" && (
         <PkCard>
@@ -102,8 +106,14 @@ export default async function MyProgramPage() {
       {active && view.state.finished && (
         <PkCard>
           <h2 className="pk-card-title">Program done</h2>
-          <span className="pk-muted">Enter your new max to run it again, or end it and pick another.</span>
-          <RestartProgramForm unit={view.unit} lifts={t.lifts.map((l) => ({ lift: l, label: LIFT_LABEL[l], suggestionKg: view.state.testMaxes[l] ?? view.state.maxes[l] ?? null }))} />
+          {coachSet ? (
+            <span className="pk-muted">Block finished. Your coach will set what comes next.</span>
+          ) : (
+            <>
+              <span className="pk-muted">Enter your new max to run it again, or end it and pick another.</span>
+              <RestartProgramForm unit={view.unit} lifts={t.lifts.map((l) => ({ lift: l, label: LIFT_LABEL[l], suggestionKg: view.state.testMaxes[l] ?? view.state.maxes[l] ?? null }))} />
+            </>
+          )}
         </PkCard>
       )}
 
@@ -143,13 +153,13 @@ export default async function MyProgramPage() {
       )}
 
       <PkSection label="Your program">
-        {ownId !== null && (
+        {ownId !== null && !coachSet && (
           <Link href={`/app/programs/built/${ownId}`} className="pk-ghost">
             <Pencil size={16} aria-hidden /> Edit program
           </Link>
         )}
-        {active && <MyProgramControls canSkip={!!plan} weekdays={view.weekdays} />}
-        {ownId !== null && t.lifts.length > 0 && <OwnMaxForm unit={view.unit} lifts={t.lifts} />}
+        {active && <MyProgramControls canSkip={!!plan} weekdays={view.weekdays} canEnd={!coachSet} />}
+        {ownId !== null && !coachSet && t.lifts.length > 0 && <OwnMaxForm unit={view.unit} lifts={t.lifts} />}
       </PkSection>
     </div>
   );

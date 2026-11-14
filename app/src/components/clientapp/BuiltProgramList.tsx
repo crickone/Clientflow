@@ -29,7 +29,7 @@ export interface CurrentProgram {
  * "Build your own", then My programs: the running program first with
  * Continue, then the member's own saved programs with Edit, Start and Delete.
  */
-export function BuiltProgramList({ current, programs, anyLive }: { current: CurrentProgram | null; programs: BuiltProgramItem[]; anyLive: boolean }) {
+export function BuiltProgramList({ current, programs, anyLive, coachSet = false }: { current: CurrentProgram | null; programs: BuiltProgramItem[]; anyLive: boolean; coachSet?: boolean }) {
   const router = useRouter();
   const confirm = useConfirm();
   const [busy, setBusy] = useState<number | null>(null);
@@ -53,9 +53,11 @@ export function BuiltProgramList({ current, programs, anyLive }: { current: Curr
 
   return (
     <>
-      <Link href="/app/programs/built/new" className="pk-dashed">
-        <Plus size={18} aria-hidden /> Build your own
-      </Link>
+      {!coachSet && (
+        <Link href="/app/programs/built/new" className="pk-dashed">
+          <Plus size={18} aria-hidden /> Build your own
+        </Link>
+      )}
       {(current || saved.length > 0) && (
         <PkSection label="My programs">
           {current && (
@@ -63,7 +65,7 @@ export function BuiltProgramList({ current, programs, anyLive }: { current: Curr
               <div className="pk-row">
                 <div>
                   <h3 className="pk-card-title">{current.name}</h3>
-                  <span className="pk-small">{current.line}</span>
+                  <span className="pk-small">{coachSet ? `Set by your coach · ${current.line}` : current.line}</span>
                 </div>
                 <span className="pk-ghost">
                   Continue <ChevronRight size={16} />
@@ -95,7 +97,7 @@ export function BuiltProgramList({ current, programs, anyLive }: { current: Curr
               </div>
             </PkCard>
           ))}
-          {saved.length > 0 && anyLive && <span className="pk-small">End your current program on My program to start another.</span>}
+          {saved.length > 0 && anyLive && <span className="pk-small">{coachSet ? "Your coach set your current program." : "End your current program on My program to start another."}</span>}
         </PkSection>
       )}
     </>
