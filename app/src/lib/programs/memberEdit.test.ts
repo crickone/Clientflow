@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { initState } from "./engines";
 import { platformProgram } from "./registry";
 import { editReason, normaliseOrigins, rebaseEdit } from "./memberEdit";
+import { trainingMax } from "./units";
 import type { EngineState, ExerciseRx, ProgramTemplate } from "./types";
 
 const bench: ExerciseRx = { name: "Bench press", sets: [{ kind: "fixed", reps: 5, rest: 120 }], rule: { kind: "linear", incKg: 2.5, deloadAfter: 3, startKg: 60 } };
@@ -251,7 +252,6 @@ assert.equal(edit(before, program([[[bench, face], [row]]]), running).state.cycl
   assert.equal(out.state.stages["t1:back squat"], 1, "a GZCLP stage is kept");
   assert.equal(out.state.weights["t1:back squat"], 90, "and its weight");
   assert.equal(out.state.t2Base["t2:bench press"], s.t2Base["t2:bench press"], "a kept T2 base is kept");
-  assert.equal(out.state.weights["t3:lat pulldown"], undefined, "a removed exercise drops out");
 }
 {
   // An edit that changes nothing writes no lines.
@@ -261,5 +261,46 @@ assert.equal(edit(before, program([[[bench, face], [row]]]), running).state.cycl
 }
 assert.equal(editReason(["Weeks: 4 to 5."], "Coach Ann"), "Coach Ann edited the program.\nWeeks: 4 to 5.");
 assert.equal(editReason(["Weeks: 4 to 5."]), "You edited the program.\nWeeks: 4 to 5.");
+
+// ── library engines: what drops out and what is filled in ──
+{
+  const gz = platformProgram("gzclp")!;
+  const s = initState(gz, { squat: 100, bench: 80, press: 50, deadlift: 120 }, 2.5);
+  s.weights["t2:overhead press"] = 30;
+  s.misses["t2:overhead press"] = 2;
+  s.misses["t2:bench press"] = 1;
+  assert.ok(s.t2Base["t2:overhead press"] !== undefined, "the T2 press has a base before the edit");
+  const after = structuredClone(gz);
+  after.weeks[0].days[3].exercises[1] = { name: "Dumbbell curl", sets: [{ kind: "fixed", reps: 12, rest: 60 }], tier: "t3" };
+  const out = rebaseEdit({ before: gz, after, state: s, weekOrigins: [0], stepKg: 2.5, unit: "kg" });
+  assert.equal(out.state.weights["t2:overhead press"], undefined, "a removed exercise loses its weight");
+  assert.equal(out.state.misses["t2:overhead press"], undefined, "and its misses");
+  assert.equal(out.state.t2Base["t2:overhead press"], undefined, "a removed T2 loses its base");
+  assert.equal(out.state.t2Base["t2:bench press"], s.t2Base["t2:bench press"], "a kept T2 keeps its base");
+  assert.equal(out.state.misses["t2:bench press"], 1, "a kept exercise keeps its misses");
+}
+{
+  const bbb = platformProgram("531-bbb")!;
+  const s = initState(bbb, { squat: 100, bench: 100, deadlift: 100, press: 100 }, 2.5);
+  s.short = { press: true, bench: true };
+  s.testMaxes = { press: 95, bench: 90 };
+  const after = structuredClone(bbb);
+  after.lifts = after.lifts.filter((l) => l !== "press");
+  for (const w of after.weeks) for (const d of w.days) d.exercises = d.exercises.map((e) => (e.lift === "press" ? { name: "Dips", sets: [{ kind: "fixed", reps: 10, rest: 90 }] } : e));
+  const out = rebaseEdit({ before: bbb, after, state: s, weekOrigins: [0, 1, 2, 3], stepKg: 2.5, unit: "kg" });
+  assert.deepEqual(out.state.short, { bench: true }, "a hold for a lift that left the program is dropped");
+  assert.deepEqual(out.state.testMaxes, { bench: 90 }, "so is its test max");
+}
+{
+  const bbb = platformProgram("531-bbb")!;
+  const s = initState(bbb, { squat: 100, bench: 111.11, deadlift: 100, press: 100 }, 2.5);
+  delete s.tms.bench;
+  s.tms.squat = 95;
+  const after = structuredClone(bbb);
+  after.weeks[0].days[0].exercises[2] = { name: "Barbell row", sets: [{ kind: "fixed", reps: 10, rest: 90 }], progress: false };
+  const out = rebaseEdit({ before: bbb, after, state: s, weekOrigins: [0, 1, 2, 3], stepKg: 2.5, unit: "kg" });
+  assert.equal(out.state.tms.bench, trainingMax(111.11, after.tmPct), "a lift with a max and no training max gets one from the max");
+  assert.equal(out.state.tms.squat, 95, "a training max already there is kept");
+}
 
 console.log("programs/memberEdit: ok");
