@@ -42,6 +42,7 @@ const requireLocal = createRequire(import.meta.url);
   const { db } = requireLocal("../../../lib/db") as typeof import("../../../lib/db");
   const { clients } = requireLocal("../../../lib/db/schema") as typeof import("../../../lib/db/schema");
   const en = requireLocal("../../../lib/programs/enrolments") as typeof import("../../../lib/programs/enrolments");
+  const cp = requireLocal("../../../lib/programs/coachPrograms") as typeof import("../../../lib/programs/coachPrograms");
   const mp = requireLocal("../../../lib/programs/memberPrograms") as typeof import("../../../lib/programs/memberPrograms");
   const { blankMemberTemplate } = requireLocal("../../../lib/programs/memberTemplate") as typeof import("../../../lib/programs/memberTemplate");
   const actions = requireLocal("./actions") as typeof import("./actions");
@@ -140,6 +141,23 @@ const requireLocal = createRequire(import.meta.url);
     const id = create(owner);
     currentClientId = newMember();
     assert.deepEqual(await built.saveBuiltProgramAction({ id, from: null, template: program(), weekOrigins: [0] }), { ok: false, errors: ["That program no longer exists."] });
+  });
+
+  test("a coach-set program refuses the member's end, restart, start and max with the coach message", async () => {
+    const c = newMember();
+    const r = cp.coachAssign(
+      c,
+      { key: "smolov-base", template: null, replace: false, maxesKg: { squat: 150 }, unit: "kg", stepKg: 2.5, startDate: new Date().toISOString().slice(0, 10), weekdays: [1, 4] },
+      staff,
+    );
+    assert.ok(r.ok, `assigned: ${JSON.stringify(r)}`);
+    currentClientId = c;
+    const msg = { ok: false, error: "Your coach set this program. Ask them to change it." };
+    assert.deepEqual(await actions.endProgramAction(), msg);
+    assert.deepEqual(await actions.restartProgramAction({ maxes: [] }), msg, "refused before any max check");
+    assert.deepEqual(await actions.startProgramAction(startInput("smolov-base")), msg);
+    assert.deepEqual(await actions.setOwnMaxAction({ max: { lift: "squat", kind: "one_rm", weight: 160, reps: null } }), msg);
+    assert.ok(en.liveEnrolment(c), "still running");
   });
 
   try {

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { requireClient } from "@/lib/clientAuth";
 import { memberSeesPrograms } from "@/lib/programs/access";
 import {
+  COACH_SET,
   endEnrolment,
   enrol,
   liveEnrolment,
@@ -39,6 +40,7 @@ function member() {
 export async function startProgramAction(raw: unknown): Promise<Result> {
   const c = member();
   if (!c) return OFF;
+  if (liveEnrolment(c.clientId)?.assignedBy) return COACH_SET;
   const p = startZ.safeParse(raw);
   if (!p.success) return { ok: false, error: p.error.issues.find((i) => i.path[0] === "startDate")?.message ?? "Check your entries and try again." };
   const v = p.data;
@@ -79,6 +81,7 @@ export async function skipProgramSessionAction(): Promise<Result> {
 export async function endProgramAction(): Promise<Result> {
   const c = member();
   if (!c) return OFF;
+  if (liveEnrolment(c.clientId)?.assignedBy) return COACH_SET;
   if (!endEnrolment(c.clientId, { kind: "member" })) return { ok: false, error: "You don't have a program running." };
   refresh();
   return { ok: true };
@@ -98,6 +101,7 @@ export async function setProgramDaysAction(weekdays: number[]): Promise<Result> 
 export async function restartProgramAction(raw: unknown): Promise<Result> {
   const c = member();
   if (!c) return OFF;
+  if (liveEnrolment(c.clientId)?.assignedBy) return COACH_SET;
   const p = z.object({ maxes: z.array(maxEntryZ).max(5) }).safeParse(raw);
   if (!p.success) return { ok: false, error: "Check your entries and try again." };
   const view = liveEnrolment(c.clientId);
@@ -113,6 +117,7 @@ export async function restartProgramAction(raw: unknown): Promise<Result> {
 export async function setOwnMaxAction(raw: unknown): Promise<Result> {
   const c = member();
   if (!c) return OFF;
+  if (liveEnrolment(c.clientId)?.assignedBy) return COACH_SET;
   const p = z.object({ max: maxEntryZ }).safeParse(raw);
   if (!p.success) return { ok: false, error: "Check your entry and try again." };
   const view = liveEnrolment(c.clientId);

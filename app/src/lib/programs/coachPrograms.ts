@@ -19,7 +19,7 @@ import { copyErrors, parseTemplate, templateErrors } from "./validate";
  */
 
 export type AssignInput = Omit<EnrolInput, "key"> & { key: string; template: unknown | null; replace: boolean };
-export type AssignResult = { ok: true; id: number } | { ok: false; error: string; needsReplace?: true; errors?: string[] };
+export type AssignResult = { ok: true; id: number; name: string } | { ok: false; error: string; needsReplace?: true; errors?: string[] };
 
 /** The coach's draft of a person's copy, checked like a gym version: the template check plus every lift the original's engine needs. */
 export function checkPersonCopy(original: ProgramTemplate, raw: unknown): { ok: true; template: ProgramTemplate } | { ok: false; errors: string[] } {
@@ -65,7 +65,7 @@ export function coachAssign(clientId: number, input: AssignInput, actor: StaffAc
         assignedBy: actor.userId,
       });
     });
-    return { ok: true, id };
+    return { ok: true, id, name: t.name };
   } catch (err) {
     if (String(err).includes("UNIQUE")) return { ok: false, error: "The member's program changed. Try again." };
     throw err;

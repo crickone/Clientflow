@@ -107,7 +107,6 @@ assert.equal(full.live!.skipped.length, 4);
 // nothing live
 assert.equal(panelFrom({ enrolment: null, plan: null, events: [], past: [] }).live, null);
 
-console.log("programs/panel: ok");
 
 // a coach-set program says who set it and when; a member's own does not
 const coachSet = panelFrom({ enrolment: { id: 11, status: "active", template: sl, state, unit: "kg", basedOnName: null, assignedAt: Date.UTC(2026, 10, 14), assignedByName: "Coach Ann" }, plan: null, events: [], past: [] }).live!;
@@ -118,3 +117,5 @@ assert.equal(noName.setBy, "Set by a coach on 14 Nov 2026");
 const ownChoice = panelFrom({ enrolment: { id: 12, status: "active", template: sl, state, unit: "kg", basedOnName: null, assignedAt: null, assignedByName: null }, plan: null, events: [], past: [] }).live!;
 assert.equal(ownChoice.coachSet, false);
 assert.equal(ownChoice.setBy, null);
+
+console.log("programs/panel: ok");

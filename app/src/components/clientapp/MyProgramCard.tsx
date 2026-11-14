@@ -39,7 +39,7 @@ export function MyProgramCard({ clientId }: { clientId: number }) {
         </>
       ) : (
         <Link href="/app/programs/mine" style={{ fontSize: 13.5, color: "var(--accent-ink)" }}>
-          Program done. Enter your new max to run it again.
+          {view.assignedBy ? "Block finished. Your coach will set what comes next." : "Program done. Enter your new max to run it again."}
         </Link>
       )}
     </Card>

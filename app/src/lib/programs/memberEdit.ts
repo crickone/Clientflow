@@ -205,6 +205,7 @@ export function rebaseEdit(input: EditInput): EditOutput {
   for (const [k, ex] of newKeys) {
     if (!oldKeys.has(k)) {
       delete next.misses[k];
+      if (fresh.t2Base[k] !== undefined) next.t2Base[k] = fresh.t2Base[k];
       if (fresh.weights[k] !== undefined) next.weights[k] = fresh.weights[k];
       else delete next.weights[k];
       continue;

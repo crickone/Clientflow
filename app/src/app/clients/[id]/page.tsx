@@ -132,7 +132,7 @@ export default async function ClientProfile(
   const openWorkout = openSession(id);
   const programPanel = programsEnabled ? programPanelData(id) : null;
   const hasProgram = programPanel !== null;
-  const showWorkoutLog = assignedWk.length > 0 || workoutSessions.length > 0 || openWorkout !== null || hasProgram;
+  const showWorkoutLog = assignedWk.length > 0 || workoutSessions.length > 0 || openWorkout !== null || hasProgram || programsEnabled;
   const lifts = showWorkoutLog ? liftRecords(id) : [];
   const training = showWorkoutLog ? trainingOverview(id) : null;
   const mealsLogged = mealCount(id);

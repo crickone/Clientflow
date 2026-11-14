@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 
 import { initState } from "./engines";
+import { stateKey } from "./planner";
 import { platformProgram } from "./registry";
 import { editReason, normaliseOrigins, rebaseEdit } from "./memberEdit";
 import { trainingMax } from "./units";
@@ -301,6 +302,79 @@ assert.equal(editReason(["Weeks: 4 to 5."]), "You edited the program.\nWeeks: 4 
   const out = rebaseEdit({ before: bbb, after, state: s, weekOrigins: [0, 1, 2, 3], stepKg: 2.5, unit: "kg" });
   assert.equal(out.state.tms.bench, trainingMax(111.11, after.tmPct), "a lift with a max and no training max gets one from the max");
   assert.equal(out.state.tms.squat, 95, "a training max already there is kept");
+}
+
+// ── a new GZCLP T2 exercise gets its T2 base ──
+{
+  const gz = platformProgram("gzclp")!;
+  const s = initState(gz, { squat: 100, bench: 80, press: 50, deadlift: 120 }, 2.5);
+  const t2: ExerciseRx = { name: "Front squat", lift: "squat", sets: [{ kind: "fixed", reps: 10, rest: 90 }], tier: "t2", startPct: 0.5 };
+  const after = structuredClone(gz);
+  after.weeks[0].days[0].exercises.push(t2);
+  const k = stateKey(t2);
+  assert.equal(s.t2Base[k], undefined, "not in the state before the edit");
+  const out = rebaseEdit({ before: gz, after, state: s, weekOrigins: [0], stepKg: 2.5, unit: "kg" });
+  assert.ok(out.state.t2Base[k] !== undefined && out.state.t2Base[k] > 0, "the new T2 has a base");
+  assert.equal(out.state.t2Base[k], initState(after, s.maxes, 2.5).t2Base[k], "worked out as a fresh start would");
+}
+
+// ── carry-over by engine: one kept, added and removed case each ──
+{
+  // StrongLifts (linear): a kept exercise keeps its weight and misses.
+  const sl = platformProgram("stronglifts-5x5")!;
+  const s = initState(sl, { squat: 100, bench: 80, press: 50, deadlift: 120 }, 2.5);
+  const row = sl.weeks[0].days[0].exercises.find((e) => e.name === "Barbell row")!;
+  const squatK = stateKey(sl.weeks[0].days[0].exercises[0]);
+  const benchK = stateKey(sl.weeks[0].days[0].exercises[1]);
+  const rowK = stateKey(row);
+  s.weights[squatK] = 85;
+  s.misses[squatK] = 2;
+  s.weights[rowK] = 47.5;
+  s.misses[rowK] = 1;
+  const after = structuredClone(sl);
+  for (const w of after.weeks) for (const d of w.days) d.exercises = d.exercises.filter((e) => e.name !== "Barbell row");
+  after.weeks[0].days[0].exercises.push({ name: "Face pull", sets: [{ kind: "fixed", reps: 15, rest: 60 }], rule: { kind: "manual", startKg: 20 } });
+  const out = rebaseEdit({ before: sl, after, state: s, weekOrigins: sl.weeks.map((_, i) => i), stepKg: 2.5, unit: "kg" });
+  assert.equal(out.state.weights[squatK], 85, "kept: weight");
+  assert.equal(out.state.misses[squatK], 2, "kept: misses");
+  assert.equal(out.state.weights[benchK], s.weights[benchK], "an untouched exercise is unchanged");
+  assert.equal(out.state.weights[rowK], undefined, "removed: weight gone");
+  assert.equal(out.state.misses[rowK], undefined, "removed: misses gone");
+  assert.equal(out.state.weights["manual:face pull"], 20, "added: starts from its rule");
+}
+{
+  // A fixed block (smolov-base): position and test maxes survive.
+  const sm = platformProgram("smolov-base")!;
+  const s = { ...initState(sm, { squat: 100 }, 2.5), week: 2, day: 1, testMaxes: { squat: 110 } };
+  const after = structuredClone(sm);
+  after.weeks[2].days[1].exercises.push({ name: "Hip thrust", sets: [{ kind: "fixed", reps: 8, rest: 90 }] });
+  const out = rebaseEdit({ before: sm, after, state: s, weekOrigins: sm.weeks.map((_, i) => i), stepKg: 2.5, unit: "kg" });
+  assert.deepEqual([out.state.week, out.state.day], [2, 1], "same week and day");
+  assert.deepEqual(out.state.testMaxes, { squat: 110 }, "test max kept");
+  assert.ok(out.lines.some((l) => l.includes("Hip thrust")), "the added exercise is logged");
+  const removed = structuredClone(sm);
+  removed.weeks[3].days.pop();
+  const out2 = rebaseEdit({ before: sm, after: removed, state: s, weekOrigins: sm.weeks.map((_, i) => i), stepKg: 2.5, unit: "kg" });
+  assert.deepEqual([out2.state.week, out2.state.day], [2, 1], "a later week losing a day leaves the position alone");
+  assert.deepEqual(out2.state.testMaxes, { squat: 110 });
+}
+{
+  // Double progression (phul): a kept range weight survives, a new exercise has no weight.
+  const ph = platformProgram("phul")!;
+  const s = initState(ph, {}, 2.5);
+  const ex = ph.weeks[0].days[0].exercises;
+  const benchK = stateKey(ex[0]);
+  const pulldownK = stateKey(ex.find((e) => e.name === "Lat pulldown")!);
+  s.weights[benchK] = 82.5;
+  s.weights[pulldownK] = 60;
+  const after = structuredClone(ph);
+  after.weeks[0].days[0].exercises = after.weeks[0].days[0].exercises.filter((e) => e.name !== "Lat pulldown");
+  const fresh: ExerciseRx = { name: "Cable crossover", sets: [{ kind: "fixed", reps: { min: 10, max: 15 }, rest: 60 }] };
+  after.weeks[0].days[0].exercises.push(fresh);
+  const out = rebaseEdit({ before: ph, after, state: s, weekOrigins: [0], stepKg: 2.5, unit: "kg" });
+  assert.equal(out.state.weights[benchK], 82.5, "kept range weight survives");
+  assert.equal(out.state.weights[pulldownK], undefined, "removed exercise drops its weight");
+  assert.equal(out.state.weights[stateKey(fresh)], undefined, "a new exercise has no weight");
 }
 
 console.log("programs/memberEdit: ok");

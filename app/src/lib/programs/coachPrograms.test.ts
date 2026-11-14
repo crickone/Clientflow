@@ -73,6 +73,7 @@ const requireLocal = createRequire(import.meta.url);
     const r = cp.coachAssign(c, base, staff);
     assert.ok(r.ok);
     const v = en.liveEnrolment(c)!;
+    assert.equal(r.name, v.template.name, "returns the saved copy's name");
     assert.equal(v.assignedBy, 7);
     assert.equal(v.template.engine.key, "tm_cycle", "keeps its own engine");
     const ev = en.enrolmentEvents(v.id)[0];

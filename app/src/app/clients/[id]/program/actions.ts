@@ -24,7 +24,8 @@ export async function coachAssignAction(clientId: number, raw: unknown, template
   if (!actor) return OFF;
   const id = idZ.safeParse(clientId);
   const p = startZ.safeParse(raw);
-  if (!id.success || !p.success) return { ok: false as const, error: "Check the entries and try again." };
+  if (!id.success) return { ok: false as const, error: "Check the entries and try again." };
+  if (!p.success) return { ok: false as const, error: p.error.issues.find((i) => i.path[0] === "startDate")?.message ?? "Check the entries and try again." };
   const v = p.data;
   if ((v.unit === "lb") !== (v.step === "5lb")) return { ok: false as const, error: "Pick a smallest jump in the same unit." };
   const maxes = resolveMaxes(id.data, v.unit, v.maxes);
@@ -32,7 +33,7 @@ export async function coachAssignAction(clientId: number, raw: unknown, template
   const r = coachAssign(id.data, { key: v.key, template, maxesKg: maxes.kg, unit: v.unit, stepKg: stepFromKey(v.step), startDate: v.startDate, weekdays: v.weekdays, replace: replace === true }, actor);
   if (!r.ok) return { ok: false as const, error: r.error, ...(r.needsReplace ? { needsReplace: true as const } : {}) };
   refresh(id.data);
-  const name = programByKey(v.key)?.template.name ?? "a program";
+  const name = r.name;
   // Best effort: a push failure never undoes the assignment.
   void sendToClient(id.data, { title: "New program", body: `Your coach set you a program: ${name}.`, url: "/app/programs/mine" }).catch((err) => console.error("[programs] assign push failed:", err));
   return { ok: true as const };

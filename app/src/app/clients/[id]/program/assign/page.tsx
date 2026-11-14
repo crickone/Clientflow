@@ -2,18 +2,21 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
+import { PhaseBar, PkSection } from "@/components/clientapp/programs/kit";
 import { AssignProgramFlow } from "@/components/clients/AssignProgramFlow";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { db } from "@/lib/db";
 import { clients } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { cardLine, defaultWeekdays, groupByGoal, toCard, byline } from "@/lib/programs/cards";
+import { programContent } from "@/lib/programs/content";
 import { isFullBlock } from "@/lib/programs/editing";
 import { bestLoggedSet, liveEnrolment, planContextFor } from "@/lib/programs/enrolments";
 import { memberPrograms, programByKey } from "@/lib/programs/library";
 import { currentStaffActor } from "@/lib/programs/staffActor";
 import { ENGINE_LABEL, LIFT_LABEL } from "@/lib/programs/types";
-import { keyFromStep } from "@/lib/programs/units";
+import { howWeightsMove } from "@/lib/programs/progressionText";
+import { keyFromStep, shownStepKg } from "@/lib/programs/units";
 import { dateKey } from "@/lib/trainingProgress";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +33,7 @@ export default async function AssignProgramPage(props: { params: Promise<{ id: s
   const first = client.firstName || "this member";
   const back = (
     <Link href={`/clients/${client.id}`} className="cp-back">
-      <ArrowLeft size={14} /> {client.firstName ?? "Client"}
+      <ArrowLeft size={14} /> {client.firstName || "Client"}
     </Link>
   );
 
@@ -77,12 +80,29 @@ export default async function AssignProgramPage(props: { params: Promise<{ id: s
     return { lift, label: LIFT_LABEL[lift], logged: b ? { kg: b.kg, reps: b.reps, e1rm: b.e1rm } : null };
   });
   const live = liveEnrolment(client.id);
+  // The same explanation the member reads, so the coach knows what they are setting.
+  const content = programContent(t, entry.copyId !== null ? { kind: "copy", basedOnName: entry.basedOnName ?? t.name } : { kind: "platform" });
+  const unit = client.weightUnit === "lb" ? "lb" : "kg";
+  const stepKg = shownStepKg(unit, client.plateStepKg);
   return (
     <div className="app-page">
       <Link href={`/clients/${client.id}/program/assign`} className="cp-back">
         <ArrowLeft size={14} /> All programs
       </Link>
       <PageHeader title={`Set ${t.name} for ${first}`} subtitle={cardLine(toCard(t))} />
+      <div className="pk" style={{ marginBottom: 24 }}>
+        {content.summary && <p className="pk-lead">{content.summary}</p>}
+        <PkSection label="The shape of it">
+          <PhaseBar phases={content.phases} named />
+        </PkSection>
+        <PkSection label="How their weights move">
+          <ul className="pk-list">
+            {howWeightsMove(t, unit, stepKg).map((l, i) => (
+              <li key={i}>{l}</li>
+            ))}
+          </ul>
+        </PkSection>
+      </div>
       <AssignProgramFlow
         clientId={client.id}
         memberName={first}

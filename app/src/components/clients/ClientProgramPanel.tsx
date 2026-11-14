@@ -40,10 +40,10 @@ export function ClientProgramPanel({ clientId, data }: { clientId: number; data:
     });
   }
 
-  function endProgram() {
+  async function endProgram() {
     if (!live) return;
+    if (!(await confirm({ title: `End ${live.name}?`, body: "Its history is kept.", confirmLabel: "End it", destructive: true }))) return;
     startEnd(async () => {
-      if (!(await confirm({ title: `End ${live.name}?`, body: "Its history is kept.", confirmLabel: "End it", destructive: true }))) return;
       const r = await coachEndProgramAction(clientId, live.enrolmentId);
       if (!r.ok) return void toast.error(r.error);
       toast.success("Program ended.");

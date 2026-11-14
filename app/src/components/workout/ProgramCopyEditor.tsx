@@ -213,12 +213,12 @@ function ExerciseEditor({
   );
 }
 
+export type EditorSave = (t: ProgramTemplate, weekOrigins: (number | null)[]) => Promise<{ ok: true } | { ok: false; errors: string[] }>;
+
 /**
  * Weeks, then days, then exercises, then set rows, in the style of the Detailed builder.
  * fullBlock: the original's weeks are its whole length, so the length is the number of weeks.
  */
-export type EditorSave = (t: ProgramTemplate, weekOrigins: (number | null)[]) => Promise<{ ok: true } | { ok: false; errors: string[] }>;
-
 export function ProgramCopyEditor({
   save: saveTemplate,
   saveLabel,
@@ -331,13 +331,14 @@ export function ProgramCopyEditor({
 
       <div className="pe-weeks" role="tablist" aria-label="Weeks">
         {t.weeks.map((_, i) => (
-          <button key={i} type="button" role="tab" aria-selected={i === w} className="pe-tab" onClick={() => setWi(i)}>
+          <button key={i} type="button" role="tab" aria-selected={i === w} className="pe-tab" disabled={pending} onClick={() => setWi(i)}>
             {weekLabel(t, { week: i, cycle: 0 })}
           </button>
         ))}
         <button
           type="button"
           className="pe-tab"
+          disabled={pending}
           onClick={() => {
             edit((d) => void d.weeks.splice(w + 1, 0, structuredClone(d.weeks[w])));
             setOrigins((o) => [...o.slice(0, w + 1), null, ...o.slice(w + 1)]);
@@ -350,6 +351,7 @@ export function ProgramCopyEditor({
           <button
             type="button"
             className="pe-tab"
+            disabled={pending}
             onClick={() => {
               edit((d) => void d.weeks.splice(w, 1));
               setOrigins((o) => o.filter((_, i) => i !== w));
