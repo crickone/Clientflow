@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { PkCard, PkSection, StepBar, StickyBar } from "@/components/clientapp/programs/kit";
 import { startProgramAction } from "@/app/app/programs/actions";
+import type { StartProgramInput } from "@/lib/programs/startInput";
 import { firstSets, firstWeek, shortDate, trainingDates, weightsMoveBetweenSessions, type PlanExtra } from "@/lib/programs/outline";
 import { STEP_TITLE, initialStart, maxEntries, maxesKg, reduceStart, rowMaxKg, startSteps, stepBlocker, stepForError, type StartLift } from "@/lib/programs/startFlow";
 import type { ProgramTemplate, WeightUnit } from "@/lib/programs/types";
@@ -31,6 +32,9 @@ export function StartProgramForm({
   defaultWeekdays,
   today,
   backHref,
+  submit: submitProp,
+  doneHref,
+  submitLabel,
 }: {
   programKey: string;
   programName: string;
@@ -45,6 +49,12 @@ export function StartProgramForm({
   today: string;
   /** Where Back goes from the first screen. */
   backHref: string;
+  /** Staff setting a program for a member pass their own; the member's start action is the default. */
+  submit?: (input: StartProgramInput) => Promise<{ ok: true } | { ok: false; error: string }>;
+  /** Where to go after a successful start. */
+  doneHref?: string;
+  /** The final button's label. */
+  submitLabel?: string;
 }) {
   const router = useRouter();
   const steps = startSteps(lifts.length > 0);
@@ -98,7 +108,7 @@ export function StartProgramForm({
     submitting.current = true;
     setError(null);
     start(async () => {
-      const res = await startProgramAction({ key: programKey, unit: s.unit, step: s.step, startDate: s.startDate, weekdays: s.days, maxes: maxEntries(s, lifts) });
+      const res = await (submitProp ?? startProgramAction)({ key: programKey, unit: s.unit, step: s.step, startDate: s.startDate, weekdays: s.days, maxes: maxEntries(s, lifts) });
       if (!res.ok) {
         submitting.current = false;
         const at = stepForError(res.error, steps);
@@ -106,8 +116,8 @@ export function StartProgramForm({
         go(at);
         return;
       }
-      toast.success("Program started");
-      router.push("/app/programs/mine");
+      if (!submitProp) toast.success("Program started");
+      router.push(doneHref ?? "/app/programs/mine");
       router.refresh();
     });
   }
@@ -295,7 +305,7 @@ export function StartProgramForm({
       <StickyBar>
         {step === "review" ? (
           <button type="button" className="pk-cta" onClick={submit} disabled={pending}>
-            {pending ? "Starting" : "Start program"}
+            {pending ? "Starting" : (submitLabel ?? "Start program")}
           </button>
         ) : (
           <button type="button" className="pk-cta" onClick={next}>
