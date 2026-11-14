@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 
 import { initState } from "./engines";
+import { platformProgram } from "./registry";
 import { editReason, normaliseOrigins, rebaseEdit } from "./memberEdit";
 import type { EngineState, ExerciseRx, ProgramTemplate } from "./types";
 
@@ -222,5 +223,43 @@ const early: EngineState = { ...initState(pairWeeks, {}, 2.5), week: 0, cycle: 0
 const pushed = edit(pairWeeks, program([[[row]], [[row]], [[curl]], [[bench]]]), early, [null, null, 0, 1]);
 assert.deepEqual([pushed.state.cycle, pushed.state.week], [0, 2], "never a negative cycle");
 assert.equal(edit(before, program([[[bench, face], [row]]]), running).state.cycle, 2, "the same week count keeps the cycle");
+
+// ── library engines keep their own progress across an edit ──
+{
+  const bbb = platformProgram("531-bbb")!;
+  const s0 = initState(bbb, { squat: 111.11, bench: 111.11, deadlift: 111.11, press: 111.11 }, 2.5);
+  // One cycle later: the training maxes rose and the bench + set fell short this cycle.
+  const s = { ...structuredClone(s0), cycle: 1, week: 1, day: 2, tms: { squat: 105, bench: 102.5, deadlift: 105, press: 102.5 }, short: { bench: true } };
+  const after = structuredClone(bbb);
+  after.weeks[1].days[2].exercises[2] = { name: "Barbell row", sets: [{ kind: "fixed", reps: 10, rest: 90 }], progress: false };
+  const out = rebaseEdit({ before: bbb, after, state: s, weekOrigins: [0, 1, 2, 3], stepKg: 2.5, unit: "kg" });
+  assert.deepEqual(out.state.tms, s.tms, "5/3/1 training maxes are kept, not reset from the max");
+  assert.deepEqual(out.state.short, { bench: true }, "the + set hold survives");
+  assert.equal(out.state.week, 1);
+  assert.equal(out.state.day, 2);
+  assert.ok(out.lines.length > 0);
+}
+{
+  const gz = platformProgram("gzclp")!;
+  const s0 = initState(gz, { squat: 100, bench: 80, press: 50, deadlift: 120 }, 2.5);
+  const s = structuredClone(s0);
+  s.stages["t1:back squat"] = 1;
+  s.weights["t1:back squat"] = 90;
+  const after = structuredClone(gz);
+  after.weeks[0].days[0].exercises[2] = { name: "Dumbbell row", sets: [{ kind: "fixed", reps: 15, rest: 60 }, { kind: "fixed", reps: 15, rest: 60 }, { kind: "fixed", reps: 15, rest: 60, amrap: true }], tier: "t3" };
+  const out = rebaseEdit({ before: gz, after, state: s, weekOrigins: [0], stepKg: 2.5, unit: "kg" });
+  assert.equal(out.state.stages["t1:back squat"], 1, "a GZCLP stage is kept");
+  assert.equal(out.state.weights["t1:back squat"], 90, "and its weight");
+  assert.equal(out.state.t2Base["t2:bench press"], s.t2Base["t2:bench press"], "a kept T2 base is kept");
+  assert.equal(out.state.weights["t3:lat pulldown"], undefined, "a removed exercise drops out");
+}
+{
+  // An edit that changes nothing writes no lines.
+  const jug = platformProgram("juggernaut-style")!;
+  const s = initState(jug, { squat: 100, bench: 100, deadlift: 100, press: 100 }, 2.5);
+  assert.deepEqual(rebaseEdit({ before: jug, after: structuredClone(jug), state: s, weekOrigins: jug.weeks.map((_, i) => i), stepKg: 2.5, unit: "kg" }).lines, []);
+}
+assert.equal(editReason(["Weeks: 4 to 5."], "Coach Ann"), "Coach Ann edited the program.\nWeeks: 4 to 5.");
+assert.equal(editReason(["Weeks: 4 to 5."]), "You edited the program.\nWeeks: 4 to 5.");
 
 console.log("programs/memberEdit: ok");

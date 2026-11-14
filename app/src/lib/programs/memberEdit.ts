@@ -17,7 +17,7 @@
  */
 import { initState, ownStartWeight } from "./engines";
 import { stateKey } from "./planner";
-import { LIFT_LABEL, type EngineState, type ExerciseRx, type ProgramTemplate, type RuleKind, type WeightUnit } from "./types";
+import { LIFT_LABEL, type EngineState, type ExerciseRx, type LiftKey, type ProgramTemplate, type RuleKind, type WeightUnit } from "./types";
 import { formatWeight, trainingMax } from "./units";
 
 export interface EditInput {
@@ -221,12 +221,16 @@ export function rebaseEdit(input: EditInput): EditOutput {
     } else delete next.weights[k];
   }
 
-  // ── maxes: training max = max; a lift new to the program needs a max ──
+  // ── maxes: own rules take the training max from the max; library engines keep the training max they reached ──
+  const own = after.engine.key === "own_rules";
   for (const lift of after.lifts) {
     const max = next.maxes[lift];
-    if (max !== undefined) next.tms[lift] = trainingMax(max, after.tmPct);
-    else if (!before.lifts.includes(lift)) first.push(`Add your ${LIFT_LABEL[lift].toLowerCase()} max on My program to get its weights.`);
+    if (max !== undefined && (own || next.tms[lift] === undefined)) next.tms[lift] = trainingMax(max, after.tmPct);
+    else if (max === undefined && !before.lifts.includes(lift)) first.push(`Add your ${LIFT_LABEL[lift].toLowerCase()} max on My program to get its weights.`);
   }
+  for (const k of Object.keys(next.t2Base)) if (!newKeys.has(k)) delete next.t2Base[k];
+  for (const lift of Object.keys(next.short) as LiftKey[]) if (!after.lifts.includes(lift)) delete next.short[lift];
+  for (const lift of Object.keys(next.testMaxes) as LiftKey[]) if (!after.lifts.includes(lift)) delete next.testMaxes[lift];
 
   // ── position: the same week where it moved to, else the nearest earlier one ──
   const at = origins.indexOf(state.week);
@@ -271,7 +275,7 @@ export function rebaseEdit(input: EditInput): EditOutput {
   return { state: next, lines: [...first, ...lines] };
 }
 
-/** The change-log entry for an edit. */
-export function editReason(lines: string[]): string {
-  return ["You edited the program.", ...lines].join("\n");
+/** The change-log entry for an edit: "You edited the program." for the member, "<name> edited the program." for a coach. */
+export function editReason(lines: string[], who = "You"): string {
+  return [`${who} edited the program.`, ...lines].join("\n");
 }
