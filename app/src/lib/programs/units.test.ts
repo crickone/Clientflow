@@ -14,6 +14,7 @@ import {
   shownStepKg,
   parseRpe,
   parseWeightIn,
+  repJumpKg,
   resolveMax,
   roundToStep,
   stepFromKey,
@@ -107,5 +108,11 @@ assert.equal(tmJumpKg(2.5, "lb"), 2.268);
 assert.equal(tmJumpKg(5, "lb"), 4.536);
 assert.equal(tmJumpKg(1, "lb"), 2.268);
 assert.equal(tmJumpKg(0, "lb"), 0);
+
+// A per-rep jump for a pounds member is a round 2.5 lb: 1.25 kg is 2.5 lb, 2.5 kg is 5 lb.
+assert.equal(repJumpKg(1.25, "kg"), 1.25);
+assert.equal(repJumpKg(1.25, "lb"), 1.134);
+assert.equal(repJumpKg(2.5, "lb"), 2.268);
+assert.equal(repJumpKg(0.2, "lb"), 1.134);
 
 console.log("programs/units: ok");

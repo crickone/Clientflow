@@ -68,7 +68,7 @@ const engineZ = z.discriminatedUnion("key", [
   }),
   z.object({
     key: z.literal("tm_cycle"),
-    rule: z.enum(["cycle", "amrap_table", "drive_set", "gzclp"]),
+    rule: z.enum(["cycle", "amrap_table", "drive_set", "gzclp", "reps_over"]),
     increment: kgZ,
     increments: incrementsZ,
     amrapTable: z.array(z.object({ minReps: z.number().int().min(0).max(50), kg: kgZ })).max(10).optional(),

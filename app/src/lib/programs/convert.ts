@@ -3,7 +3,8 @@
  * A library program (or the member's current one) as a member-built program:
  * each exercise gets the nearest own rule. Linear engines become `linear`,
  * double progression `range`, percentages of a max `percent` (scaled so the
- * percentage is of the max, not the training max), RPE-only exercises `rpe`,
+ * percentage is of the max, not the training max; RPE sets on a lift the
+ * program takes a max for count as the share of the max they plan), other RPE-only exercises `rpe`,
  * and anything else `manual`. Carried weights become start weights and carried
  * training maxes become maxes, so the converted program plans the same
  * weights. Pure.
@@ -63,7 +64,9 @@ function convertExercise(t: ProgramTemplate, ex: ExerciseRx, carry: Carry): Exer
   if (ex.notes) base.notes = ex.notes;
   if (ex.rule) return { ...base, ...(ex.lift ? { lift: ex.lift } : {}), rule: withStart(ex.rule, startKg) };
   const pctLike = sets.every((s) => s.kind === "pct" || s.kind === "amrap" || s.kind === "rpe");
-  if (pctLike && ex.lift && sets.some((s) => s.kind === "pct" || s.kind === "amrap")) {
+  // An RPE-only exercise on a lift the program takes a max for plans from that max, so it stays a percentage of it.
+  const fromMax = ex.lift !== undefined && (sets.some((s) => s.kind === "pct" || s.kind === "amrap") || t.lifts.includes(ex.lift));
+  if (pctLike && ex.lift && fromMax) {
     return { ...base, lift: ex.lift, sets: sets.map((s) => asPctOfMax(s, t.tmPct)), rule: { kind: "percent" } };
   }
   if (sets.every((s) => s.kind === "rpe")) return { ...base, rule: { kind: "rpe" } };

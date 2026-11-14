@@ -92,6 +92,8 @@ export const RULE_LABEL: Record<RuleKind, string> = {
   rpe: "RPE",
   manual: "Manual",
 };
+/** Reps past the minimum that count towards a reps_over training-max rise. */
+export const REPS_OVER_CAP = 5;
 /** An own-rules deload is always 10% lighter. */
 export const OWN_DELOAD_PCT = 0.1;
 
@@ -150,8 +152,10 @@ export interface TmCycleSettings {
    * amrap_table: training max moves by the reps on the driving AMRAP set (nSuns).
    * drive_set: training max rises when the driving set is completed (Texas Method).
    * gzclp: per-exercise weights move through rep schemes (GZCLP).
+   * reps_over: each rep past the minimum on the driving AMRAP set adds the lift's
+   *   increment to its training max, up to REPS_OVER_CAP reps (Juggernaut).
    */
-  rule: "cycle" | "amrap_table" | "drive_set" | "gzclp";
+  rule: "cycle" | "amrap_table" | "drive_set" | "gzclp" | "reps_over";
   increment: number;
   increments?: Partial<Record<LiftKey, number>>;
   amrapTable?: { minReps: number; kg: number }[];

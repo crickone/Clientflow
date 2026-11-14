@@ -10,13 +10,13 @@ import { contentErrors } from "../content";
 import { PLATFORM_PROGRAMS } from "../registry";
 
 const programs = PLATFORM_PROGRAMS;
-assert.equal(programs.length, 19);
+assert.equal(programs.length, 28);
 
 // Only these programs describe one pass through a cycle that repeats.
 assert.deepEqual(
   programs.filter((t) => t.phasesRepeat === true).map((t) => t.key).sort(),
-  ["531-bbb", "531-fsl", "texas-method"],
-  "only 5/3/1 and the Texas Method repeat",
+  ["531-bbb", "531-fsl", "texas-method", "y3t-style"],
+  "only 5/3/1, the Texas Method and Y3T repeat",
 );
 for (const t of programs) assert.ok(t.phasesRepeat === true || t.phasesRepeat === undefined, `${t.key}: phasesRepeat is true or left out`);
 

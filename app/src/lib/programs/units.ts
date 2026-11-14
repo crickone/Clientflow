@@ -52,6 +52,12 @@ export function tmJumpKg(kg: number, unit: WeightUnit): number {
   return unitToKg(Math.max(5, Math.round(kg / LB_TO_KG / 5) * 5), "lb");
 }
 
+/** A per-rep training-max jump in the member's unit: as set in kg, or for pounds the nearest 2.5 lb (at least 2.5 lb). */
+export function repJumpKg(kg: number, unit: WeightUnit): number {
+  if (unit !== "lb" || !(kg > 0)) return kg;
+  return unitToKg(Math.max(2.5, Math.round(kg / LB_TO_KG / 2.5) * 2.5), "lb");
+}
+
 export function kgToUnit(kg: number, unit: WeightUnit): number {
   return unit === "lb" ? Math.round((kg / LB_TO_KG) * 10) / 10 : Math.round(kg * 100) / 100;
 }

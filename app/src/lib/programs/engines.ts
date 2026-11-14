@@ -9,6 +9,7 @@ import { advance, isLastSession, progresses, schemeLabel, stateKey } from "./pla
 import {
   LIFT_LABEL,
   OWN_DELOAD_PCT,
+  REPS_OVER_CAP,
   emptyState,
   type EngineState,
   type ExerciseResult,
@@ -21,7 +22,7 @@ import {
   type TmCycleSettings,
   type WeightUnit,
 } from "./types";
-import { formatMax, formatWeight, maxFromSet, roundToStep, tmJumpKg, trainingMax } from "./units";
+import { formatMax, formatWeight, maxFromSet, repJumpKg, roundToStep, tmJumpKg, trainingMax } from "./units";
 
 export interface ProgressInput {
   template: ProgramTemplate;
@@ -275,6 +276,21 @@ function tmCycle(c: Ctx, s: TmCycleSettings): void {
           c.reasons.push(`${LIFT_LABEL[lift]} training max goes up to ${tmText(next)}. You got ${got} on the ${p.reps}+ set.`);
         } else {
           c.reasons.push(`${LIFT_LABEL[lift]} training max stays at ${tmText(cur)}. You got ${got} on the ${p.reps}+ set.`);
+        }
+      } else if (s.rule === "reps_over") {
+        if (got === null) {
+          c.reasons.push(`${LIFT_LABEL[lift]} training max stays at ${tmText(cur)}. The ${p.reps}+ set wasn't logged.`);
+        } else if (light) {
+          c.reasons.push(`${LIFT_LABEL[lift]} training max stays at ${tmText(cur)}. The ${p.reps}+ set was lighter than planned.`);
+        } else {
+          const extra = Math.min(REPS_OVER_CAP, Math.max(0, got - p.reps));
+          if (extra > 0) {
+            const next = round2(cur + extra * repJumpKg(s.increments?.[lift] ?? s.increment, c.unit));
+            c.state.tms[lift] = next;
+            c.reasons.push(`${LIFT_LABEL[lift]} training max goes up to ${tmText(next)}. You got ${got} on the ${p.reps}+ set, ${extra} over.`);
+          } else {
+            c.reasons.push(`${LIFT_LABEL[lift]} training max stays at ${tmText(cur)}. You got ${got} on the ${p.reps}+ set.`);
+          }
         }
       } else if (s.rule === "drive_set") {
         if (got !== null && light) {

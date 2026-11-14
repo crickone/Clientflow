@@ -17,14 +17,14 @@ assert.equal(byline(copy), "Our version, based on Smolov base mesocycle");
 assert.equal(cardLine({ daysPerWeek: 1, lengthWeeks: 1 }), "1 day a week for 1 week");
 
 assert.equal(filterCards(cards, NO_FILTER).length, PLATFORM_PROGRAMS.length);
-assert.equal(filterCards(cards, { ...NO_FILTER, family: "peaking" }).length, 6);
+assert.equal(filterCards(cards, { ...NO_FILTER, family: "peaking" }).length, 8);
 assert.equal(filterCards(cards, { ...NO_FILTER, family: "beginner" }).length, 3);
 assert.deepEqual(
   filterCards(cards, { ...NO_FILTER, days: "5+" }).map((c) => c.key).sort(),
-  ["arnold-style-split", "phat", "push-pull-legs"],
+  ["arnold-style-split", "fst-7-style", "phat", "push-pull-legs", "rp-style-hypertrophy-block", "y3t-style"],
 );
 assert.ok(filterCards(cards, { ...NO_FILTER, days: "3" }).every((c) => c.daysPerWeek <= 3));
-assert.equal(filterCards(cards, { ...NO_FILTER, length: "short" }).length, 7);
+assert.equal(filterCards(cards, { ...NO_FILTER, length: "short" }).length, 8);
 assert.ok(filterCards(cards, { ...NO_FILTER, length: "medium" }).every((c) => c.lengthWeeks >= 7 && c.lengthWeeks <= 12));
 assert.equal(filterCards(cards, { family: "peaking", days: "4", length: "short" }).length, 4);
 

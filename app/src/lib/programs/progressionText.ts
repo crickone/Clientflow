@@ -8,8 +8,8 @@
 import { listText, weeksText } from "./content";
 import { barKg } from "./engines";
 import { progresses, schemeLabel } from "./planner";
-import { LIFT_LABEL, OWN_DELOAD_PCT, type ExerciseRx, type LiftKey, type ProgramTemplate, type SetRx, type WeightUnit } from "./types";
-import { formatWeight, roundToStep, tmJumpKg } from "./units";
+import { LIFT_LABEL, OWN_DELOAD_PCT, REPS_OVER_CAP, type ExerciseRx, type LiftKey, type ProgramTemplate, type SetRx, type WeightUnit } from "./types";
+import { formatWeight, repJumpKg, roundToStep, tmJumpKg } from "./units";
 
 const WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 const word = (n: number) => WORDS[n] ?? String(n);
@@ -196,6 +196,14 @@ function tmLines(t: ProgramTemplate, e: Extract<ProgramTemplate["engine"], { key
       lines.push("If the top set falls short, isn't ticked, or is more than one jump lighter than planned, the training max stays the same.");
       break;
     }
+    case "reps_over": {
+        const perRep = jumpsByLift(t.lifts, e.increment, e.increments, (kg) => (kg > 0 ? formatWeight(repJumpKg(kg, unit), unit) : null));
+        const plusWeeks = t.weeks.flatMap((w, i) => (w.days.some((d) => d.exercises.some((ex) => ex.sets.some((s) => s.kind === "amrap" && s.drives))) ? [i + 1] : []));
+        if (plusWeeks.length) lines.push(`The last set of each main lift in ${plusWeeks.length === 1 ? `week ${plusWeeks[0]}` : `weeks ${listText(plusWeeks.map(String))}`} is as many reps as you can.`);
+        if (perRep) lines.push(`Each rep past the target on that set raises that lift's training max by ${perRep}. Up to ${word(REPS_OVER_CAP)} extra reps count, and the weeks after it use the new training max.`);
+        lines.push("If the + set falls short of the target, isn't ticked, or is more than one jump lighter than planned, the training max stays the same.");
+        break;
+      }
     case "gzclp": {
       const all = exercises(t);
       const tier = (k: "t1" | "t2" | "t3") => all.find((ex) => ex.tier === k);
@@ -225,13 +233,24 @@ function addText(kg: number, unit: WeightUnit, stepKg: number): string {
 }
 
 function blockLines(t: ProgramTemplate, unit: WeightUnit, stepKg: number): string[] {
-  const lines = [`Every weight is a percentage of the ${t.tmPct === 1 ? "max" : "training max"} you enter.`];
+  // A test day's work-up ends in an RPE 10 single for every block, so only the training days say what the block is made of.
+  const kinds = new Set(t.weeks.flatMap((w) => w.days.filter((d) => !d.test).flatMap((d) => d.exercises.flatMap((ex) => ex.sets.map((s) => s.kind)))));
+  const hasPct = kinds.has("pct") || kinds.has("amrap");
+  const hasRpe = kinds.has("rpe");
+  const of = t.tmPct === 1 ? "max" : "training max";
+  const lines = [
+    hasRpe && !hasPct
+      ? `Each set has a target effort (RPE). The app suggests a weight from the ${of} you enter. Go by the effort: if the set feels harder or easier than its RPE, change the weight.`
+      : hasRpe
+        ? `Most weights are a percentage of the ${of} you enter. Sets with an RPE are a target effort: the app suggests a weight, and you go by the effort.`
+        : `Every weight is a percentage of the ${of} you enter.`,
+  ];
   const addOf = (s: SetRx) => (s.kind === "pct" || s.kind === "amrap" ? (s.addKg ?? 0) : 0);
   const adds = t.weeks
     .map((w, i) => ({ week: i + 1, kg: Math.max(0, ...w.days.flatMap((d) => d.exercises.flatMap((ex) => ex.sets.map(addOf)))) }))
     .filter((a) => a.kg > 0);
   if (adds.length) lines.push(`${cap(listText(adds.map((a) => `week ${a.week} adds ${addText(a.kg, unit, stepKg)}`)))} to every set.`);
-  lines.push("The weights are set from the start. They do not change with how a session goes.");
+  lines.push(hasRpe ? "The suggested weights are set from the start. They do not change with how a session goes." : "The weights are set from the start. They do not change with how a session goes.");
   if (t.weeks.some((w) => w.days.some((d) => d.test))) lines.push("The test day works out your max from your best set. Start the block again from it.");
   return lines;
 }
@@ -246,12 +265,24 @@ export function howWeightsMove(t: ProgramTemplate, unit: WeightUnit, stepKg: num
       return [...tmLines(t, e, unit, stepKg), ...leftAlone(t)];
     case "fixed_block":
       return [...blockLines(t, unit, stepKg), ...leftAlone(t)];
-    case "double_progression":
-      return [
+    case "double_progression": {
+      const all = exercises(t);
+      const pctNames = unique(all.filter((ex) => ex.sets.some((s) => s.kind === "pct" || s.kind === "amrap")).map((ex) => ex.name.toLowerCase()));
+      const rpeOf = (withLift: boolean) => unique(all.filter((ex) => !!ex.lift === withLift && ex.sets.every((s) => s.kind === "rpe")).map((ex) => ex.name.toLowerCase()));
+      const rpeLogged = rpeOf(false);
+      const rpeMax = rpeOf(true);
+      const lines = [
         "You pick each starting weight.",
         `When every set reaches the top of its rep range, the weight goes up ${formatWeight(stepKg, unit)} and the reps go back to the bottom.`,
-        ...leftAlone(t),
       ];
+      const has = (n: string[]) => (n.length === 1 ? "has" : "have");
+      // Long lists (a conjugate program's weekly max-effort lifts) read better as the kind of set.
+      const rpeLead = (n: string[]) => (n.length <= 4 ? `${cap(listText(n))} ${has(n)} a target effort (RPE).` : "Sets with an RPE are a target effort.");
+      if (pctNames.length) lines.push(`${pctNames.length <= 4 ? `The ${listText(pctNames)} sets with a percentage` : "Sets with a percentage"} are taken from the max you enter, and stay the same until you change it.`);
+      if (rpeMax.length) lines.push(`${rpeLead(rpeMax)} The app suggests a weight from the max you enter.`);
+      if (rpeLogged.length) lines.push(`${rpeLead(rpeLogged)} Once you have logged that exercise, the app suggests a weight from your best recent set.`);
+      return [...lines, ...leftAlone(t)];
+    }
     case "fixed_volume": {
       const jump = stepJump(e.increment, unit, stepKg);
       const lines = [startLine(t, e.startPct)];

@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { requireClient } from "@/lib/clientAuth";
 import { memberSeesPrograms } from "@/lib/programs/access";
+import { MEMBER_LIMITS } from "@/lib/programs/memberTemplate";
 import { createMemberProgram, deleteMemberProgram, parseStartFrom, saveMemberProgram, startingDraft } from "@/lib/programs/memberPrograms";
 
 // The member's own programs. Every action takes the member from their client
@@ -30,7 +31,7 @@ const saveZ = z.object({
   from: z.string().max(80).nullable(),
   template: z.unknown(),
   /** For each week, the saved week it came from (null for a new one); lets a running member stay on the same logical week. Required for an edit. */
-  weekOrigins: z.array(z.number().int().min(0).max(11).nullable()).max(12).optional(),
+  weekOrigins: z.array(z.number().int().min(0).max(MEMBER_LIMITS.weeks - 1).nullable()).max(MEMBER_LIMITS.weeks).optional(),
 });
 const UNREADABLE = "Couldn't read the program. Reload the page and try again.";
 

@@ -98,9 +98,9 @@ assert.deepEqual(
 );
 assert.deepEqual(errorsOf(program((p) => void (p.name = ""))), ["Add a name."]);
 
-// ── limits: 12 weeks, 7 days, 15 exercises, 10 sets, 80-character names, 300-character notes ──
-assert.deepEqual(errorsOf(program((p) => void (p.weeks = Array.from({ length: 13 }, () => structuredClone(p.weeks[0]))))), ["No more than 12 weeks."]);
-assert.ok(validateMemberTemplate(program((p) => void (p.weeks = Array.from({ length: 12 }, () => structuredClone(p.weeks[0])))), "member:7").ok);
+// ── limits: 16 weeks, 7 days, 15 exercises, 10 sets, 80-character names, 300-character notes ──
+assert.deepEqual(errorsOf(program((p) => void (p.weeks = Array.from({ length: 17 }, () => structuredClone(p.weeks[0]))))), ["No more than 16 weeks."]);
+assert.ok(validateMemberTemplate(program((p) => void (p.weeks = Array.from({ length: 16 }, () => structuredClone(p.weeks[0])))), "member:7").ok);
 assert.deepEqual(errorsOf(program((p) => void (p.weeks[0].days = Array.from({ length: 8 }, (_, i) => ({ name: `Day ${i + 1}`, exercises: [structuredClone(bench)] }))))), ["Week 1: no more than 7 days."]);
 assert.deepEqual(
   errorsOf(program((p) => void (p.weeks[0].days[0].exercises = Array.from({ length: 16 }, () => structuredClone(bench))))),

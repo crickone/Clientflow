@@ -8,7 +8,7 @@ import { mostDays } from "./editing";
 import { LIFT_KEYS, type ExerciseRx, type LiftKey, type ProgramTemplate } from "./types";
 import { parseTemplate, templateErrors, type TemplateCheck } from "./validate";
 
-export const MEMBER_LIMITS = { weeks: 12, days: 7, exercises: 15, sets: 10, name: 80, notes: 300 } as const;
+export const MEMBER_LIMITS = { weeks: 16, days: 7, exercises: 15, sets: 10, name: 80, notes: 300 } as const;
 export const MEMBER_AUTHOR = "Built by the member";
 export const MEMBER_PREFIX = "member:";
 
