@@ -251,7 +251,7 @@ function ProgressSection({ progress }: { progress: NonNullable<NonNullable<Progr
           {charts.length === 1 && <b className="pk-chart-name">{charts[0].label}</b>}
           <LiftSwitch lifts={charts.map((c) => ({ lift: c.lift, label: c.label }))}>
             {charts.map((c) => (
-              <PathChart key={c.lift} chart={c} totalWeeks={progress.totalWeeks} unit={progress.unit} kind={progress.kind} />
+              <PathChart key={c.lift} chart={c} totalWeeks={progress.totalWeeks} firstWeek={progress.firstWeek} unit={progress.unit} kind={progress.kind} />
             ))}
           </LiftSwitch>
           <span className="pk-small">{progress.plannedNote}</span>

@@ -18,7 +18,7 @@ export function ProgramProgress({ data }: { data: ProgramProgressData }) {
           {charts.length === 1 && <b className="pk-chart-name">{charts[0].label}</b>}
           <LiftSwitch lifts={charts.map((c) => ({ lift: c.lift, label: c.label }))}>
             {charts.map((c) => (
-              <PathChart key={c.lift} chart={c} totalWeeks={data.totalWeeks} unit={data.unit} kind={data.kind} />
+              <PathChart key={c.lift} chart={c} totalWeeks={data.totalWeeks} firstWeek={data.firstWeek} unit={data.unit} kind={data.kind} />
             ))}
           </LiftSwitch>
           <span className="pk-small">{data.plannedNote}</span>

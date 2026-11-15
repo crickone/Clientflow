@@ -64,4 +64,12 @@ assert.ok(flat.yMax > flat.yMin, "a flat line has a non-empty range");
 const one = pathGeometry({ ...chart, soFar: [{ week: 1, kg: 100 }], planned: [{ week: 1, kg: 100 }] }, 1, W, H);
 assert.ok(!/NaN|Infinity/.test(one.soFar + one.planned));
 
+// A later round: the x axis starts at the round's first week, so a restarted block has no empty left half.
+const round2 = pathGeometry({ ...chart, soFar: [{ week: 5, kg: 100 }, { week: 7, kg: 105 }], planned: [{ week: 7, kg: 105 }, { week: 8, kg: 110 }] }, 8, W, H, 5);
+const r2 = pts(round2.soFar);
+assert.equal(r2[0][0], 10, "the first week of the round is at the left edge (PAD.left)");
+assert.equal(pts(round2.planned).at(-1)![0], 250, "and the last week at the right edge");
+const wrong = pathGeometry({ ...chart, soFar: [{ week: 5, kg: 100 }, { week: 7, kg: 105 }], planned: [{ week: 7, kg: 105 }, { week: 8, kg: 110 }] }, 8, W, H);
+assert.ok(pts(wrong.soFar)[0][0] > 100, "counted from week 1 the same line would start in the middle of the chart");
+
 console.log("programs/pathChart: ok");

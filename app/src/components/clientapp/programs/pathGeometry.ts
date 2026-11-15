@@ -10,8 +10,8 @@ export const PAD = { top: 24, right: 10, bottom: 34, left: 10 };
 
 type Pt = { week: number; kg: number };
 
-/** The scales for one chart: weeks across (1 to the program's last week), kg up. Shared by the lines and the labels. */
-export function chartScale(chart: LiftChart, totalWeeks: number, w: number, h: number) {
+/** The scales for one chart: weeks across (the round's first week to the program's last week), kg up. Shared by the lines and the labels. */
+export function chartScale(chart: LiftChart, totalWeeks: number, w: number, h: number, firstWeek = 1) {
   const all = [...chart.soFar, ...chart.planned];
   const kgs = all.map((p) => p.kg);
   const lo = kgs.length ? Math.min(...kgs) : 0;
@@ -19,8 +19,10 @@ export function chartScale(chart: LiftChart, totalWeeks: number, w: number, h: n
   const pad = Math.max((hi - lo) * 0.12, Math.abs(hi) * 0.02, 1);
   const yMin = lo - pad;
   const yMax = hi + pad;
-  const span = Math.max(totalWeeks - 1, 1);
-  const x = (week: number) => PAD.left + ((Math.min(Math.max(week, 1), Math.max(totalWeeks, 1)) - 1) / span) * (w - PAD.left - PAD.right);
+  const first = Math.max(firstWeek, 1);
+  const last = Math.max(totalWeeks, first);
+  const span = Math.max(last - first, 1);
+  const x = (week: number) => PAD.left + ((Math.min(Math.max(week, first), last) - first) / span) * (w - PAD.left - PAD.right);
   const y = (kg: number) => PAD.top + (1 - (kg - yMin) / (yMax - yMin)) * (h - PAD.top - PAD.bottom);
   return { x, y, yMin, yMax };
 }
@@ -39,7 +41,7 @@ function stepPoints(points: Pt[], x: (week: number) => number, y: (kg: number) =
 }
 
 /** Pure geometry for PathChart, exported for tests: the two lines as SVG points strings, and the kg range they are drawn in. */
-export function pathGeometry(chart: LiftChart, totalWeeks: number, w: number, h: number): { soFar: string; planned: string; yMin: number; yMax: number } {
-  const s = chartScale(chart, totalWeeks, w, h);
+export function pathGeometry(chart: LiftChart, totalWeeks: number, w: number, h: number, firstWeek = 1): { soFar: string; planned: string; yMin: number; yMax: number } {
+  const s = chartScale(chart, totalWeeks, w, h, firstWeek);
   return { soFar: stepPoints(chart.soFar, s.x, s.y), planned: stepPoints(chart.planned, s.x, s.y), yMin: s.yMin, yMax: s.yMax };
 }

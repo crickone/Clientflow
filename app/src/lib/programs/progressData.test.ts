@@ -31,7 +31,9 @@ const requireLocal = createRequire(import.meta.url);
   const { controlSqlite } = requireLocal("../db/control") as typeof import("../db/control");
   const { runWithTenant } = requireLocal("../db/tenant") as typeof import("../db/tenant");
   const { db } = requireLocal("../db") as typeof import("../db");
-  const { clients } = requireLocal("../db/schema") as typeof import("../db/schema");
+  const { clients, workoutSessionExercises } = requireLocal("../db/schema") as typeof import("../db/schema");
+  const { eq } = requireLocal("drizzle-orm") as typeof import("drizzle-orm");
+  const Sqlite = requireLocal("better-sqlite3") as { prototype: { prepare: (...a: unknown[]) => unknown } };
   const log = requireLocal("../workoutLog") as typeof import("../workoutLog");
   const en = requireLocal("./enrolments") as typeof import("./enrolments");
   const pd = requireLocal("./progressData") as typeof import("./progressData");
@@ -163,6 +165,131 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(data.plannedNote, "Dashed: if you get every rep");
     assert.deepEqual(data.rows, []);
   });
+
+  test("a program without lifts: a logged session gives a top-set row (its first weighted exercise)", () => {
+    const clientId = newMember();
+    enrolIn(clientId, "phul");
+    const st = en.startEnrolmentSession(clientId);
+    assert.ok(st.ok);
+    const v = log.getSession(clientId, st.sessionId)!;
+    log.saveSessionSets(
+      clientId,
+      v.id,
+      v.exercises.map((ex) => ({ id: ex.id, sets: ex.plan!.sets.map((p) => ({ weightKg: p.kg ?? 40, reps: p.reps, done: true })) })),
+    );
+    assert.equal(log.finishSession(clientId, v.id), true);
+    assert.ok(en.finishEnrolmentSession(clientId, v.id));
+    const data = pd.programProgress(en.liveEnrolment(clientId)!);
+    assert.equal(data.rows.length, 1, "one row for the session");
+    assert.equal(data.rows[0].lift, v.exercises[0].plan!.name, "the session's first exercise");
+    assert.ok(/ x \d+/.test(data.rows[0].got), data.rows[0].got);
+    assert.equal(data.rows[0].week, 1);
+  });
+
+  test("18 logged sessions: at most 12 rows, newest first, and a few queries however many sessions", () => {
+    const clientId = newMember();
+    enrolIn(clientId, "531-bbb");
+    // The deload week (sessions 13 to 16) has no + set, so 14 rows exist across the 18 sessions.
+    for (let i = 0; i < 18; i++) runNext(clientId, 3 + i);
+    const view = en.liveEnrolment(clientId)!;
+    let prepares = 0;
+    const realPrepare = Sqlite.prototype.prepare;
+    Sqlite.prototype.prepare = function (this: unknown, ...a: unknown[]) {
+      prepares++;
+      return realPrepare.apply(this, a);
+    };
+    let data: ReturnType<typeof pd.programProgress>;
+    try {
+      data = pd.programProgress(view);
+    } finally {
+      Sqlite.prototype.prepare = realPrepare;
+    }
+    assert.equal(data.rows.length, 12);
+    assert.deepEqual(
+      data.rows.map((r) => Number(r.got.split(" x ")[1])),
+      [20, 19, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5],
+      "newest first: the two oldest + sets are not in the list",
+    );
+    assert.ok(data.rows.every((r, i) => i === 0 || r.at <= data.rows[i - 1].at));
+    assert.ok(prepares < 20, `a handful of queries, not one per exercise and set (${prepares})`);
+  });
+
+  test("older sessions are not read once 12 rows exist", () => {
+    const clientId = newMember();
+    enrolIn(clientId, "greyskull-lp");
+    // Greyskull logs several + sets a session, so the newest batch of sessions already holds more than 12 rows.
+    for (let i = 0; i < 14; i++) runNext(clientId, 6 + (i % 5));
+    const view = en.liveEnrolment(clientId)!;
+    let prepares = 0;
+    const realPrepare = Sqlite.prototype.prepare;
+    Sqlite.prototype.prepare = function (this: unknown, ...a: unknown[]) {
+      prepares++;
+      return realPrepare.apply(this, a);
+    };
+    let data: ReturnType<typeof pd.programProgress>;
+    try {
+      data = pd.programProgress(view);
+    } finally {
+      Sqlite.prototype.prepare = realPrepare;
+    }
+    assert.equal(data.rows.length, 12);
+    assert.ok(data.rows.every((r, i) => i === 0 || r.at <= data.rows[i - 1].at), "newest first");
+    // The change log, the sessions and one batch of exercises and sets come to 8 prepared statements; the 2 sessions past the first batch of 12 would cost 4 more.
+    assert.ok(prepares <= 8, `one batch of sessions was read (${prepares} prepared statements)`);
+  });
+
+  test("a stored exercise without a sets list is skipped, not a crash", () => {
+    const clientId = newMember();
+    enrolIn(clientId, "531-bbb");
+    const id = runNext(clientId, 7);
+    const first = db.select().from(workoutSessionExercises).where(eq(workoutSessionExercises.sessionId, id)).all();
+    db.update(workoutSessionExercises).set({ rxJson: '{"name":"Old format"}' }).where(eq(workoutSessionExercises.id, first[0].id)).run();
+    db.update(workoutSessionExercises).set({ rxJson: "null" }).where(eq(workoutSessionExercises.id, first[1].id)).run();
+    const data = pd.programProgress(en.liveEnrolment(clientId)!);
+    assert.ok(Array.isArray(data.rows));
+  });
+
+  test("a fixed block keeps its chart in the test week and after the test, ending at the test max", () => {
+    const clientId = newMember();
+    enrolIn(clientId, "smolov-base");
+    for (let i = 0; i < 12; i++) runNext(clientId);
+    const atTest = pd.programProgress(en.liveEnrolment(clientId)!);
+    assert.equal(atTest.kind, "top");
+    assert.equal(atTest.charts.length, 1, "the squat chart is still there in the test week");
+    assert.equal(atTest.charts[0].soFar.at(-1)!.week, 3);
+    runNext(clientId);
+    const view = en.liveEnrolment(clientId)!;
+    assert.equal(view.state.finished, true);
+    const after = pd.programProgress(view);
+    assert.equal(after.charts.length, 1, "and after the test");
+    const last = after.charts[0].soFar.at(-1)!;
+    assert.equal(last.week, 4);
+    assert.ok(Math.abs(last.kg - view.state.testMaxes.squat!) <= 1.25 + 1e-9, "the last so-far point is the test max (to the member's step)");
+    assert.equal(after.charts[0].nowKg, last.kg);
+  });
+
+  test("after a restart: rows and chart count from the round's first week", () => {
+    const clientId = newMember();
+    enrolIn(clientId, "smolov-base");
+    for (let i = 0; i < 13; i++) runNext(clientId);
+    const r = en.restartFromTest(clientId, { squat: 110 });
+    assert.ok(r.ok, JSON.stringify(r));
+    runNext(clientId);
+    const data = pd.programProgress(en.liveEnrolment(clientId)!);
+    assert.equal(data.totalWeeks, 8);
+    assert.equal(data.firstWeek, 5, "round 2 starts at program week 5");
+    assert.equal(data.charts[0].soFar[0].week, 5, "the so-far line starts at the round's first week");
+    assert.equal(data.rows.length, 1, "only this round's session");
+    assert.equal(data.rows[0].week, 1, "the row reads Week 1, as the program says it");
+    const first = pd.programProgress(en.liveEnrolment(enrolFresh())!);
+    assert.equal(first.firstWeek, 1);
+  });
+
+  const enrolFresh = () => {
+    const c = newMember();
+    enrolIn(c, "531-bbb");
+    return c;
+  };
 
   try {
     runWithTenant(tid, () => {

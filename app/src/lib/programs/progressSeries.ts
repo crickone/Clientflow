@@ -9,6 +9,7 @@ import { progress } from "./engines";
 import { planSession, progresses, stateKey, weekInRound, weekNumber } from "./planner";
 import { perfect } from "./simulate";
 import { emptyState, type EngineState, type LiftKey, type PlannedExercise, type PlannedSession, type ProgramTemplate, type SessionResult, type SetRx, type WeightUnit } from "./types";
+import { roundToStep } from "./units";
 
 export type ChartKind = "tm" | "weight" | "top";
 
@@ -44,20 +45,21 @@ export function liftValue(t: ProgramTemplate, state: EngineState, lift: LiftKey,
     case "tm":
       return state.tms[lift] ?? null;
     case "weight": {
+      // The main lift's weight: GZCLP also runs the lift as a lighter T2 (which can come first in the week), so a T1 or untiered exercise wins.
+      let fallback: number | null = null;
       for (const w of t.weeks)
         for (const d of w.days)
-          for (const ex of d.exercises)
-            if (ex.lift === lift && progresses(ex)) return state.weights[stateKey(ex)] ?? null;
-      return null;
+          for (const ex of d.exercises) {
+            if (ex.lift !== lift || !progresses(ex)) continue;
+            const kg = state.weights[stateKey(ex)] ?? null;
+            if (!ex.tier || ex.tier === "t1") return kg;
+            if (fallback === null) fallback = kg;
+          }
+      return fallback;
     }
     case "top":
       return topSetKg(t, state, lift, stepKg);
   }
-}
-
-/** The lifts a chart can be drawn for: the template's lifts that have a value in `state`. Empty when none. */
-export function chartLifts(t: ProgramTemplate, state: EngineState, stepKg: number): LiftKey[] {
-  return t.lifts.filter((l) => liftValue(t, state, l, stepKg) !== null);
 }
 
 export interface SeriesPoint {
@@ -79,15 +81,29 @@ function toPoints(byWeek: Map<number, number>): SeriesPoint[] {
   return [...byWeek.entries()].sort((a, b) => a[0] - b[0]).map(([week, kg]) => ({ week, kg }));
 }
 
-/** The value after each recorded change since the latest start or restart, one point per program week (the last value in that week wins). */
-export function soFarSeries(t: ProgramTemplate, snapshots: Snapshot[], lift: LiftKey, stepKg: number): SeriesPoint[] {
+/**
+ * The value after each recorded change since the latest start or restart, one point per program week (the last value in that week wins).
+ * A fixed block's top set is not planned on its test day, so once the test is done (`current` is finished) the test result is the last point, in the test week.
+ */
+export function soFarSeries(t: ProgramTemplate, snapshots: Snapshot[], lift: LiftKey, stepKg: number, current?: EngineState): SeriesPoint[] {
   const byWeek = new Map<number, number>();
   for (const snap of snapshots) {
     const state: EngineState = { ...emptyState(), ...snap };
     const kg = liftValue(t, state, lift, stepKg);
     if (kg !== null) byWeek.set(weekNumber(t, state), kg);
   }
+  const tested = current?.testMaxes[lift];
+  if (current && chartKind(t) === "top" && current.finished && tested !== undefined) byWeek.set(weekNumber(t, current), roundToStep(tested, stepKg));
   return toPoints(byWeek);
+}
+
+/** The points from the round's first week on. A value carried in from an earlier round is held at that first week, so the line starts at the left edge. */
+export function inRound(points: SeriesPoint[], firstWeek: number): SeriesPoint[] {
+  if (firstWeek <= 1) return points;
+  const kept = points.filter((p) => p.week >= firstWeek);
+  if (kept.length > 0 && kept[0].week === firstWeek) return kept;
+  const prior = points.filter((p) => p.week < firstWeek).at(-1);
+  return prior ? [{ week: firstWeek, kg: prior.kg }, ...kept] : kept;
 }
 
 const MAX_SESSIONS = 400;
@@ -119,6 +135,27 @@ export function plannedSeries(t: ProgramTemplate, state: EngineState, lift: Lift
   return toPoints(byWeek);
 }
 
+export interface LiftSeries {
+  lift: LiftKey;
+  soFar: SeriesPoint[];
+  planned: SeriesPoint[];
+}
+
+/**
+ * The lifts a chart can be drawn for, each with its two lines: the template's lifts with a value anywhere on the so-far line or the plan.
+ * Chosen from the series, not the current state alone, so a fixed block still has its chart in the test week and after the test.
+ */
+export function liftSeries(t: ProgramTemplate, snapshots: Snapshot[], state: EngineState, stepKg: number, unit: WeightUnit): LiftSeries[] {
+  const firstWeek = (weekInRound(t, state).round - 1) * t.lengthWeeks + 1;
+  const out: LiftSeries[] = [];
+  for (const lift of t.lifts) {
+    const soFar = inRound(soFarSeries(t, snapshots, lift, stepKg, state), firstWeek);
+    const planned = plannedSeries(t, state, lift, stepKg, unit);
+    if (soFar.length > 0 || planned.length > 0) out.push({ lift, soFar, planned });
+  }
+  return out;
+}
+
 /** Every set done as planned: the top of a rep range, + sets two over. */
 function perfectResult(session: PlannedSession): SessionResult {
   return {
@@ -141,6 +178,8 @@ export function hasPlusSets(t: ProgramTemplate): boolean {
 }
 
 export interface LoggedExercise {
+  /** The session the exercise was logged in. */
+  session: number;
   at: number;
   week: number;
   plan: PlannedExercise;
@@ -155,9 +194,13 @@ export interface PlusSetRow {
   got: string;
 }
 
-/** The + sets (AMRAP or drives) logged, newest first; for programs without + sets, the heaviest done set of each logged exercise that has a lift. */
-export function plusSetRows(rows: LoggedExercise[], plus: boolean, fmt: (kg: number) => string): PlusSetRow[] {
+/**
+ * The + sets (AMRAP or drives) logged, newest first. For programs without + sets, the heaviest done set of each logged exercise that has a lift;
+ * `lifts` false (a template with no lifts: PHUL, PPL and so on) takes each session's first weighted exercise instead.
+ */
+export function plusSetRows(rows: LoggedExercise[], plus: boolean, fmt: (kg: number) => string, lifts = true): PlusSetRow[] {
   const out: PlusSetRow[] = [];
+  const taken = new Set<number>();
   for (const row of rows) {
     if (plus) {
       row.plan.sets.forEach((p, i) => {
@@ -167,14 +210,17 @@ export function plusSetRows(rows: LoggedExercise[], plus: boolean, fmt: (kg: num
         const load = d.kg === null ? "Bodyweight" : fmt(d.kg);
         out.push({ at: row.at, week: row.week, lift: row.plan.name, planned, got: `${load} x ${d.reps}` });
       });
-    } else if (row.plan.lift) {
+    } else if (lifts ? !!row.plan.lift : !taken.has(row.session)) {
       let best: { kg: number; reps: number } | null = null;
       row.sets.forEach((d) => {
         if (!d.done || d.kg === null || d.reps === null) return;
         if (best === null || d.kg > best.kg) best = { kg: d.kg, reps: d.reps };
       });
       const b = best as { kg: number; reps: number } | null;
-      if (b) out.push({ at: row.at, week: row.week, lift: row.plan.name, planned: planLabel(row.plan), got: `${fmt(b.kg)} x ${b.reps}` });
+      if (b) {
+        taken.add(row.session);
+        out.push({ at: row.at, week: row.week, lift: row.plan.name, planned: planLabel(row.plan), got: `${fmt(b.kg)} x ${b.reps}` });
+      }
     }
   }
   return out.sort((a, b) => b.at - a.at);
