@@ -71,7 +71,7 @@ assert.equal(firstWeek(get("phul"), {}, 2.5, "kg")[0].lines[0], "Bench press 4 x
 assert.equal(firstWeek(get("greyskull-lp"), { bench: 80, row: 70, squat: 100, press: 50, deadlift: 120 }, 2.5, "kg")[1].lines[1], "Chin-up 2 x 5, then 1 x 5+, bodyweight");
 assert.equal(firstSets(get("smolov-base"), "squat", 140, 2.5, "kg"), "4 x 9 at 97.5 kg");
 assert.equal(firstSets(get("smolov-base"), "squat", 140, STEP_5LB_KG, "lb"), "4 x 9 at 215 lb");
-assert.equal(firstSets(get("531-bbb"), "squat", 100, 2.5, "kg"), "1 x 5 at 57.5 kg, then 1 x 5 at 67.5 kg, then 1 x 5+ at 77.5 kg", "5/3/1 uses the training max");
+assert.equal(firstSets(get("531-bbb"), "squat", 100, 2.5, "kg"), "1 x 5 at 65 kg, then 1 x 5 at 75 kg, then 1 x 5+ at 85 kg", "5/3/1 uses the training max, which starts at the full max");
 assert.equal(firstSets(get("smolov-base"), "bench", 100, 2.5, "kg"), null, "no exercise uses that lift");
 {
   // The first week plans what the app will: with the member's last weight (planContextFor's lastKg) a manual exercise shows it, the same as planSession.
@@ -107,7 +107,7 @@ assert.equal(weightWhy(wk2, sm.weeks[1].days[0].exercises[0], sm.tmPct, "kg"), "
 const bbb = get("531-bbb");
 const bst = initState(bbb, { press: 60, deadlift: 160, bench: 100, squat: 140 }, 2.5);
 const main = planExercise(bbb.weeks[0].days[0].exercises[0], 0, bst, { stepKg: 2.5 });
-assert.equal(weightWhy(main, bbb.weeks[0].days[0].exercises[0], bbb.tmPct, "kg"), "65% to 85% of your training max.");
+assert.equal(weightWhy(main, bbb.weeks[0].days[0].exercises[0], bbb.tmPct, "kg"), "65% to 85% of your max.");
 const sl = get("stronglifts-5x5");
 const slPlan = planExercise(sl.weeks[0].days[0].exercises[0], 0, initState(sl, { squat: 100 }, 2.5), { stepKg: 2.5 });
 assert.equal(weightWhy(slPlan, sl.weeks[0].days[0].exercises[0], sl.tmPct, "kg"), null, "a working weight needs no line");

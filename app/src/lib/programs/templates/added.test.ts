@@ -10,8 +10,8 @@ import { howWeightsMove } from "../progressionText";
 import { line, perfect, planAt, simulate, type Performer } from "../simulate";
 import { STEP_5LB_KG } from "../units";
 
-// A max of 111.11 kg gives a 90% training max of exactly 100 kg.
-const tm100 = { squat: 111.11, bench: 111.11, deadlift: 111.11, press: 111.11 };
+// 5/3/1 and Juggernaut take their training max from the full max, so a 100 kg max is a 100 kg training max.
+const tm100 = { squat: 100, bench: 100, deadlift: 100, press: 100 };
 const days = (key: string) => platformProgram(key)!.weeks.map((w) => w.days.map((d) => d.name));
 
 // ── Juggernaut-style ──────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ assert.equal(line(planAt(jug, tm100, 14, 3).exercises[0]), "Overhead press 1 x 5
   assert.equal(run.final.tms.bench, Math.round((100 + 2 * 1.134) * 100) / 100);
 }
 assert.deepEqual(howWeightsMove(jug, "kg", 2.5).slice(0, 4), [
-  "Your training max is 90% of your max. Every percentage is taken from it.",
+  "Your training max starts at the one-rep max you enter. Every percentage is taken from it.",
   "The last set of each main lift in weeks 3, 7, 11 and 15 is as many reps as you can.",
   "Each rep past the target on that set raises that lift's training max by 1.25 kg, or 2.5 kg on the squat and deadlift. Up to five extra reps count, and the weeks after it use the new training max.",
   "If the + set falls short of the target, isn't ticked, or is more than one jump lighter than planned, the training max stays the same.",

@@ -38,8 +38,23 @@ const bbb = platformProgram("531-bbb")!;
 const b = panelFrom({ enrolment: { id: 1, status: "paused", template: bbb, state: initState(bbb, { press: 100, deadlift: 100, bench: 100, squat: 100 }, 2.5), unit: "lb", basedOnName: null }, plan: null, events: [], past: [] });
 assert.equal(b.live!.status, "paused");
 assert.equal(b.live!.lifts[0].max, "220.5 lb");
-assert.equal(b.live!.lifts[0].tm, "198.4 lb");
+assert.equal(b.live!.lifts[0].tm, null, "5/3/1 starts its training max at the max, so there is nothing more to show");
 assert.equal(b.live!.next, null);
+
+// ...until the training max rises above the max over the cycles
+const bbbRisen = initState(bbb, { press: 100, deadlift: 100, bench: 100, squat: 100 }, 2.5);
+bbbRisen.tms.press = 102.5;
+const risen = panelFrom({ enrolment: { id: 1, status: "active", template: bbb, state: bbbRisen, unit: "kg", basedOnName: null }, plan: null, events: [], past: [] });
+assert.equal(risen.live!.lifts[0].lift, "press");
+assert.equal(risen.live!.lifts[0].max, "100 kg");
+assert.equal(risen.live!.lifts[0].tm, "102.5 kg", "a raised training max is shown beside the max");
+assert.equal(risen.live!.lifts[1].tm, null, "a lift whose training max is still the max shows none");
+
+// a program that sets its training max below the max (Texas Method: the 5-rep max, 6/7 of it) always shows it
+const texas = platformProgram("texas-method")!;
+const tx = panelFrom({ enrolment: { id: 1, status: "paused", template: texas, state: initState(texas, { press: 100, deadlift: 100, bench: 100, squat: 100 }, 2.5), unit: "lb", basedOnName: null }, plan: null, events: [], past: [] });
+assert.equal(tx.live!.lifts[0].max, "220.5 lb");
+assert.equal(tx.live!.lifts[0].tm, "189 lb");
 
 // the coach's week options are weeks of the member's current round: a 5/3/1
 // member in their second cycle (cycle 1) on its 3s week sees weeks 5 to 8,

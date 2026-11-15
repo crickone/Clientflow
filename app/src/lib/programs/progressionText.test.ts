@@ -88,7 +88,7 @@ assert.ok(greyLb.includes("A lift never drops below the empty bar (45 lb)."));
 }
 
 assert.deepEqual(howWeightsMove(get("531-bbb"), "kg", 2.5), [
-  "Your training max is 90% of your max. Every percentage is taken from it.",
+  "Your training max starts at the one-rep max you enter. Every percentage is taken from it.",
   "The last set of each main lift in weeks 1 to 3 is as many reps as you can.",
   "After each four-week cycle, your training max goes up 2.5 kg, or 5 kg on the deadlift and squat.",
   "If you finish a session and its + set falls short, isn't ticked, or is more than one jump lighter than planned, that lift's training max stays the same for the next cycle. Skipped sessions don't hold it back.",

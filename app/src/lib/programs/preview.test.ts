@@ -12,10 +12,10 @@ assert.deepEqual(smolov[0].rows[0], { day: "Day 1", test: false, exercise: "Back
 assert.deepEqual(smolov[1].rows[0], { day: "Day 1", test: false, exercise: "Back squat", rx: "4 x 9 at 70% + 10 kg", example: "4 x 9 at 80 kg" });
 assert.equal(smolov[3].rows[0].test, true);
 
-// 5/3/1: percentages of a 90 kg training max (90% of 100 kg)
+// 5/3/1: percentages of the training max, which starts at the full 100 kg max
 const bbb = previewProgram(platformProgram("531-bbb")!);
 assert.equal(bbb[0].rows[0].rx, "1 x 5 at 65%, then 1 x 5 at 75%, then 1 x 5+ at 85%");
-assert.equal(bbb[0].rows[0].example, "1 x 5 at 57.5 kg, then 1 x 5 at 67.5 kg, then 1 x 5+ at 77.5 kg");
+assert.equal(bbb[0].rows[0].example, "1 x 5 at 65 kg, then 1 x 5 at 75 kg, then 1 x 5+ at 85 kg");
 
 // linear programs show starting weights; rep-range programs leave the weight to the member
 assert.equal(previewProgram(platformProgram("stronglifts-5x5")!)[0].rows[0].example, "5 x 5 at 50 kg");

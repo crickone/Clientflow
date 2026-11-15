@@ -58,7 +58,10 @@ assert.deepEqual(rules("phat"), ["manual", "range"], "PHAT keeps its fixed acces
 // ── percentages become percentages of the max; RPE sets on a percent exercise plan the same share ──
 const bbb = toOwnRules(platformProgram("531-bbb")!).template;
 const firstPct = bbb.weeks[0].days[0].exercises[0].sets[0];
-assert.ok(firstPct.kind === "pct" && near(firstPct.pct, 0.65 * 0.9), "5/3/1's 65% of a 90% training max is 58.5% of the max");
+assert.ok(firstPct.kind === "pct" && near(firstPct.pct, 0.65), "5/3/1's training max is the full max, so 65% of it is 65% of the max");
+const texasConv = toOwnRules(platformProgram("texas-method")!).template;
+const texasPct = texasConv.weeks[0].days[0].exercises[0].sets[0];
+assert.ok(texasPct.kind === "pct" && near(texasPct.pct, 0.9 * (6 / 7)), "Texas's 90% of a 5-rep training max (6/7 of the max) is 77.1% of the max");
 const smolovTest = toOwnRules(platformProgram("smolov-base")!).template.weeks.at(-1)!.days.find((d) => d.test)!;
 const lastSet = smolovTest.exercises[0].sets.at(-1)!;
 assert.ok(lastSet.kind === "pct" && near(lastSet.pct, 1), "the max attempt is 100% of the max");
@@ -101,7 +104,12 @@ const w531 = platformProgram("531-fsl")!;
 const s531 = initState(w531, { squat: 150, bench: 100, deadlift: 180, press: 60 }, STEP);
 s531.tms.squat = 145;
 const c531 = toOwnRules(w531, { weights: s531.weights, tms: s531.tms });
-assert.ok(near(c531.maxes.squat!, 145 / 0.9), "the max that keeps the same weights: training max / 90%");
+assert.ok(near(c531.maxes.squat!, 145), "5/3/1's training max is the max, so the max that keeps the same weights is the training max");
+const wTx = platformProgram("texas-method")!;
+const sTx = initState(wTx, { squat: 150, bench: 100, deadlift: 180, press: 60 }, STEP);
+sTx.tms.squat = 120;
+const cTx = toOwnRules(wTx, { weights: sTx.weights, tms: sTx.tms });
+assert.ok(near(cTx.maxes.squat!, 120 / (6 / 7)), "the max that keeps the same weights: training max / (6/7)");
 
 // ── a member program converts to itself, with its weights as start weights ──
 const again = toOwnRules({ ...fromCurrent, key: "member:3" }, { weights: { "linear:back squat": 92.5 } }).template;

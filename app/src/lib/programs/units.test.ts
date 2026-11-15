@@ -12,6 +12,7 @@ import {
   kgToUnit,
   maxFromSet,
   shownStepKg,
+  showsTrainingMax,
   parseRpe,
   parseWeightIn,
   repJumpKg,
@@ -114,5 +115,12 @@ assert.equal(repJumpKg(1.25, "kg"), 1.25);
 assert.equal(repJumpKg(1.25, "lb"), 1.134);
 assert.equal(repJumpKg(2.5, "lb"), 2.268);
 assert.equal(repJumpKg(0.2, "lb"), 1.134);
+
+// When a training max is shown beside the max.
+assert.equal(showsTrainingMax(6 / 7, 100, 85.71), true, "a training max set below the max is shown");
+assert.equal(showsTrainingMax(1, 100, 100), false, "a training max equal to the max adds nothing");
+assert.equal(showsTrainingMax(1, 100, 102.5), true, "a training max that has risen above the max is shown");
+assert.equal(showsTrainingMax(1, 100, undefined), false, "no training max, nothing to show");
+assert.equal(showsTrainingMax(6 / 7, 100, undefined), false, "no training max, nothing to show");
 
 console.log("programs/units: ok");

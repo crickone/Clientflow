@@ -8,8 +8,10 @@ import { line, planAt, simulate } from "../simulate";
 import type { SetRx } from "../types";
 import { validateTemplate } from "../validate";
 
-// A max of 111.11 kg gives a 90% training max of exactly 100 kg.
-const tm100 = { squat: 111.11, bench: 111.11, deadlift: 111.11, press: 111.11 };
+// 5/3/1 and Juggernaut take their training max from the full max, so a 100 kg max is a 100 kg training max.
+const tm100 = { squat: 100, bench: 100, deadlift: 100, press: 100 };
+// nSuns-style still takes a 90% training max: a max of 111.11 kg gives exactly 100 kg.
+const nsMax = { squat: 111.11, bench: 111.11, deadlift: 111.11, press: 111.11 };
 
 // ── 5/3/1 Boring But Big ──────────────────────────────────────────────────
 const bbb = platformProgram("531-bbb")!;
@@ -40,12 +42,12 @@ const ns = nsunsStyle;
 assert.ok(validateTemplate(ns).ok, "nSuns-style passes the template check");
 assert.equal(ns.weeks.length, 1);
 assert.equal(ns.weeks[0].days.length, 5);
-assert.deepEqual(planAt(ns, tm100, 0, 1).exercises.map((e) => line(e)), [
+assert.deepEqual(planAt(ns, nsMax, 0, 1).exercises.map((e) => line(e)), [
   "Back squat 1 x 5 at 75 kg, then 1 x 3 at 85 kg, then 1 x 1+ at 95 kg, then 1 x 3 at 90 kg, then 1 x 3 at 85 kg, then 1 x 3 at 80 kg, then 1 x 5 at 75 kg, then 1 x 5 at 70 kg, then 1 x 5+ at 65 kg",
   "Sumo deadlift 1 x 5 at 50 kg, then 1 x 5 at 60 kg, then 1 x 3 at 70 kg, then 1 x 5 at 70 kg, then 1 x 7 at 70 kg, then 1 x 4 at 70 kg, then 1 x 6 at 70 kg, then 1 x 8 at 70 kg",
 ]);
 // one week, every rep (3 reps on each 1+ set): +2.5 kg on all four training maxes
-assert.deepEqual(simulate(ns, { maxes: tm100, sessions: 5 }).final.tms, { squat: 102.5, bench: 102.5, deadlift: 102.5, press: 102.5 });
+assert.deepEqual(simulate(ns, { maxes: nsMax, sessions: 5 }).final.tms, { squat: 102.5, bench: 102.5, deadlift: 102.5, press: 102.5 });
 
 // ── Texas Method ─────────────────────────────────────────────────────────
 // A max of 116.67 kg gives an estimated 5-rep max (6/7) of exactly 100 kg.
