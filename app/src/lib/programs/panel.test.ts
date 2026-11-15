@@ -133,4 +133,13 @@ const ownChoice = panelFrom({ enrolment: { id: 12, status: "active", template: s
 assert.equal(ownChoice.coachSet, false);
 assert.equal(ownChoice.setBy, null);
 
+// progress passes through as given, and is null when absent
+const sample = { kind: "tm", plus: true, kindLabel: "Training max", plannedNote: "Dashed: if each + set hits its reps", totalWeeks: 4, charts: [], rowsTitle: "Your + sets", rows: [], unit: "kg" } as const;
+const withProgress = panelFrom({ enrolment: { id: 13, status: "active", template: sl, state, unit: "kg", basedOnName: null }, plan: null, events: [], past: [], progress: { ...sample, charts: [], rows: [] } }).live!;
+assert.deepEqual(withProgress.progress, sample);
+assert.equal(quiet.live!.progress, null);
+assert.equal(panelFrom({ enrolment: { id: 14, status: "active", template: sl, state, unit: "kg", basedOnName: null }, plan: null, events: [], past: [], progress: null }).live!.progress, null);
+// plain data: survives the server-to-client boundary unchanged
+assert.deepEqual(JSON.parse(JSON.stringify(withProgress.progress)), withProgress.progress);
+
 console.log("programs/panel: ok");

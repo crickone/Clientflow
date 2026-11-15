@@ -11,6 +11,8 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Input } from "@/components/ui/Input";
 import { coachEndProgramAction } from "@/app/clients/[id]/program/actions";
 import { coachMoveWeekAction, coachSetMaxAction } from "@/app/clients/[id]/programActions";
+import { LiftSwitch } from "@/components/clientapp/programs/LiftSwitch";
+import { PathChart } from "@/components/clientapp/programs/kit";
 import { PANEL_EVENT_LIMIT, type ProgramPanelData } from "@/lib/programs/panel";
 
 /** Staff view of a member's DIY program: where they are, their maxes, the next session, and every change with its reason. */
@@ -181,6 +183,8 @@ export function ClientProgramPanel({ clientId, data }: { clientId: number; data:
             </div>
           )}
 
+          {live.progress && <ProgressSection progress={live.progress} />}
+
           <div className="dp-card">
             <div className="dp-card-title">Recent skips</div>
             {live.skipped.length === 0 && <div className="dp-line">No skips in the latest changes.</div>}
@@ -233,5 +237,44 @@ export function ClientProgramPanel({ clientId, data }: { clientId: number; data:
         </div>
       )}
     </section>
+  );
+}
+
+/** The member's chart and + sets, read-only. Colours are the brand variables the .pk- block uses. */
+function ProgressSection({ progress }: { progress: NonNullable<NonNullable<ProgramPanelData["live"]>["progress"]> }) {
+  const { charts, rows } = progress;
+  return (
+    <>
+      {charts.length > 0 && (
+        <div className="dp-card">
+          <div className="dp-card-title">{progress.kindLabel}</div>
+          {charts.length === 1 && <b className="pk-chart-name">{charts[0].label}</b>}
+          <LiftSwitch lifts={charts.map((c) => ({ lift: c.lift, label: c.label }))}>
+            {charts.map((c) => (
+              <PathChart key={c.lift} chart={c} totalWeeks={progress.totalWeeks} unit={progress.unit} kind={progress.kind} />
+            ))}
+          </LiftSwitch>
+          <span className="pk-small">{progress.plannedNote}</span>
+        </div>
+      )}
+      <div className="dp-card">
+        <div className="dp-card-title">{progress.rowsTitle}</div>
+        {rows.length === 0 ? (
+          <div className="dp-line">{progress.plus ? "No + sets logged yet." : "No top sets logged yet."}</div>
+        ) : (
+          <ul className="pk-rows">
+            {rows.map((r) => (
+              <li key={`${r.at}-${r.lift}-${r.planned}-${r.got}`} className="pk-rows-item">
+                <span className="pk-rows-what">
+                  <span>{`Week ${r.week} · ${r.planned}`}</span>
+                  <span className="pk-small">{r.lift}</span>
+                </span>
+                <b className="pk-rows-got">{r.got}</b>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
   );
 }

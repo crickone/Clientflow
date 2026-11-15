@@ -5,6 +5,7 @@ import { enrolmentEvents, listEnrolments, liveEnrolment, planFor } from "./enrol
 import { getCopy } from "./library";
 import { parseMemberKey } from "./memberTemplate";
 import { PANEL_EVENT_LIMIT, panelFrom, type ProgramPanelData } from "./panel";
+import { programProgress, type ProgramProgressData } from "./progressData";
 
 /**
  * The client page's DIY program panel, or null when the member has never run a
@@ -41,7 +42,18 @@ function buildPanel(clientId: number): ProgramPanelData | null {
     plan: live && live.status === "active" ? planFor(live) : null,
     events: live ? enrolmentEvents(live.id, PANEL_EVENT_LIMIT) : [],
     past: past.map((p) => ({ name: p.template.name, endedAt: p.endedAt })),
+    progress: live ? progressFor(live) : null,
   });
+}
+
+/** The chart data for the panel. A failure here only drops the chart, never the panel or the page. */
+function progressFor(live: NonNullable<ReturnType<typeof liveEnrolment>>): ProgramProgressData | null {
+  try {
+    return programProgress(live);
+  } catch (err) {
+    console.error(`[programs] progress for enrolment ${live.id} failed:`, err);
+    return null;
+  }
 }
 
 /** The coach who set the program: the newest start event logged by a staff member. */
