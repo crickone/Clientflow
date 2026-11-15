@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, ScanLine } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 import { requireClientPage } from "@/lib/clientAuth";
 import { trainingOverview } from "@/lib/trainingOverview";
@@ -10,7 +10,11 @@ import { WearableSummary } from "@/components/clientapp/WearableSummary";
 import { formatSet } from "@/lib/workoutLogModel";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
 import { formatChange, formatMetric, METRIC_BY_KEY, type MetricKey } from "@/lib/inbody/metrics";
-import { Card, PageTitle, SectionTitle } from "@/components/clientapp/ui";
+import { memberSeesPrograms } from "@/lib/programs/access";
+import { liveEnrolment } from "@/lib/programs/enrolments";
+import { programProgress, type ProgramProgressData } from "@/lib/programs/progressData";
+import { PkCard, PkHeader, PkSection, QuietRow, StatStrip } from "@/components/clientapp/programs/kit";
+import { ProgramProgress } from "@/components/clientapp/programs/ProgramProgress";
 import { TrendChart } from "@/components/bodyscans/TrendChart";
 import { WeekBars } from "@/components/progress/WeekBars";
 import { Sparkline } from "@/components/progress/Sparkline";
@@ -21,173 +25,141 @@ function day(ms: number) {
   return new Date(ms).toLocaleDateString("en-IE", { day: "numeric", month: "short", timeZone: "Europe/Dublin" });
 }
 
-const TONE: Record<string, string> = { good: "var(--success)", bad: "var(--attn-ink, var(--text-secondary))", flat: "var(--text-tertiary)" };
+const BODY_LABEL: Record<string, string> = { smm: "Muscle", pbf: "Body fat", weight: "Weight" };
 
+/** Progress: a running program's path first, then strength, weeks, lifts, body scans and wearables. An empty section is one quiet row. */
 export default async function ProgressPage() {
-  const { clientId, tenantId } = requireClientPage();
+  const { clientId, client, tenantId } = requireClientPage();
   const t = trainingOverview(clientId);
+
+  // Only an active program shows here; a paused one (coach guided) does not.
+  const live = memberSeesPrograms({ tenantId, client, clientId }) ? liveEnrolment(clientId) : null;
+  const view = live && live.status === "active" ? live : null;
+  // A row that will not read must never take the page down: log it and leave the program section out.
+  let progress: ProgramProgressData | null = null;
+  if (view) {
+    try {
+      progress = programProgress(view);
+    } catch (e) {
+      console.error("[progress] program progress failed", view.id, e);
+    }
+  }
 
   const scansOn = bodyScansEnabled(tenantId);
   const consent = scansOn && getScanProfile(clientId).consentAt !== null;
   const scans = consent ? listClientScans(clientId).filter((s) => Object.keys(s.metrics).length > 0) : [];
   const latestScan = scans[0];
   const firstScan = scans[scans.length - 1];
-  const bodyKeys: MetricKey[] = ["smm", "pbf", "weight"];
+  const bodyKeys = (["smm", "pbf", "weight"] as MetricKey[]).filter((k) => latestScan?.metrics[k] !== undefined);
 
   const strengthNow = t.strength.length ? t.strength[t.strength.length - 1].value : null;
   const tracked = t.lifts.filter((l) => l.sessions > 1);
-  const thisWeek = t.weeks[t.weeks.length - 1];
+  const hasStrength = t.strength.length > 1 && tracked.length > 0;
+  const hasWeeks = t.weeks.some((w) => w.workouts > 0);
   const devices = connectionsFor(tenantId, clientId);
 
+  // No zero tiles: a number shows only when it is above zero, and the strip only when a workout is logged.
+  const strip: { label: string; value: string; sub?: string }[] = [];
+  if (t.totalWorkouts > 0) {
+    if (strengthNow !== null && tracked.length > 0) strip.push({ label: "Strength", value: signed(strengthNow, "%"), sub: `across ${tracked.length} lift${tracked.length === 1 ? "" : "s"}` });
+    if (t.streak > 0) strip.push({ label: "Streak", value: String(t.streak), sub: t.streak === 1 ? "week" : "weeks" });
+    if (t.workouts30 > 0) strip.push({ label: "Last 30 days", value: String(t.workouts30), sub: t.workouts30 === 1 ? "workout" : "workouts" });
+  }
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <PageTitle sub={t.totalWorkouts ? `${t.totalWorkouts} workout${t.totalWorkouts === 1 ? "" : "s"} logged` : "Your strength and body, over time"}>Progress</PageTitle>
+    <div className="pk">
+      <PkHeader title="Progress" lead={t.totalWorkouts ? `${t.totalWorkouts} workout${t.totalWorkouts === 1 ? "" : "s"} logged` : undefined} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
-        <Tile label="Strength" value={strengthNow !== null && tracked.length ? signed(strengthNow, "%") : "-"} note={tracked.length ? `across ${tracked.length} lift${tracked.length === 1 ? "" : "s"}` : "log a lift twice"} tone={strengthNow && strengthNow > 0 ? "good" : "flat"} />
-        <Tile label="Week streak" value={String(t.streak)} note={t.streak === 1 ? "week in a row" : "weeks in a row"} />
-        <Tile label="Last 30 days" value={String(t.workouts30)} note={t.workouts30 === 1 ? "workout" : "workouts"} />
-        {latestScan && firstScan && latestScan !== firstScan ? (
-          <Tile
-            label="Body fat"
-            value={formatChange("pbf", latestScan.metrics.pbf, firstScan.metrics.pbf)?.text ?? "-"}
-            note={`since ${day(firstScan.measuredAt)}`}
-            tone={formatChange("pbf", latestScan.metrics.pbf, firstScan.metrics.pbf)?.tone}
-          />
-        ) : (
-          <Tile label="This week" value={String(thisWeek?.workouts ?? 0)} note={thisWeek?.volume ? `${thisWeek.volume.toLocaleString("en-IE")} kg lifted` : "workouts"} />
-        )}
-      </div>
+      {view && progress && (
+        <PkSection label="Your program">
+          <ProgramProgress data={progress} />
+          <QuietRow href="/app/programs/mine" label="See your program" icon="chevron" />
+        </PkSection>
+      )}
 
-      <Card style={{ padding: "14px 14px 10px", display: "grid", gap: 6 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-          <span style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-primary)" }}>Strength</span>
-          {strengthNow !== null && tracked.length > 0 && <span style={{ fontSize: 13, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>{signed(strengthNow, "%")}</span>}
-        </div>
-        {t.strength.length > 1 && tracked.length > 0 ? (
-          <>
-            <TrendChart label="Strength" unit="%" points={t.strength} height={120} />
-            <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--text-tertiary)" }}>
-              The average rise in your estimated one-rep max on each lift since you first logged it.
-            </div>
-          </>
-        ) : (
-          <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--text-secondary)" }}>
-            Log the same lifts over a few weeks and this line shows how much stronger you are getting.
+      {strip.length > 0 && <StatStrip items={strip} />}
+
+      {hasStrength ? (
+        <PkCard>
+          <div className="pk-row">
+            <b style={{ fontSize: 15, color: "var(--text-primary)" }}>Strength</b>
+            {strengthNow !== null && <b style={{ fontSize: 17, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{signed(strengthNow, "%")}</b>}
           </div>
-        )}
-      </Card>
+          <TrendChart label="Strength" unit="%" points={t.strength} height={120} />
+          <span className="pk-small">The average rise in your estimated one-rep max on each lift since you first logged it.</span>
+        </PkCard>
+      ) : (
+        <QuietRow href="/app/workouts" label="Log a lift twice to see your strength trend" icon="chevron" />
+      )}
 
-      <Card style={{ padding: "14px 14px 10px", display: "grid", gap: 6 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-          <span style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-primary)" }}>Workouts each week</span>
-          <span style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>Last 12 weeks</span>
-        </div>
-        <WeekBars label="Workouts each week" weeks={t.weeks.map((w) => ({ weekStart: w.weekStart, value: w.workouts }))} />
-      </Card>
+      {hasWeeks ? (
+        <PkSection label="Workouts each week">
+          <WeekBars label="Workouts each week" weeks={t.weeks.map((w) => ({ weekStart: w.weekStart, value: w.workouts }))} />
+          <span className="pk-small">Last 12 weeks</span>
+        </PkSection>
+      ) : (
+        <QuietRow href="/app/workouts" label="Log a workout to see your weeks" icon="chevron" />
+      )}
+
+      {t.lifts.length === 0 ? (
+        <QuietRow href="/app/workouts" label="Log a workout with weights to see your lifts" icon="chevron" />
+      ) : (
+        <PkSection label="Lifts">
+          {t.lifts.map((l) => (
+            <Link key={l.key} href={`/app/workouts/progress/${encodeURIComponent(l.key)}`} className="pk-linkrow" style={{ borderBottom: "1px solid var(--hairline)", padding: "6px 0" }}>
+              <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
+                <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</span>
+                <span className="pk-small" style={{ fontVariantNumeric: "tabular-nums" }}>
+                  Best {formatSet(l.best)}
+                  {l.sessions > 1 && l.change.kg !== 0 ? ` · ${signed(l.change.kg, " kg")} est. max` : ""}
+                </span>
+              </div>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                <Sparkline values={l.points.map((p) => p.e1rm)} />
+                <ChevronRight size={16} className="pk-chev" aria-hidden />
+              </span>
+            </Link>
+          ))}
+        </PkSection>
+      )}
+
+      {scansOn &&
+        (!consent ? (
+          <QuietRow href="/app/body" label="Add your InBody scans" icon="chevron" />
+        ) : !latestScan ? (
+          <QuietRow label="No InBody scans yet. Step on the scanner next time you’re in and your muscle and body fat will show here." />
+        ) : (
+          <PkSection label="Body">
+            {bodyKeys.length > 0 && (
+              <StatStrip
+                items={bodyKeys.map((k) => {
+                  const ch = firstScan !== latestScan ? formatChange(k, latestScan.metrics[k], firstScan.metrics[k]) : null;
+                  return { label: BODY_LABEL[k], value: formatMetric(k, latestScan.metrics[k]), sub: ch?.text };
+                })}
+              />
+            )}
+            {firstScan !== latestScan && <span className="pk-small">Changes since your first scan on {day(firstScan.measuredAt)}.</span>}
+            {scans.length > 1 &&
+              (["smm", "pbf"] as MetricKey[])
+                .filter((k) => scans.filter((s) => s.metrics[k] !== undefined).length > 1)
+                .map((k) => (
+                  <div key={k} style={{ display: "grid", gap: 6 }}>
+                    <div className="pk-row">
+                      <span className="pk-muted">{METRIC_BY_KEY[k].label}</span>
+                      <b style={{ fontSize: 15, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{formatMetric(k, latestScan.metrics[k])}</b>
+                    </div>
+                    <TrendChart metric={k} points={scans.filter((s) => s.metrics[k] !== undefined).map((s) => ({ at: s.measuredAt, value: s.metrics[k]! }))} height={100} />
+                  </div>
+                ))}
+            <QuietRow href="/app/body" label="Every scan" icon="chevron" />
+          </PkSection>
+        ))}
 
       {devices.length > 0 && (
-        <div style={{ display: "grid", gap: 10 }}>
-          <SectionTitle>From your {devices.length === 1 ? PROVIDER_NAME[devices[0].provider] : "devices"}</SectionTitle>
-          <Card>
-            <WearableSummary days={recentDays(tenantId, clientId, 14)} today={dateKey(Date.now())} />
-          </Card>
-        </div>
+        <PkSection label={`From your ${devices.length === 1 ? PROVIDER_NAME[devices[0].provider] : "devices"}`}>
+          <WearableSummary days={recentDays(tenantId, clientId, 14)} today={dateKey(Date.now())} />
+        </PkSection>
       )}
-
-      {scansOn && (
-        <div style={{ display: "grid", gap: 10 }}>
-          <SectionTitle>Body</SectionTitle>
-          {!consent ? (
-            <Link href="/app/body">
-              <Card style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={iconBox}><ScanLine size={18} /></span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Add your InBody scans</div>
-                  <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>See your muscle and body fat next to your strength</div>
-                </div>
-                <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
-              </Card>
-            </Link>
-          ) : !latestScan ? (
-            <Card>
-              <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--text-secondary)" }}>
-                No InBody scans yet. Step on the scanner next time you&rsquo;re in and your muscle and body fat will show here.
-              </div>
-            </Card>
-          ) : (
-            <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                {bodyKeys.map((k) => {
-                  const ch = firstScan !== latestScan ? formatChange(k, latestScan.metrics[k], firstScan.metrics[k]) : null;
-                  return (
-                    <Card key={k} style={{ padding: 12, display: "grid", gap: 3 }}>
-                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{k === "smm" ? "Muscle" : k === "pbf" ? "Body fat" : "Weight"}</span>
-                      <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{formatMetric(k, latestScan.metrics[k])}</span>
-                      {ch && <span style={{ fontSize: 11.5, fontWeight: 500, color: TONE[ch.tone] }}>{ch.text}</span>}
-                    </Card>
-                  );
-                })}
-              </div>
-              {firstScan !== latestScan && (
-                <div style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "-4px 2px 0" }}>Changes since your first scan on {day(firstScan.measuredAt)}.</div>
-              )}
-              {scans.length > 1 &&
-                (["smm", "pbf"] as MetricKey[])
-                  .filter((k) => scans.filter((s) => s.metrics[k] !== undefined).length > 1)
-                  .map((k) => (
-                    <Card key={k} style={{ padding: "14px 14px 10px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-                        <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-primary)" }}>{METRIC_BY_KEY[k].label}</span>
-                        <span style={{ fontSize: 13, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>{formatMetric(k, latestScan.metrics[k])}</span>
-                      </div>
-                      <TrendChart metric={k} points={scans.filter((s) => s.metrics[k] !== undefined).map((s) => ({ at: s.measuredAt, value: s.metrics[k]! }))} height={100} />
-                    </Card>
-                  ))}
-              <Link href="/app/body" style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--accent-ink)", fontSize: 13.5, padding: "2px 2px" }}>
-                Every scan <ChevronRight size={15} />
-              </Link>
-            </>
-          )}
-        </div>
-      )}
-
-      <div style={{ display: "grid", gap: 8 }}>
-        <SectionTitle>Lifts</SectionTitle>
-        {t.lifts.length === 0 ? (
-          <Card>
-            <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--text-secondary)" }}>Log a workout with weights and each lift shows here with its best set.</div>
-          </Card>
-        ) : (
-          t.lifts.map((l) => (
-            <Link key={l.key} href={`/app/workouts/progress/${encodeURIComponent(l.key)}`}>
-              <Card style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px" }}>
-                <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 2 }}>
-                  <span style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</span>
-                  <span style={{ fontSize: 12.5, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>
-                    Best {formatSet(l.best)}
-                    {l.sessions > 1 && l.change.kg !== 0 ? ` · ${signed(l.change.kg, " kg")} est. max` : ""}
-                  </span>
-                </div>
-                <Sparkline values={l.points.map((p) => p.e1rm)} />
-                <ChevronRight size={18} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
-              </Card>
-            </Link>
-          ))
-        )}
-      </div>
     </div>
   );
 }
-
-function Tile({ label, value, note, tone }: { label: string; value: string; note: string; tone?: "good" | "bad" | "flat" }) {
-  return (
-    <Card style={{ padding: 14, display: "grid", gap: 3 }}>
-      <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{label}</span>
-      <span style={{ fontSize: 22, fontWeight: 600, color: tone === "good" ? "var(--success)" : "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{value}</span>
-      <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{note}</span>
-    </Card>
-  );
-}
-
-const iconBox: React.CSSProperties = { width: 36, height: 36, borderRadius: 10, background: "var(--surface-2)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--accent-ink)", flexShrink: 0 };
