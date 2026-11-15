@@ -15,7 +15,7 @@ export default async function TrainingDaysPage() {
   const programId = programs.some((p) => p.id === row.programId) ? row.programId! : programs[0].id;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <PageTitle sub="Your week, planned around your programme">Training days</PageTitle>
+      <PageTitle sub="Your week, planned around your program">Training days</PageTitle>
       <Card style={{ padding: 18 }}>
         <TrainingDaysForm programs={programs} initialProgramId={programId} initialWeekdays={row.programId === programId ? row.weekdays : []} />
       </Card>

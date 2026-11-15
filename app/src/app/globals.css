@@ -5900,6 +5900,9 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 /* Quiet row: a link or an empty state in one line, 44px tall, a hairline under it. */
 .pk-row--quiet { min-height: 44px; border-bottom: 1px solid var(--hairline); font-size: 14.5px; line-height: 1.35; color: var(--text-primary); text-decoration: none; }
 .pk-row--quiet:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+/* A quiet row that runs an action: a button dressed as the row. */
+.pk-row--btn { width: 100%; padding: 0; border: 0; border-bottom: 1px solid var(--hairline); background: transparent; font: inherit; font-size: 14.5px; text-align: left; cursor: pointer; }
+.pk-row--btn:disabled { opacity: 0.6; cursor: default; }
 .pk-row-value { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: 14px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 /* Path chart: solid so far, dashed planned, the value now and the planned end labelled. */
 .pk-chart { display: block; width: 100%; height: auto; overflow: visible; }

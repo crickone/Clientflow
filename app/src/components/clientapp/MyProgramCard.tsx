@@ -1,47 +1,68 @@
 // app/src/components/clientapp/MyProgramCard.tsx
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
 
-import { liveEnrolment, planFor, sessionTitle } from "@/lib/programs/enrolments";
-import { summarisePlanned, weekLabel } from "@/lib/programs/planner";
+import { liveEnrolment, planFor } from "@/lib/programs/enrolments";
+import { sessionMinutes } from "@/lib/programs/outline";
+import { weekLabel } from "@/lib/programs/planner";
 import { openSession } from "@/lib/workoutLog";
-import { Card } from "@/components/clientapp/ui";
+import { PkCard, SessionTable } from "@/components/clientapp/programs/kit";
 import { StartProgramSessionButton } from "@/components/clientapp/StartProgramSessionButton";
 
-/** Home and Workouts: the member's DIY program and its next session, every weight worked out. */
-export function MyProgramCard({ clientId }: { clientId: number }) {
+/**
+ * The member's DIY program and its next session.
+ * "full" (Workouts): the one white card, with the day name, about how long it
+ * takes, every set as a table and Start or Continue session.
+ * "line" (Home): one row, "Press day · Week 1 of 12", and a compact Start button.
+ */
+export function MyProgramCard({ clientId, variant = "full" }: { clientId: number; variant?: "full" | "line" }) {
   const view = liveEnrolment(clientId);
   if (!view || view.status !== "active") return null;
   const plan = planFor(view);
   const open = openSession(clientId);
   const inProgress = !!open && open.enrolmentId === view.id;
-  return (
-    <Card style={{ display: "grid", gap: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>My program</span>
-        <Link href="/app/programs/mine" style={{ fontSize: 13, color: "var(--accent-ink)", display: "inline-flex", alignItems: "center", gap: 2, minHeight: 44, padding: "0 4px" }}>
-          Details <ChevronRight size={14} />
+  const week = weekLabel(view.template, view.state);
+
+  if (variant === "line") {
+    return (
+      <div className="pk-row pk-row--quiet">
+        <Link href="/app/programs/mine" className="pk-linkrow" style={{ flex: 1, minWidth: 0 }}>
+          <span>{plan ? `${plan.dayName} · ${week}` : view.template.name}</span>
         </Link>
+        {plan ? (
+          <StartProgramSessionButton label={inProgress ? "Continue" : "Start"} compact />
+        ) : (
+          <Link href="/app/programs/mine" className="pk-ghost">
+            See program
+          </Link>
+        )}
       </div>
-      <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-        {view.template.name}, {weekLabel(view.template, view.state).toLowerCase()}
+    );
+  }
+
+  return (
+    <PkCard>
+      <div className="pk-row">
+        <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
+          <span className="pk-small">
+            {view.template.name} · {week}
+          </span>
+          <h2 className="pk-card-title">{plan ? plan.dayName : "Program finished"}</h2>
+        </div>
+        <Link href="/app/programs/mine" className="pk-ghost">
+          Details
+        </Link>
       </div>
       {plan ? (
         <>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>{sessionTitle(view, plan)}</div>
-          {plan.exercises.slice(0, 4).map((ex) => (
-            <div key={ex.index} style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-              <span style={{ color: "var(--text-primary)" }}>{ex.name}</span> {summarisePlanned(ex.sets, view.unit)}
-            </div>
-          ))}
-          {plan.exercises.length > 4 && <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>And {plan.exercises.length - 4} more</div>}
+          <span className="pk-small">About {sessionMinutes(view.template)} minutes</span>
+          <SessionTable exercises={plan.exercises} unit={view.unit} />
           <StartProgramSessionButton label={inProgress ? "Continue session" : "Start session"} />
         </>
       ) : (
-        <Link href="/app/programs/mine" style={{ fontSize: 13.5, color: "var(--accent-ink)" }}>
+        <Link href="/app/programs/mine" className="pk-ghost">
           {view.assignedBy ? "Block finished. Your coach will set what comes next." : "Program done. Enter your new max to run it again."}
         </Link>
       )}
-    </Card>
+    </PkCard>
   );
 }

@@ -26,7 +26,7 @@ export type StartResult = { ok: true; sessionId: number } | { ok: false; error: 
  */
 export function startSession(clientId: number, program: ProgramInput, dayPosition: number): StartResult {
   const day = program.days[dayPosition];
-  if (!program.id || program.type !== "detailed" || !day) return { ok: false, error: "That day isn't in your programme." };
+  if (!program.id || program.type !== "detailed" || !day) return { ok: false, error: "That day isn't in your program." };
   const exercises = day.exercises.filter((e) => e.name.trim());
   if (exercises.length === 0) return { ok: false, error: "This day has no exercises yet." };
 

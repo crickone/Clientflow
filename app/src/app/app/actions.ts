@@ -227,9 +227,9 @@ export async function startWorkoutAction(programId: number, dayPosition: number)
   const { clientId } = requireClient();
   const p = idSchema.safeParse(programId);
   const d = z.number().int().min(0).max(100).safeParse(dayPosition);
-  if (!p.success || !d.success) return { ok: false, error: "That day isn't in your programme." };
+  if (!p.success || !d.success) return { ok: false, error: "That day isn't in your program." };
   const program = assignedWorkoutProgramDetail(clientId, p.data);
-  if (!program) return { ok: false, error: "That programme isn't assigned to you." };
+  if (!program) return { ok: false, error: "That program isn't assigned to you." };
   const r = startSession(clientId, program, d.data);
   revalidatePath("/app/workouts");
   return r;
@@ -358,7 +358,7 @@ export async function saveTrainingDaysAction(programId: number, weekdays: number
   const p = idSchema.safeParse(programId);
   const d = z.array(z.number().int().min(1).max(7)).max(7).safeParse(weekdays);
   if (!p.success || !d.success) return { ok: false, error: "Couldn't save your training days." };
-  if (!assignedWorkoutProgramDetail(clientId, p.data)) return { ok: false, error: "That programme isn't assigned to you." };
+  if (!assignedWorkoutProgramDetail(clientId, p.data)) return { ok: false, error: "That program isn't assigned to you." };
   setTrainingPlan(clientId, p.data, d.data);
   revalidatePath("/app/workouts");
   revalidatePath("/app");

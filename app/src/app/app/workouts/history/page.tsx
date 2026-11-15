@@ -21,7 +21,7 @@ export default async function WorkoutHistoryPage() {
       {sessions.length === 0 ? (
         <Card>
           <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--text-secondary)" }}>
-            No workouts logged yet. Open your programme, pick a day and tap Start workout.
+            No workouts logged yet. Open your program, pick a day and tap Start workout.
           </div>
           <Link href="/app/workouts" style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 8, color: "var(--accent-ink)", fontSize: 13.5 }}>
             Go to my workouts <ChevronRight size={15} />

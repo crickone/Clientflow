@@ -42,7 +42,7 @@ export function TrainingDaysForm({
     <div style={{ display: "grid", gap: 18 }}>
       {programs.length > 1 && (
         <div style={{ display: "grid", gap: 8 }}>
-          <div className="td-label">Programme</div>
+          <div className="td-label">Program</div>
           <div style={{ display: "grid", gap: 8 }}>
             {programs.map((p) => (
               <button key={p.id} type="button" className="td-option" aria-pressed={p.id === programId} onClick={() => setProgramId(p.id)}>
@@ -66,8 +66,8 @@ export function TrainingDaysForm({
           {days.length === 0
             ? "Pick the days you plan to train."
             : program && days.length !== program.dayNames.length
-              ? `Your programme has ${program.dayNames.length} days and you picked ${days.length}. The days run in order, so they will rotate across weeks.`
-              : `Each training day gets the next day of your programme, in order.`}
+              ? `Your program has ${program.dayNames.length} days and you picked ${days.length}. The days run in order, so they will rotate across weeks.`
+              : `Each training day gets the next day of your program, in order.`}
         </div>
       </div>
       <Button onClick={save} loading={pending} style={{ width: "100%" }}>

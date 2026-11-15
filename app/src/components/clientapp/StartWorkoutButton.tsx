@@ -24,7 +24,7 @@ export function StartWorkoutButton({
   programId?: number;
   dayPosition?: number;
   label: string;
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "row";
   size?: "sm" | "md";
 }) {
   const router = useRouter();
@@ -38,6 +38,17 @@ export function StartWorkoutButton({
       const openId = r.inProgressId;
       toast.error(r.error, openId ? { action: { label: "Open it", onClick: () => router.push(`/app/workouts/log/${openId}`) } } : undefined);
     });
+  }
+
+  if (variant === "row") {
+    return (
+      <button type="button" className="pk-row pk-row--quiet pk-row--btn" onClick={go} disabled={pending}>
+        <span>{label}</span>
+        <span className="pk-row-value">
+          <Plus size={16} className="pk-chev" aria-hidden />
+        </span>
+      </button>
+    );
   }
 
   return (
