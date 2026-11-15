@@ -10,12 +10,12 @@ import Link from "next/link";
 import { AlertTriangle, ChevronRight, Plus } from "lucide-react";
 
 import { weeksText } from "@/lib/programs/content";
-import { repsLabel } from "@/lib/programs/planner";
 import type { LiftChart } from "@/lib/programs/progressData";
 import type { ChartKind } from "@/lib/programs/progressSeries";
-import type { Phase, PlannedExercise, PlannedSet, WeightUnit } from "@/lib/programs/types";
+import type { Phase, PlannedExercise, WeightUnit } from "@/lib/programs/types";
 import { formatMax, formatWeight } from "@/lib/programs/units";
 import { chartScale, PAD, pathGeometry } from "./pathGeometry";
+import { setLine } from "./setLine";
 
 export { pathGeometry };
 
@@ -167,14 +167,6 @@ export function StatStrip({ items }: { items: { label: string; value: string; su
   );
 }
 
-/** One set as the table writes it, weight first: "100 kg x 5", "about 140 kg x 3 · RPE 8", "3 reps · RPE 8", "12 reps". */
-function setLine(set: PlannedSet, unit: WeightUnit): string {
-  const reps = repsLabel(set);
-  const load = set.kg !== null && set.kg > 0 ? formatWeight(set.kg, unit) : null;
-  if (set.rpe !== null) return `${load ? `about ${load} x ${reps}` : `${reps} reps`} · RPE ${set.rpe}`;
-  return load ? `${load} x ${reps}` : `${reps} reps`;
-}
-
 /** A session as a table: the exercise on the left, each set on its own line on the right. + sets are in the accent colour. */
 export function SessionTable({ exercises, unit }: { exercises: PlannedExercise[]; unit: WeightUnit }) {
   return (
@@ -238,10 +230,10 @@ function sideAt(x: number): { dx: number; anchor: "start" | "end" } {
  * 0.5 kg or 1 lb (formatMax, as My program writes it); a working weight or top
  * set is exact (formatWeight).
  */
-export function PathChart({ chart, totalWeeks, unit, kind }: { chart: LiftChart; totalWeeks: number; unit: WeightUnit; kind: ChartKind }) {
+export function PathChart({ chart, totalWeeks, firstWeek = 1, unit, kind }: { chart: LiftChart; totalWeeks: number; firstWeek?: number; unit: WeightUnit; kind: ChartKind }) {
   const fmt = (kg: number) => (kind === "tm" ? formatMax(kg, unit) : formatWeight(kg, unit));
-  const g = pathGeometry(chart, totalWeeks, CHART_W, CHART_H);
-  const { x, y } = chartScale(chart, totalWeeks, CHART_W, CHART_H);
+  const g = pathGeometry(chart, totalWeeks, CHART_W, CHART_H, firstWeek);
+  const { x, y } = chartScale(chart, totalWeeks, CHART_W, CHART_H, firstWeek);
   const now = chart.soFar.at(-1) ?? null;
   const end = chart.planned.at(-1) ?? null;
   const nowX = now ? x(now.week) : null;
@@ -280,7 +272,7 @@ export function PathChart({ chart, totalWeeks, unit, kind }: { chart: LiftChart;
         Week 1
       </text>
       <text className="pk-chart-label pk-chart-label--weak" x={CHART_W - PAD.right} y={CHART_H - 2} textAnchor="end">
-        {`Week ${Math.max(totalWeeks, 1)}`}
+        {`Week ${Math.max(totalWeeks - Math.max(firstWeek, 1) + 1, 1)}`}
       </text>
     </svg>
   );

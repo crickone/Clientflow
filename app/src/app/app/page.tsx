@@ -10,6 +10,7 @@ import { WEEKDAYS } from "@/lib/memberChoicesModel";
 import { requireClientPage } from "@/lib/clientAuth";
 import { MyProgramCard } from "@/components/clientapp/MyProgramCard";
 import { PkCard, PkHeader, PkSection, QuietRow, StatStrip } from "@/components/clientapp/programs/kit";
+import { liveStripItems } from "@/components/clientapp/programs/screenModel";
 import { memberSeesPrograms } from "@/lib/programs/access";
 import { liveEnrolment, programWeek } from "@/lib/programs/enrolments";
 import { clientDashboard, clientUpcoming } from "@/lib/clientApp";
@@ -27,6 +28,7 @@ import { trainingOverview } from "@/lib/trainingOverview";
 import { dateKey, signed } from "@/lib/trainingProgress";
 import { formatSet } from "@/lib/workoutLogModel";
 import { StartWorkoutButton } from "@/components/clientapp/StartWorkoutButton";
+import { openSession } from "@/lib/workoutLog";
 
 export const dynamic = "force-dynamic";
 
@@ -70,12 +72,16 @@ export default async function ClientHome() {
   const done = weekDays ? weekDays.filter((x) => x.status === "done").length : 0;
   const thisWeek = t.weeks.at(-1)?.workouts ?? 0;
   const sessions = planned > 0 ? { value: `${done}/${planned}`, sub: "sessions" } : { value: String(thisWeek), sub: thisWeek === 1 ? "session" : "sessions" };
-  // A brand-new member has nothing to count yet: no strip of zeros, just the quiet rows below.
-  const hasNumbers = planned > 0 || thisWeek > 0 || t.workouts30 > 0 || t.streak > 0 || !!diy;
+  // The program line already carries "Continue" for its own open workout, so its accent card would be a second one.
+  const open = diy ? openSession(clientId) : null;
+  const openIsProgram = !!diy && !!open && open.enrolmentId === diy.id;
   const next = d.nextClass;
-  const nextTile = next
-    ? { label: "Next class", value: next.date === todayIso() ? "Today" : dayLabel(next.date, { weekday: "short" }), sub: next.startTime }
-    : { label: "Next class", value: "None" };
+  // A brand-new member has nothing to count yet: a number of 0 (or no class) is not shown, and with nothing left there is no strip.
+  const stripItems = liveStripItems([
+    { label: "This week", value: sessions.value, sub: sessions.sub },
+    { label: "Streak", value: String(t.streak), sub: t.streak === 1 ? "week" : "weeks" },
+    next ? { label: "Next class", value: next.date === todayIso() ? "Today" : dayLabel(next.date, { weekday: "short" }), sub: next.startTime } : null,
+  ]);
 
   // The coach's plan row: not while a program leads or a workout is already open (its card is above).
   const showPlanRow = !diy && !t.open && !!t.next;
@@ -84,7 +90,7 @@ export default async function ClientHome() {
     <div style={{ display: "grid", gap: 18 }}>
       <PkHeader crumb="Welcome back" title={client.firstName} />
 
-      {t.open && (
+      {t.open && !openIsProgram && (
         <PkCard href={`/app/workouts/log/${t.open.id}`} accent>
           <div className="pk-row">
             <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
@@ -98,7 +104,7 @@ export default async function ClientHome() {
         </PkCard>
       )}
 
-      {hasNumbers && <StatStrip items={[{ label: "This week", value: sessions.value, sub: sessions.sub }, { label: "Streak", value: String(t.streak), sub: t.streak === 1 ? "week" : "weeks" }, nextTile]} />}
+      {stripItems.length > 0 && <StatStrip items={stripItems} />}
 
       {/* the one start button on the page: a running program, else the coach's next workout */}
       {diy ? (
@@ -106,7 +112,7 @@ export default async function ClientHome() {
       ) : showPlanRow && t.next ? (
         <div className="pk-row pk-row--quiet">
           <Link href="/app/workouts" className="pk-linkrow" style={{ flex: 1, minWidth: 0 }}>
-            <span>{t.next.dayName}</span>
+            <span>{`Next up: ${t.next.dayName}`}</span>
           </Link>
           <StartWorkoutButton programId={t.next.programId} dayPosition={t.next.dayPosition} label="Start" compact />
         </div>
@@ -162,7 +168,7 @@ export default async function ClientHome() {
           <QuietRow href="/app/timetable" label="No class booked" value="Browse the timetable" icon="chevron" />
         )}
 
-        {(d.weekBooked > 0 || d.totalAttended > 0) && (
+        {d.weekBooked > 0 && (
           <QuietRow label="Classes this week" value={`${d.weekAttended} of ${d.weekBooked} attended`} />
         )}
 
@@ -216,7 +222,7 @@ export default async function ClientHome() {
           <QuietRow href="/app/workouts" label={t.last ? `Last workout: ${t.last.dayName}, ${t.last.sets} sets` : "Workouts"} value={t.last ? shortDate(t.last.finishedAt) : undefined} icon="chevron" />
         )}
         {showTraining && t.latestBest && <QuietRow href="/app/progress" label={`Latest best: ${t.latestBest.name}`} value={formatSet(t.latestBest)} icon="chevron" />}
-        {showTraining && t.plan && t.plan.weekdays.length === 0 && <QuietRow href="/app/workouts/plan" label="Pick your training days" icon="chevron" />}
+        {showTraining && !diy && t.plan && t.plan.weekdays.length === 0 && <QuietRow href="/app/workouts/plan" label="Pick your training days" icon="chevron" />}
       </div>
 
       {/* upcoming list: the first booking is the next-class row above */}

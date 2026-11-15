@@ -5398,7 +5398,9 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .ps--note span { font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); }
 .ps-hint { margin: 10px 0; font-size: 12.5px; color: var(--text-tertiary); }
 .ps-off { justify-self: start; padding: 8px 0; border: 0; background: transparent; color: var(--text-tertiary); font: inherit; font-size: 12.5px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-.ps--card { padding: 14px; border-radius: 16px; border: 1px solid var(--accent); background: var(--accent-soft); }
+/* On Home the reminder offer is a quiet row, not a second accent button: hairline under it, an outlined button. */
+.ps--card { padding: 8px 0 12px; border-bottom: 1px solid var(--hairline); }
+.ps--card .ps-btn { justify-self: start; background: transparent; color: var(--accent-ink); border: 1px solid var(--hairline); }
 
 /* ── Workout builder: supersets/circuits and coaching notes ── */
 .wbx-ex { display: grid; gap: 4px; }
@@ -5880,8 +5882,8 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .pk-sheet-body { display: grid; gap: 14px; min-width: 0; }
 .pk-sheet-foot { position: sticky; bottom: 0; display: grid; gap: 8px; padding-top: 8px; background: var(--surface-1); }
 @media (prefers-reduced-motion: reduce) { .pk-fold > summary svg { transition: none; } }
-/* Stat strip: three numbers across, hairlines between, no boxes. */
-.pk-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Stat strip: one to three numbers across, equal columns that fill the row, hairlines between, no boxes. */
+.pk-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 .pk-strip-item { display: grid; gap: 3px; align-content: start; min-width: 0; padding: 2px 12px; }
 .pk-strip-item:first-child { padding-left: 0; }
 .pk-strip-item:last-child { padding-right: 0; }

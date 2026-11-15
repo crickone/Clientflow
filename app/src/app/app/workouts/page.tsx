@@ -3,6 +3,8 @@ import { ChevronRight } from "lucide-react";
 import { requireClientPage } from "@/lib/clientAuth";
 import { MyProgramCard } from "@/components/clientapp/MyProgramCard";
 import { PkCard, PkHeader, PkSection, QuietRow, StatStrip } from "@/components/clientapp/programs/kit";
+import { liveStripItems, showsNoProgramRow } from "@/components/clientapp/programs/screenModel";
+import { chartKind } from "@/lib/programs/progressSeries";
 import { memberSeesPrograms } from "@/lib/programs/access";
 import { liveEnrolment, programWeek } from "@/lib/programs/enrolments";
 import { LIFT_LABEL } from "@/lib/programs/types";
@@ -44,14 +46,19 @@ export default async function ClientWorkoutsPage() {
   const thisWeek = t.weeks.at(-1)?.workouts ?? 0;
   const sessions = planned > 0 ? { value: `${done}/${planned}`, sub: "sessions" } : { value: String(thisWeek), sub: thisWeek === 1 ? "session" : "sessions" };
 
-  const lift = diy?.template.lifts.find((l) => diy.state.tms[l] !== undefined);
+  // The training max headline is only for programs that run on one; everything else counts workouts in the last 30 days.
+  const lift = diy && chartKind(diy.template) === "tm" ? diy.template.lifts.find((l) => diy.state.tms[l] !== undefined) : undefined;
   const headline =
     diy && lift
-      ? { label: `${LIFT_LABEL[lift]} TM`, value: formatMax(diy.state.tms[lift]!, diy.unit), sub: undefined }
+      ? { label: `${LIFT_LABEL[lift]} TM`, value: formatMax(diy.state.tms[lift]!, diy.unit) }
       : { label: "Last 30 days", value: String(t.workouts30), sub: t.workouts30 === 1 ? "workout" : "workouts" };
 
-  // A brand-new member has nothing to count yet: no strip of zeros, just the empty row below.
-  const hasNumbers = planned > 0 || thisWeek > 0 || t.workouts30 > 0 || t.streak > 0 || !!diy;
+  // A brand-new member has nothing to count yet: a 0 is not shown, and with nothing left there is no strip.
+  const stripItems = liveStripItems([
+    { label: "This week", value: sessions.value, sub: sessions.sub },
+    headline,
+    { label: "Streak", value: String(t.streak), sub: t.streak === 1 ? "week" : "weeks" },
+  ]);
 
   const trainingDays = t.plan ? (t.plan.weekdays.length ? t.plan.weekdays.map((d) => WEEKDAY_SHORT[d - 1]).join(", ") : "Set days") : null;
 
@@ -59,15 +66,7 @@ export default async function ClientWorkoutsPage() {
     <div style={{ display: "grid", gap: 18 }}>
       <PkHeader title="Workouts" />
 
-      {hasNumbers && (
-        <StatStrip
-          items={[
-            { label: "This week", value: sessions.value, sub: sessions.sub },
-            headline,
-            { label: "Streak", value: String(t.streak), sub: t.streak === 1 ? "week" : "weeks" },
-          ]}
-        />
-      )}
+      {stripItems.length > 0 && <StatStrip items={stripItems} />}
 
       {weekDays && <WeekStrip days={weekDays} todayKey={today} />}
 
@@ -98,7 +97,7 @@ export default async function ClientWorkoutsPage() {
           </div>
           <StartWorkoutButton programId={t.next.programId} dayPosition={t.next.dayPosition} label={`Start ${t.next.dayName}`} tall />
         </PkCard>
-      ) : !t.plan && programs.length === 0 && !view ? (
+      ) : showsNoProgramRow({ coachPlan: !!t.plan, assignedPrograms: programs.length, enrolment: !!view }) ? (
         <QuietRow label="No program yet. Your coach can add one, or log your own." />
       ) : null}
 
@@ -106,7 +105,7 @@ export default async function ClientWorkoutsPage() {
         {!t.open && <StartWorkoutButton variant="row" label="Log your own workout" />}
         <QuietRow href="/app/workouts/history" label="History" value={thisWeek > 0 ? `${thisWeek} this week` : undefined} icon="chevron" />
         <QuietRow href="/app/progress" label="Progress" icon="chevron" />
-        {trainingDays && <QuietRow href="/app/workouts/plan" label="Training days" value={trainingDays} icon="chevron" />}
+        {trainingDays && !diy && <QuietRow href="/app/workouts/plan" label="Training days" value={trainingDays} icon="chevron" />}
       </div>
 
       {programs.length > 0 && (
