@@ -21,6 +21,7 @@ export function StartWorkoutButton({
   variant = "primary",
   size = "md",
   tall,
+  compact,
 }: {
   programId?: number;
   dayPosition?: number;
@@ -29,6 +30,8 @@ export function StartWorkoutButton({
   size?: "sm" | "md";
   /** 44px tall, for the one start button a screen leads with. */
   tall?: boolean;
+  /** 44px tall at its own width, to sit at the end of a one-line row. */
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -55,7 +58,7 @@ export function StartWorkoutButton({
   }
 
   return (
-    <Button variant={variant} size={size} onClick={go} loading={pending} style={tall ? { width: "100%", height: 44 } : { width: "100%" }}>
+    <Button variant={variant} size={size} onClick={go} loading={pending} style={compact ? { width: "auto", height: 44, flexShrink: 0 } : tall ? { width: "100%", height: 44 } : { width: "100%" }}>
       {!pending && (own ? <Plus size={16} /> : <Play size={15} />)}
       {label}
     </Button>

@@ -1,5 +1,5 @@
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { CalendarHeart, ChevronRight, ClipboardCheck, CreditCard, ListChecks, Play, Salad, ScanLine, Target, TrendingUp, Trophy } from "lucide-react";
 import { memberCheckin } from "@/lib/checkins";
 import { memberHabits } from "@/lib/habits";
 import { HabitTicks } from "@/components/clientapp/HabitTicks";
@@ -9,9 +9,12 @@ import { WEEKDAYS } from "@/lib/memberChoicesModel";
 
 import { requireClientPage } from "@/lib/clientAuth";
 import { MyProgramCard } from "@/components/clientapp/MyProgramCard";
+import { PkCard, PkHeader, PkSection, QuietRow, StatStrip } from "@/components/clientapp/programs/kit";
 import { memberSeesPrograms } from "@/lib/programs/access";
+import { liveEnrolment, programWeek } from "@/lib/programs/enrolments";
 import { clientDashboard, clientUpcoming } from "@/lib/clientApp";
-import { Card, dayLabel, euros, SectionTitle } from "@/components/clientapp/ui";
+import { dayLabel, euros } from "@/components/clientapp/ui";
+import { todayIso } from "@/lib/timetable";
 import { dailyTarget, mealsForDay } from "@/lib/meals";
 import { getManualBody, goalTarget } from "@/lib/goals";
 import { memberCycle } from "@/lib/cycle";
@@ -19,16 +22,19 @@ import { PHASE_LABEL, statusLine } from "@/lib/cycleModel";
 import { GOAL_BY_KEY } from "@/lib/goalsModel";
 import { dayTotals, kcal } from "@/lib/mealsModel";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
-import { formatMetric } from "@/lib/inbody/metrics";
-import { formatChange } from "@/lib/inbody/metrics";
+import { formatChange, formatMetric } from "@/lib/inbody/metrics";
 import { trainingOverview } from "@/lib/trainingOverview";
 import { dateKey, signed } from "@/lib/trainingProgress";
 import { formatSet } from "@/lib/workoutLogModel";
-import { WeekStrip } from "@/components/clientapp/WeekStrip";
 import { StartWorkoutButton } from "@/components/clientapp/StartWorkoutButton";
 
 export const dynamic = "force-dynamic";
 
+function shortDate(ms: number) {
+  return new Date(ms).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Dublin" });
+}
+
+/** Home: one glance at your week. The full session table lives on Workouts. */
 export default async function ClientHome() {
   const { clientId, client, tenantId } = requireClientPage();
   const programsVisible = memberSeesPrograms({ tenantId, client, clientId });
@@ -55,349 +61,177 @@ export default async function ClientHome() {
   const muscle = latestScan && firstScan && latestScan !== firstScan ? formatChange("smm", latestScan.metrics.smm, firstScan.metrics.smm) : null;
   const fat = latestScan && firstScan && latestScan !== firstScan ? formatChange("pbf", latestScan.metrics.pbf, firstScan.metrics.pbf) : null;
   const showProgress = strengthNow !== null || muscle !== null || fat !== null;
-  const pct = d.weekBooked > 0 ? Math.round((d.weekAttended / d.weekBooked) * 100) : 0;
+
+  // A running DIY program leads; otherwise the coach's plan does (the same rule as Workouts).
+  const view = programsVisible ? liveEnrolment(clientId) : null;
+  const diy = view && view.status === "active" ? view : null;
+  const weekDays = diy ? programWeek(diy) : t.plan?.days ?? null;
+  const planned = weekDays ? weekDays.filter((x) => x.status !== "rest").length : 0;
+  const done = weekDays ? weekDays.filter((x) => x.status === "done").length : 0;
+  const thisWeek = t.weeks.at(-1)?.workouts ?? 0;
+  const sessions = planned > 0 ? { value: `${done}/${planned}`, sub: "sessions" } : { value: String(thisWeek), sub: thisWeek === 1 ? "session" : "sessions" };
+  // A brand-new member has nothing to count yet: no strip of zeros, just the quiet rows below.
+  const hasNumbers = planned > 0 || thisWeek > 0 || t.workouts30 > 0 || t.streak > 0 || !!diy;
+  const next = d.nextClass;
+  const nextTile = next
+    ? { label: "Next class", value: next.date === todayIso() ? "Today" : dayLabel(next.date, { weekday: "short" }), sub: next.startTime }
+    : { label: "Next class", value: "None" };
+
+  // The coach's plan row: not while a program leads or a workout is already open (its card is above).
+  const showPlanRow = !diy && !t.open && !!t.next;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div>
-        <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Welcome back</div>
-        <h1 style={{ margin: 0, fontFamily: "var(--font-heading), sans-serif", fontSize: 26, textTransform: "uppercase", color: "var(--text-primary)" }}>
-          {client.firstName}
-        </h1>
-      </div>
+    <div style={{ display: "grid", gap: 18 }}>
+      <PkHeader crumb="Welcome back" title={client.firstName} />
 
       {t.open && (
-        <Link href={`/app/workouts/log/${t.open.id}`}>
-          <Card style={{ borderColor: "var(--accent)", background: "var(--accent-soft)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ ...iconBox, background: "var(--accent)", color: "#fff" }}><Play size={17} /></span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Continue {t.open.dayName}</div>
-                <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{t.open.done} of {t.open.total} sets done</div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
+        <PkCard href={`/app/workouts/log/${t.open.id}`} accent>
+          <div className="pk-row">
+            <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
+              <h2 className="pk-card-title">Continue {t.open.dayName}</h2>
+              <span className="pk-small">
+                {t.open.done} of {t.open.total} sets done
+              </span>
             </div>
-          </Card>
-        </Link>
+            <ChevronRight size={18} className="pk-chev" aria-hidden />
+          </div>
+        </PkCard>
+      )}
+
+      {hasNumbers && <StatStrip items={[{ label: "This week", value: sessions.value, sub: sessions.sub }, { label: "Streak", value: String(t.streak), sub: t.streak === 1 ? "week" : "weeks" }, nextTile]} />}
+
+      {/* the one start button on the page: a running program, else the coach's next workout */}
+      {diy ? (
+        <MyProgramCard clientId={clientId} variant="line" />
+      ) : showPlanRow && t.next ? (
+        <div className="pk-row pk-row--quiet">
+          <Link href="/app/workouts" className="pk-linkrow" style={{ flex: 1, minWidth: 0 }}>
+            <span>{t.next.dayName}</span>
+          </Link>
+          <StartWorkoutButton programId={t.next.programId} dayPosition={t.next.dayPosition} label="Start" compact />
+        </div>
+      ) : null}
+
+      {/* daily habits */}
+      {habits && (
+        <PkCard>
+          <Link href="/app/habits" className="pk-linkrow">
+            <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
+              <h2 className="pk-card-title">{habits.title}</h2>
+              <span className="pk-small">Tick them off as you go</span>
+            </div>
+            <ChevronRight size={18} className="pk-chev" aria-hidden />
+          </Link>
+          <HabitTicks habits={habits.habits} ticked={[...habits.tickedToday]} day={habits.today} streak={habits.streak} compact />
+        </PkCard>
+      )}
+
+      {/* weekly check-in: a card only while it is due */}
+      {checkin?.due && (
+        <PkCard href="/app/checkin" accent>
+          <div className="pk-row">
+            <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
+              <h2 className="pk-card-title">Check-in due</h2>
+              <span className="pk-small">{checkin.daysLate === 0 ? "Due today. Takes a couple of minutes." : `Due since ${WEEKDAYS[checkin.weekday - 1]}`}</span>
+            </div>
+            <ChevronRight size={18} className="pk-chev" aria-hidden />
+          </div>
+        </PkCard>
+      )}
+
+      <div>
+        {checkin && !checkin.due && (
+          <QuietRow
+            href="/app/checkin"
+            label="Check-in done"
+            value={`Next ${new Date(`${checkin.next}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}`}
+            icon="chevron"
+          />
+        )}
+
+        <QuietRow
+          href="/app/nutrition"
+          label={mealsToday.calories > 0 ? `${kcal(mealsToday.calories)} today · ${mealsToday.protein} g protein` : "Log a meal"}
+          value={mealsToday.calories > 0 && mealTarget ? `of ${kcal(mealTarget.calories)}` : undefined}
+          icon={mealsToday.calories > 0 ? "chevron" : "plus"}
+        />
+
+        {next ? (
+          <QuietRow href="/app/timetable" label={`${next.name}${next.instructor ? ` with ${next.instructor}` : ""}`} value={`${dayLabel(next.date, { weekday: "short", day: "numeric" })} · ${next.startTime}`} icon="chevron" />
+        ) : (
+          <QuietRow href="/app/timetable" label="No class booked" value="Browse the timetable" icon="chevron" />
+        )}
+
+        {(d.weekBooked > 0 || d.totalAttended > 0) && (
+          <QuietRow label="Classes this week" value={`${d.weekAttended} of ${d.weekBooked} attended`} />
+        )}
+
+        <QuietRow
+          href="/app/membership"
+          label={d.membership ? d.membership.name : "No active membership"}
+          value={d.membership ? `${euros(d.membership.priceCents)} · ${d.membership.status}` : "Ask your coach"}
+          icon="chevron"
+        />
+
+        {(cycle || inviteCycle) && (
+          <QuietRow
+            href="/app/cycle"
+            label={
+              cycle
+                ? cycle.settings.mode === "cycle"
+                  ? `${cycle.status.phase ? `Cycle: ${PHASE_LABEL[cycle.status.phase]}` : "Cycle"} · ${statusLine(cycle.status)}`
+                  : `Cycle · ${cycle.todayLog.energy || cycle.todayLog.mood ? "Checked in today" : "How are you today?"}`
+                : "Track your cycle"
+            }
+            icon="chevron"
+          />
+        )}
+
+        <QuietRow
+          href="/app/goal"
+          label={goal ? `Goal: ${GOAL_BY_KEY[goal.goal.goal].label} · ${goal.target.protein} g protein` : "Set a goal"}
+          value={goal ? `${goal.target.calories.toLocaleString("en-IE")} kcal` : undefined}
+          icon="chevron"
+        />
+
+        {scansOn && (
+          <QuietRow
+            href="/app/body"
+            label={latestScan ? `Body scans · ${formatMetric("smm", latestScan.metrics.smm)} muscle · ${formatMetric("pbf", latestScan.metrics.pbf)} body fat` : "Body scans"}
+            value={latestScan ? formatMetric("weight", latestScan.metrics.weight) : undefined}
+            icon="chevron"
+          />
+        )}
+
+        {showProgress && (
+          <QuietRow
+            href="/app/progress"
+            label="Your progress"
+            value={strengthNow !== null ? `Strength ${signed(strengthNow, "%")}` : muscle ? `Muscle ${muscle.text}` : fat ? `Body fat ${fat.text}` : undefined}
+            icon="chevron"
+          />
+        )}
+
+        {showTraining && (
+          <QuietRow href="/app/workouts" label={t.last ? `Last workout: ${t.last.dayName}, ${t.last.sets} sets` : "Workouts"} value={t.last ? shortDate(t.last.finishedAt) : undefined} icon="chevron" />
+        )}
+        {showTraining && t.latestBest && <QuietRow href="/app/progress" label={`Latest best: ${t.latestBest.name}`} value={formatSet(t.latestBest)} icon="chevron" />}
+        {showTraining && t.plan && t.plan.weekdays.length === 0 && <QuietRow href="/app/workouts/plan" label="Pick your training days" icon="chevron" />}
+      </div>
+
+      {/* upcoming list: the first booking is the next-class row above */}
+      {upcoming.length > 1 && (
+        <PkSection label="Also booked">
+          <div>
+            {upcoming.slice(1).map((b) => (
+              <QuietRow key={b.bookingId} href="/app/timetable" label={b.name} value={`${dayLabel(b.date, { weekday: "short", day: "numeric" })} · ${b.startTime}`} icon="chevron" />
+            ))}
+          </div>
+        </PkSection>
       )}
 
       {/* reminders: shows only until notifications are on (or can't be) */}
       {vapid && <PushSetup vapidKey={vapid} prefs={getPrefs(clientId)} compact />}
-
-      {/* daily habits */}
-      {habits && (
-        <Card>
-          <Link href="/app/habits" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-            <span style={iconBox}><ListChecks size={18} /></span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{habits.title}</div>
-              <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Tick them off as you go</div>
-            </div>
-            <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
-          </Link>
-          <HabitTicks habits={habits.habits} ticked={[...habits.tickedToday]} day={habits.today} streak={habits.streak} compact />
-        </Card>
-      )}
-
-      {/* weekly check-in */}
-      {checkin && (
-        <Link href="/app/checkin">
-          <Card style={checkin.due ? { borderColor: "var(--accent)", background: "var(--accent-soft)" } : undefined}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={checkin.due ? { ...iconBox, background: "var(--accent)", color: "var(--accent-contrast)" } : iconBox}>
-                <ClipboardCheck size={18} />
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{checkin.due ? "Check-in due" : "Check-in done"}</div>
-                <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                  {checkin.due
-                    ? checkin.daysLate === 0
-                      ? "Due today. Takes a couple of minutes."
-                      : `Due since ${WEEKDAYS[checkin.weekday - 1]}`
-                    : `Next one ${new Date(`${checkin.next}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" })}`}
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
-            </div>
-          </Card>
-        </Link>
-      )}
-
-      {programsVisible && <MyProgramCard clientId={clientId} />}
-
-      {/* training */}
-      {showTraining && (
-        <Card style={{ display: "grid", gap: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Training this week</span>
-            <Link href="/app/workouts" style={{ fontSize: 13, color: "var(--accent-ink)" }}>
-              Workouts
-            </Link>
-          </div>
-          {t.plan && <WeekStrip days={t.plan.days} todayKey={today} />}
-          {t.plan && t.plan.weekdays.length === 0 && (
-            <Link href="/app/workouts/plan" style={{ fontSize: 13, color: "var(--accent-ink)", marginTop: -4 }}>
-              Pick your training days to plan your week
-            </Link>
-          )}
-          {!t.open && t.next && (
-            <div style={{ display: "flex", alignItems: "center", gap: 12, borderTop: "1px solid var(--hairline)", paddingTop: 12 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Next up</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.next.dayName}</div>
-              </div>
-              <div style={{ width: 112, flexShrink: 0 }}>
-                <StartWorkoutButton programId={t.next.programId} dayPosition={t.next.dayPosition} label="Start" size="sm" />
-              </div>
-            </div>
-          )}
-          {t.last && (
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-              Last workout: {t.last.dayName}, {new Date(t.last.finishedAt).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Dublin" })}, {t.last.sets} sets
-            </div>
-          )}
-          {t.latestBest && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text-secondary)" }}>
-              <Trophy size={14} style={{ color: "var(--accent-ink)", flexShrink: 0 }} />
-              Latest best: {t.latestBest.name} {formatSet(t.latestBest)}
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* progress */}
-      {showProgress && (
-        <Link href="/app/progress">
-          <Card style={{ display: "grid", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <TrendingUp size={16} style={{ color: "var(--accent-ink)" }} />
-              <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Your progress</span>
-              <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-              <MiniStat label="Strength" value={strengthNow !== null ? signed(strengthNow, "%") : "-"} good={strengthNow !== null && strengthNow > 0} />
-              <MiniStat label="Muscle" value={muscle?.text ?? "-"} good={muscle?.tone === "good"} />
-              <MiniStat label="Body fat" value={fat?.text ?? "-"} good={fat?.tone === "good"} />
-            </div>
-          </Card>
-        </Link>
-      )}
-
-      {/* meals */}
-      <Link href="/app/nutrition">
-        <Card style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ width: 38, height: 38, borderRadius: 10, background: "var(--surface-2)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--accent-ink)", flexShrink: 0 }}>
-            <Salad size={18} />
-          </span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-              {mealsToday.calories > 0 ? `${kcal(mealsToday.calories)} today` : "Log a meal"}
-            </div>
-            <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>
-              {mealsToday.calories > 0
-                ? mealTarget
-                  ? `of ${kcal(mealTarget.calories)} · ${mealsToday.protein} g protein`
-                  : `${mealsToday.protein} g protein`
-                : "Snap a photo of your meal or the label"}
-            </div>
-          </div>
-          <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
-        </Card>
-      </Link>
-
-      {/* week progress: only once something has been booked */}
-      {(d.weekBooked > 0 || d.totalAttended > 0) && (
-      <Card>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <Ring pct={pct} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>This week</div>
-            <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
-              {d.weekAttended} of {d.weekBooked} booked class{d.weekBooked === 1 ? "" : "es"} attended
-            </div>
-            <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4 }}>
-              {d.upcomingCount} upcoming · {d.totalAttended} attended all-time
-            </div>
-          </div>
-        </div>
-      </Card>
-      )}
-
-      {/* next class */}
-      <div>
-        <SectionTitle>Next class</SectionTitle>
-        {d.nextClass ? (
-          <Card style={{ borderLeft: `4px solid ${d.nextClass.color}` }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>{d.nextClass.name}</div>
-                <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 2 }}>
-                  {dayLabel(d.nextClass.date)} · {d.nextClass.startTime}–{d.nextClass.endTime}
-                </div>
-                {d.nextClass.instructor && <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>with {d.nextClass.instructor}</div>}
-              </div>
-            </div>
-          </Card>
-        ) : (
-          <Card>
-            <div style={{ fontSize: 13.5, color: "var(--text-secondary)" }}>No upcoming classes booked.</div>
-            <Link href="/app/timetable" style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 8, color: "var(--accent-ink)", fontSize: 13.5 }}>
-              Browse the timetable <ChevronRight size={15} />
-            </Link>
-          </Card>
-        )}
-      </div>
-
-      {/* membership */}
-      <Link href="/app/membership">
-        <Card>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={iconBox}><CreditCard size={18} /></span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-                {d.membership ? d.membership.name : "No active membership"}
-              </div>
-              <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                {d.membership ? `${euros(d.membership.priceCents)} · ${d.membership.status}` : "Ask your coach to set one up"}
-              </div>
-            </div>
-            <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
-          </div>
-        </Card>
-      </Link>
-
-      {/* cycle: on, or a quiet invite */}
-      {(cycle || inviteCycle) && (
-        <Link href="/app/cycle">
-          <Card style={cycle?.status.onPeriod ? { borderColor: "var(--accent)", background: "var(--accent-soft)" } : undefined}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={iconBox}><CalendarHeart size={18} /></span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-                  {cycle ? (cycle.settings.mode === "cycle" && cycle.status.phase ? `Cycle: ${PHASE_LABEL[cycle.status.phase]}` : "Cycle") : "Track your cycle"}
-                </div>
-                <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                  {cycle
-                    ? cycle.settings.mode === "cycle"
-                      ? statusLine(cycle.status)
-                      : cycle.todayLog.energy || cycle.todayLog.mood
-                        ? "Checked in today"
-                        : "How are you today?"
-                    : "Periods, how you feel, and what to expect in training. Private to you."}
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
-            </div>
-          </Card>
-        </Link>
-      )}
-
-      {/* goal */}
-      <Link href="/app/goal">
-        <Card>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={iconBox}><Target size={18} /></span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{goal ? `Goal: ${GOAL_BY_KEY[goal.goal.goal].label}` : "Set a goal"}</div>
-              <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                {goal ? `${goal.target.calories.toLocaleString("en-IE")} kcal a day, ${goal.target.protein} g protein` : "Drop body fat, maintain or build muscle: your calories and macros"}
-              </div>
-            </div>
-            <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
-          </div>
-        </Card>
-      </Link>
-
-      {/* body scans */}
-      {scansOn && (
-        <Link href="/app/body">
-          <Card>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={iconBox}><ScanLine size={18} /></span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Body scans</div>
-                <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                  {latestScan
-                    ? `${formatMetric("weight", latestScan.metrics.weight)} · ${formatMetric("smm", latestScan.metrics.smm)} muscle · ${formatMetric("pbf", latestScan.metrics.pbf)} body fat`
-                    : scanConsent
-                      ? "Your InBody results will show here"
-                      : "See your InBody results here"}
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
-            </div>
-          </Card>
-        </Link>
-      )}
-
-      {/* upcoming list */}
-      {upcoming.length > 0 && (
-        <div>
-          <SectionTitle>Your upcoming classes</SectionTitle>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {upcoming.map((b) => (
-              <Card key={b.bookingId} style={{ padding: "12px 14px", borderLeft: `4px solid ${b.color}` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{b.name}</div>
-                    <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{dayLabel(b.date)} · {b.startTime}</div>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
-
-function MiniStat({ label, value, good }: { label: string; value: string; good: boolean }) {
-  return (
-    <div style={{ display: "grid", gap: 2 }}>
-      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{label}</span>
-      <span style={{ fontSize: 16, fontWeight: 600, color: good ? "var(--success)" : "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{value}</span>
-    </div>
-  );
-}
-
-function Ring({ pct }: { pct: number }) {
-  const size = 62;
-  const stroke = 7;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const off = c - (pct / 100) * c;
-  return (
-    <svg width={size} height={size} style={{ flexShrink: 0 }}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--surface-3)" strokeWidth={stroke} />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        stroke="var(--accent)"
-        strokeWidth={stroke}
-        strokeDasharray={c}
-        strokeDashoffset={off}
-        strokeLinecap="round"
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-      />
-      <text x="50%" y="52%" dominantBaseline="middle" textAnchor="middle" fontSize="14" fontWeight="600" fill="var(--text-primary)">
-        {pct}%
-      </text>
-    </svg>
-  );
-}
-
-const iconBox: React.CSSProperties = {
-  width: 36,
-  height: 36,
-  borderRadius: 10,
-  background: "var(--surface-2)",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  color: "var(--accent-ink)",
-  flexShrink: 0,
-};
