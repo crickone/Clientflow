@@ -5880,6 +5880,47 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .pk-sheet-body { display: grid; gap: 14px; min-width: 0; }
 .pk-sheet-foot { position: sticky; bottom: 0; display: grid; gap: 8px; padding-top: 8px; background: var(--surface-1); }
 @media (prefers-reduced-motion: reduce) { .pk-fold > summary svg { transition: none; } }
+/* Stat strip: three numbers across, hairlines between, no boxes. */
+.pk-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pk-strip-item { display: grid; gap: 3px; align-content: start; min-width: 0; padding: 2px 12px; }
+.pk-strip-item:first-child { padding-left: 0; }
+.pk-strip-item:last-child { padding-right: 0; }
+.pk-strip-item + .pk-strip-item { border-left: 1px solid var(--hairline); }
+.pk-strip-value { font-size: 26px; font-weight: 800; line-height: 1.1; letter-spacing: -0.01em; color: var(--text-primary); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+@media (max-width: 359px) { .pk-strip-item { padding: 2px 8px; } .pk-strip-value { font-size: 22px; } }
+/* Session table: the exercise on the left, one set per line on the right, hairlines between rows. */
+.pk-table { margin: 0; padding: 0; list-style: none; }
+.pk-table-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--hairline); }
+.pk-table-row:first-child { padding-top: 4px; }
+.pk-table-row:last-child { border-bottom: 0; padding-bottom: 4px; }
+.pk-table-name { display: grid; gap: 2px; min-width: 0; font-size: 15px; font-weight: 600; line-height: 1.35; color: var(--text-primary); overflow-wrap: anywhere; }
+.pk-table-sets { display: grid; gap: 4px; justify-items: end; min-width: 0; max-width: 62vw; text-align: right; }
+.pk-table-set { font-size: 15px; line-height: 1.35; color: var(--text-primary); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pk-table-set--plus { font-weight: 700; color: var(--accent-ink); }
+/* Quiet row: a link or an empty state in one line, 44px tall, a hairline under it. */
+.pk-row--quiet { min-height: 44px; border-bottom: 1px solid var(--hairline); font-size: 14.5px; line-height: 1.35; color: var(--text-primary); text-decoration: none; }
+.pk-row--quiet:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+.pk-row-value { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: 14px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+/* Path chart: solid so far, dashed planned, the value now and the planned end labelled. */
+.pk-chart { display: block; width: 100%; height: auto; overflow: visible; }
+.pk-chart-solid { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.pk-chart-planned { fill: none; stroke: var(--accent); stroke-opacity: 0.55; stroke-width: 2; stroke-dasharray: 4 4; stroke-linecap: round; stroke-linejoin: round; }
+.pk-chart-dot { fill: var(--accent); stroke: var(--surface-1); stroke-width: 2; }
+.pk-chart-axis { stroke: var(--hairline-strong); stroke-width: 1; }
+.pk-chart-label { font-size: 10.5px; fill: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.pk-chart-label--strong { font-size: 12.5px; font-weight: 700; fill: var(--text-primary); }
+.pk-chart-label--weak { fill: var(--text-tertiary); }
+.pk-chart-name { font-size: 17px; font-weight: 700; color: var(--text-primary); }
+/* Lift switch: a segmented control over the lifts. */
+.pk-switch { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface-2); }
+.pk-switch-btn { flex: 1; min-width: 0; min-height: 44px; padding: 0 6px; border: 0; border-radius: 9px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 12.5px; cursor: pointer; overflow-wrap: anywhere; }
+.pk-switch-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.pk-switch-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* + set rows: what was planned on the left, what was done large on the right. */
+.pk-rows { margin: 0; padding: 0; list-style: none; }
+.pk-rows-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 10px 0; border-bottom: 1px solid var(--hairline); font-size: 14px; color: var(--text-primary); }
+.pk-rows-what { display: grid; gap: 1px; min-width: 0; overflow-wrap: anywhere; }
+.pk-rows-got { flex-shrink: 0; font-size: 17px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 /* ── end Programs kit ── */
 
 /* Staff: a member's DIY program on the client page (Workout log tab). */
