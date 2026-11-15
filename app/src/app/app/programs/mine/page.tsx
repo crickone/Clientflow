@@ -10,7 +10,7 @@ import { enrolmentCounts, enrolmentEvents, liveEnrolment, planFor, programWeek, 
 import { copyKey, programByKey } from "@/lib/programs/library";
 import { memberKey, parseMemberKey } from "@/lib/programs/memberTemplate";
 import { weightWhy } from "@/lib/programs/outline";
-import { sessionCount, summarisePlanned, weekLabel } from "@/lib/programs/planner";
+import { sessionCount, weekLabel } from "@/lib/programs/planner";
 import { LIFT_LABEL } from "@/lib/programs/types";
 import { formatMax, showsTrainingMax } from "@/lib/programs/units";
 import { dateKey } from "@/lib/trainingProgress";
@@ -66,10 +66,10 @@ export default async function MyProgramPage() {
   const startsLater = view.startDate > today ? ` · Starts ${new Date(`${view.startDate}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}` : "";
   const where = view.state.finished ? "Program done" : `${weekLabel(t, view.state)}${phase !== null ? ` · ${content.phases[phase].name}` : ""}${startsLater}`;
 
-  // Sessions done in this round out of the round's total: a cycle shorter than the program's length runs on, so its total is the cycle times the repeats.
+  // Sessions done out of the round's total: a cycle shorter than the program's length runs on, so its total is the cycle times the repeats. `done` counts since the last restart and is not capped by the length (a repeating program runs past it), so "of total" shows only while done fits.
   const roundTotal = t.weeks.length > 0 ? Math.round((sessionCount(t) * Math.max(1, t.lengthWeeks)) / t.weeks.length) : 0;
   const strip: { label: string; value: string; sub?: string }[] = [
-    { label: "Sessions", value: roundTotal > 0 ? `${counts.done} of ${roundTotal}` : String(counts.done) },
+    { label: "Sessions", value: roundTotal > 0 && counts.done <= roundTotal ? `${counts.done} of ${roundTotal}` : `${counts.done} done` },
   ];
   if (counts.skipped > 0) strip.push({ label: "Skipped", value: String(counts.skipped) });
   if (phase !== null) strip.push({ label: "Phase", value: content.phases[phase].name });
