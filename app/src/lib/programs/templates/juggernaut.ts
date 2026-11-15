@@ -50,10 +50,11 @@ export const juggernautStyle: ProgramTemplate = {
   daysPerWeek: 4,
   lengthWeeks: 16,
   lifts: ["squat", "bench", "deadlift", "press"],
-  tmPct: 0.9,
+  // Members asked for the full max (2026-11-15): the training max starts at the one-rep max entered.
+  tmPct: 1,
   who: "Intermediate lifters who want steady strength with a lot of practice at each lift.",
   description:
-    "Sixteen weeks, four days a week, one main lift a day. Four waves of four weeks: sets of ten, then eight, then five, then three. In each wave the first week has the most sets, the second is heavier with fewer sets, the third ends in one set for as many reps as you can, and the fourth is a deload. Every percentage is of a training max set at 90% of your max. The reps you beat the target by on the + set raise that lift's training max for the waves that follow. The percentages and jumps are ours.",
+    "Sixteen weeks, four days a week, one main lift a day. Four waves of four weeks: sets of ten, then eight, then five, then three. In each wave the first week has the most sets, the second is heavier with fewer sets, the third ends in one set for as many reps as you can, and the fourth is a deload. Every percentage is of a training max that starts at the one-rep max you enter. The reps you beat the target by on the + set raise that lift's training max for the waves that follow. The percentages and jumps are ours.",
   summary: "Four waves of tens, eights, fives and threes. Each wave ends in a + set, and the reps you beat the target by raise your training max.",
   phases: [
     { name: "10s wave", fromWeek: 1, toWeek: 4, note: "Sets of ten at 60% and 67.5% of your training max, then a 10+ set at 75%, then a deload week." },

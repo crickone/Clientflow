@@ -162,6 +162,7 @@ function tmLines(t: ProgramTemplate, e: Extract<ProgramTemplate["engine"], { key
   const repMax = e.rule === "drive_set" && driveReps.length === 1 && Math.abs(t.tmPct - 30 / (30 + driveReps[0])) < 0.005 ? driveReps[0] : null;
   if (repMax !== null) lines.push(`Your training max is your ${repMax}-rep max, about ${Math.round(t.tmPct * 100)}% of your max. Every percentage is taken from it.`);
   else if (t.tmPct !== 1) lines.push(`Your training max is ${Math.round(t.tmPct * 100)}% of your max. Every percentage is taken from it.`);
+  else if (e.rule !== "gzclp") lines.push("Your training max starts at the one-rep max you enter. Every percentage is taken from it.");
   switch (e.rule) {
     case "cycle": {
       const jumps = jumpsByLift(t.lifts, e.increment, e.increments, raw);

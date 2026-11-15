@@ -139,11 +139,18 @@ const pctText = (p: number) => `${Math.round(p * 1000) / 10}%`;
  * from the planned sets and the template exercise they came from. Null for a
  * weight the engine keeps from session to session.
  */
-export function weightWhy(ex: PlannedExercise, rx: Pick<ExerciseRx, "sets"> | undefined, tmPct: number, unit: WeightUnit): string | null {
+export function weightWhy(
+  ex: PlannedExercise,
+  rx: Pick<ExerciseRx, "sets"> | undefined,
+  tmPct: number,
+  unit: WeightUnit,
+  /** A training-max engine: its percentages follow a training max that rises past the max, even when it starts at the max. */
+  trainingMaxEngine = false,
+): string | null {
   if (ex.bodyweight) return "Bodyweight.";
   const pcts = [...new Set(ex.sets.flatMap((s) => (s.pct !== null ? [s.pct] : [])))].sort((a, b) => a - b);
   if (pcts.length) {
-    const of = tmPct === 1 ? "your max" : "your training max";
+    const of = tmPct === 1 && !trainingMaxEngine ? "your max" : "your training max";
     const range = pcts.length === 1 ? pctText(pcts[0]) : `${pctText(pcts[0])} to ${pctText(pcts[pcts.length - 1])}`;
     const add = Math.max(0, ...(rx?.sets ?? []).map((s) => (s.kind === "pct" || s.kind === "amrap" ? (s.addKg ?? 0) : 0)));
     return `${range} of ${of}${add > 0 ? `, plus ${unit === "lb" ? `about ${formatWeight(roundToStep(add, STEP_5LB_KG), "lb")}` : formatWeight(add, unit)} this week` : ""}.`;

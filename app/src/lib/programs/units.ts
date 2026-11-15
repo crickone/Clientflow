@@ -36,6 +36,11 @@ export function shownStepKg(unit: WeightUnit, stepKg: number): number {
   return stepKg;
 }
 
+/** A training max is worth showing beside the max when it differs from it: set below it, or risen past it over the cycles. */
+export function showsTrainingMax(tmPct: number, max: number | undefined, tm: number | undefined): boolean {
+  return tm !== undefined && (tmPct !== 1 || max === undefined || Math.abs(tm - max) > 0.005);
+}
+
 /** The nearest multiple of the smallest jump (half rounds up). */
 export function roundToStep(kg: number, stepKg: number): number {
   if (!Number.isFinite(kg)) return 0;

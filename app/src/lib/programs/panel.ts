@@ -4,7 +4,7 @@ import { actorLabel } from "./cards";
 import { MEMBER_AUTHOR } from "./memberTemplate";
 import { dayTitle, summarisePlanned, summariseRx, weekInRound, weekLabel } from "./planner";
 import { LIFT_LABEL, RULE_LABEL, type EngineState, type ExerciseRx, type LiftKey, type PlannedSession, type ProgramTemplate, type WeightUnit } from "./types";
-import { formatWeight, kgToUnit } from "./units";
+import { formatWeight, kgToUnit, showsTrainingMax } from "./units";
 
 export interface PanelInput {
   enrolment: {
@@ -127,7 +127,7 @@ export function panelFrom(input: PanelInput): ProgramPanelData {
           lift,
           label: LIFT_LABEL[lift],
           max: max !== undefined ? fmt(max) : "-",
-          tm: t.tmPct !== 1 && tm !== undefined ? fmt(tm) : null,
+          tm: showsTrainingMax(t.tmPct, max, tm) ? fmt(tm!) : null,
           maxInUnit: max !== undefined ? kgToUnit(max, e.unit) : null,
         };
       }),

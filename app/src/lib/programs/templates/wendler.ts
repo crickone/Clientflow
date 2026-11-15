@@ -35,12 +35,13 @@ const shared = {
   daysPerWeek: 4,
   lengthWeeks: 12,
   lifts: ["press", "deadlift", "bench", "squat"] as LiftKey[],
-  tmPct: 0.9,
+  // Wendler sets the training max at 90% of the max; members asked for the full max (2026-11-15), so every set is heavier than his.
+  tmPct: 1,
   engine: { key: "tm_cycle" as const, rule: "cycle" as const, increment: 2.5, increments: { squat: 5, deadlift: 5 } },
 };
 
 const WAVE_TEXT =
-  "Four days a week, one main lift a day: press, deadlift, bench, squat. Three weeks of waves (5s, 3s, then 5/3/1) at percentages of a training max set at 90% of your max, then a deload week. The last set of each wave is as many reps as you can.";
+  "Four days a week, one main lift a day: press, deadlift, bench, squat. Three weeks of waves (5s, 3s, then 5/3/1) at percentages of a training max that starts at the one-rep max you enter, then a deload week. Wendler starts it at 90% of your max; this version uses your full max, so every set is heavier than his. The last set of each wave is as many reps as you can.";
 const TM_TEXT =
   "The training max goes up after each four-week cycle: 2.5 kg on press and bench, 5 kg on squat and deadlift. If you miss the minimum reps on a lift's + set (the last set of a wave), that lift's training max stays the same for the next cycle. This hold is our rule.";
 
@@ -59,7 +60,7 @@ export const wendlerBbb: ProgramTemplate = {
   ],
   phasesRepeat: true,
   whyItWorks:
-    "Your training max is 90% of your max, so the main sets start lighter than you can lift. That leaves room to beat the reps on the last set. Each cycle the training max rises, except for a lift whose + set fell short, wasn't ticked or was more than one jump lighter than planned. The 5 x 10 adds volume for size.",
+    "Your training max starts at your full one-rep max, so the top sets are close to your limit. The last set of each wave shows how far past the minimum you can go. Each cycle the training max rises, except for a lift whose + set fell short, wasn't ticked or was more than one jump lighter than planned. The 5 x 10 adds volume for size.",
   weeks: wendler(
     (_w, d) => ex(d.name, times(5, pct(0.5, 10, 90)), { lift: d.lift, notes: "Boring But Big: 5 sets of 10 at 50% of your training max." }),
     {
@@ -87,7 +88,7 @@ export const wendlerFsl: ProgramTemplate = {
   ],
   phasesRepeat: true,
   whyItWorks:
-    "The extra sets use the lightest weight of the day, so you get more practice at the main lift without much extra strain. The sessions stay shorter than Boring But Big. The training max starts at 90% of your max. Each cycle it rises, except for a lift whose + set fell short, wasn't ticked or was more than one jump lighter than planned.",
+    "The extra sets use the lightest weight of the day, so you get more practice at the main lift without much extra strain. The sessions stay shorter than Boring But Big. The training max starts at your full one-rep max. Each cycle it rises, except for a lift whose + set fell short, wasn't ticked or was more than one jump lighter than planned.",
   weeks: wendler(
     (w, d) => ex(d.name, times(5, pct(WAVES[w][0][0], 5, 90)), { lift: d.lift, notes: "First Set Last: 5 sets of 5 at your first set's weight." }),
     {

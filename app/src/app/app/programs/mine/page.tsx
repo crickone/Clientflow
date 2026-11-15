@@ -13,7 +13,7 @@ import { memberKey, parseMemberKey } from "@/lib/programs/memberTemplate";
 import { weightWhy } from "@/lib/programs/outline";
 import { sessionCount, summarisePlanned, weekLabel } from "@/lib/programs/planner";
 import { LIFT_LABEL } from "@/lib/programs/types";
-import { formatMax } from "@/lib/programs/units";
+import { formatMax, showsTrainingMax } from "@/lib/programs/units";
 import { dateKey } from "@/lib/trainingProgress";
 import { openSession } from "@/lib/workoutLog";
 import { PhaseBar, PkCard, PkHeader, PkSection, StatTiles, Timeline, Warn } from "@/components/clientapp/programs/kit";
@@ -88,7 +88,7 @@ export default async function MyProgramPage() {
           <h2 className="pk-card-title">{sessionTitle(view, plan)}</h2>
           {plan.test && <Warn>Test day. Work up to a new max with a spotter or safety bars.</Warn>}
           {plan.exercises.map((ex) => {
-            const why = weightWhy(ex, day?.exercises[ex.index], t.tmPct, view.unit);
+            const why = weightWhy(ex, day?.exercises[ex.index], t.tmPct, view.unit, t.engine.key === "tm_cycle" && t.engine.rule !== "gzclp");
             return (
               <div key={ex.index}>
                 <div className="pk-line">
@@ -123,7 +123,8 @@ export default async function MyProgramPage() {
             ...t.lifts.map((l) => ({
               label: `${LIFT_LABEL[l]} max`,
               value: view.state.maxes[l] !== undefined ? formatMax(view.state.maxes[l]!, view.unit) : "-",
-              sub: t.tmPct !== 1 && view.state.tms[l] !== undefined ? `Training max ${formatMax(view.state.tms[l]!, view.unit)}` : undefined,
+              // Shown when it differs from the max: set below it (Texas), or risen past it over the cycles.
+              sub: showsTrainingMax(t.tmPct, view.state.maxes[l], view.state.tms[l]) ? `Training max ${formatMax(view.state.tms[l]!, view.unit)}` : undefined,
             })),
             {
               label: "Sessions",

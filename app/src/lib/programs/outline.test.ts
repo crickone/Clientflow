@@ -108,6 +108,7 @@ const bbb = get("531-bbb");
 const bst = initState(bbb, { press: 60, deadlift: 160, bench: 100, squat: 140 }, 2.5);
 const main = planExercise(bbb.weeks[0].days[0].exercises[0], 0, bst, { stepKg: 2.5 });
 assert.equal(weightWhy(main, bbb.weeks[0].days[0].exercises[0], bbb.tmPct, "kg"), "65% to 85% of your max.");
+assert.equal(weightWhy(main, bbb.weeks[0].days[0].exercises[0], bbb.tmPct, "kg", true), "65% to 85% of your training max.", "5/3/1 follows a training max that rises past the max");
 const sl = get("stronglifts-5x5");
 const slPlan = planExercise(sl.weeks[0].days[0].exercises[0], 0, initState(sl, { squat: 100 }, 2.5), { stepKg: 2.5 });
 assert.equal(weightWhy(slPlan, sl.weeks[0].days[0].exercises[0], sl.tmPct, "kg"), null, "a working weight needs no line");
