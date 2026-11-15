@@ -12,8 +12,9 @@ import { AlertTriangle, ChevronRight, Plus } from "lucide-react";
 import { weeksText } from "@/lib/programs/content";
 import { repsLabel } from "@/lib/programs/planner";
 import type { LiftChart } from "@/lib/programs/progressData";
+import type { ChartKind } from "@/lib/programs/progressSeries";
 import type { Phase, PlannedExercise, PlannedSet, WeightUnit } from "@/lib/programs/types";
-import { formatWeight } from "@/lib/programs/units";
+import { formatMax, formatWeight } from "@/lib/programs/units";
 import { chartScale, PAD, pathGeometry } from "./pathGeometry";
 
 export { pathGeometry };
@@ -166,12 +167,12 @@ export function StatStrip({ items }: { items: { label: string; value: string; su
   );
 }
 
-/** One set as the table writes it: "100 kg x 5", "3 x RPE 8 · about 140 kg", "12 reps". */
+/** One set as the table writes it, weight first: "100 kg x 5", "about 140 kg x 3 · RPE 8", "3 reps · RPE 8", "12 reps". */
 function setLine(set: PlannedSet, unit: WeightUnit): string {
   const reps = repsLabel(set);
-  if (set.rpe !== null) return `${reps} x RPE ${set.rpe}${set.kg !== null && set.kg > 0 ? ` · about ${formatWeight(set.kg, unit)}` : ""}`;
-  if (set.kg !== null && set.kg > 0) return `${formatWeight(set.kg, unit)} x ${reps}`;
-  return `${reps} reps`;
+  const load = set.kg !== null && set.kg > 0 ? formatWeight(set.kg, unit) : null;
+  if (set.rpe !== null) return `${load ? `about ${load} x ${reps}` : `${reps} reps`} · RPE ${set.rpe}`;
+  return load ? `${load} x ${reps}` : `${reps} reps`;
 }
 
 /** A session as a table: the exercise on the left, each set on its own line on the right. + sets are in the accent colour. */
@@ -222,53 +223,63 @@ export function QuietRow({ href, label, value, icon }: { href?: string; label: s
 
 const CHART_W = 260;
 const CHART_H = 120;
+const AXIS_Y = CHART_H - 16;
+const KIND_NOUN: Record<ChartKind, string> = { tm: "training max", weight: "working weight", top: "top set" };
 
-/** Where a label at x sits so it stays inside the chart. */
-function anchorAt(x: number): "start" | "middle" | "end" {
-  return x < 44 ? "start" : x > CHART_W - 44 ? "end" : "middle";
+/** Where a label sits beside its point: after it, or before it when that would run off the chart. */
+function sideAt(x: number): { dx: number; anchor: "start" | "end" } {
+  return x > CHART_W - 70 ? { dx: -6, anchor: "end" } : { dx: 6, anchor: "start" };
 }
 
 /**
  * One lift's path: a solid accent line for the value so far, a dashed line for
  * the plan from now to the end, the value now on the solid line and the planned
- * end value at the end of the dashed one. `kind` names what is plotted
- * ("training max") for screen readers.
+ * end value at the end of the dashed one. A training max reads to the nearest
+ * 0.5 kg or 1 lb (formatMax, as My program writes it); a working weight or top
+ * set is exact (formatWeight).
  */
-export function PathChart({ chart, totalWeeks, unit, kind }: { chart: LiftChart; totalWeeks: number; unit: WeightUnit; kind?: string }) {
+export function PathChart({ chart, totalWeeks, unit, kind }: { chart: LiftChart; totalWeeks: number; unit: WeightUnit; kind: ChartKind }) {
+  const fmt = (kg: number) => (kind === "tm" ? formatMax(kg, unit) : formatWeight(kg, unit));
   const g = pathGeometry(chart, totalWeeks, CHART_W, CHART_H);
   const { x, y } = chartScale(chart, totalWeeks, CHART_W, CHART_H);
   const now = chart.soFar.at(-1) ?? null;
   const end = chart.planned.at(-1) ?? null;
   const nowX = now ? x(now.week) : null;
   const endX = end ? x(end.week) : null;
-  // When the two labels would sit on top of each other, the planned end goes under its point.
-  const endBelow = nowX !== null && endX !== null && Math.abs(endX - nowX) < 56;
-  const axisY = CHART_H - PAD.bottom + 6;
-  const aria =
-    `${chart.label}${kind ? ` ${kind}` : ""}: ` +
-    [chart.nowKg !== null ? `${formatWeight(chart.nowKg, unit)} now` : null, chart.endKg !== null && end ? `${formatWeight(chart.endKg, unit)} planned by week ${end.week}` : null]
-      .filter(Boolean)
-      .join(", ");
+  const close = nowX !== null && endX !== null && Math.abs(endX - nowX) < 56;
+  // The line drops at "now" (a reset or a deload): the vertical is on the label's side, so the label goes under the dot.
+  const prev = chart.soFar.at(-2);
+  const next = chart.planned.find((p) => now && p.kg !== now.kg);
+  const drops = !!now && ((!!prev && prev.kg > now.kg) || (!!next && next.kg < now.kg));
+  // Close together, the two labels take opposite sides: the higher value above, the lower below.
+  const nowBelow = drops || (close && !!now && !!end && end.kg >= now.kg);
+  const endBelow = close && !nowBelow && !!now && !!end && end.kg < now.kg;
+  const nowSide = nowX !== null ? sideAt(nowX) : null;
+  const aria = `${chart.label} ${KIND_NOUN[kind]}: ${
+    chart.nowKg === null && chart.endKg === null
+      ? "no data yet"
+      : [chart.nowKg !== null ? `${fmt(chart.nowKg)} now` : null, chart.endKg !== null && end ? `${fmt(chart.endKg)} planned by week ${end.week}` : null].filter(Boolean).join(", ")
+  }`;
   return (
     <svg className="pk-chart" viewBox={`0 0 ${CHART_W} ${CHART_H}`} width="100%" role="img" aria-label={aria}>
-      <line className="pk-chart-axis" x1={PAD.left} x2={CHART_W - PAD.right} y1={axisY} y2={axisY} />
+      <line className="pk-chart-axis" x1={PAD.left} x2={CHART_W - PAD.right} y1={AXIS_Y} y2={AXIS_Y} />
       {g.planned && <polyline className="pk-chart-planned" points={g.planned} />}
       {g.soFar && <polyline className="pk-chart-solid" points={g.soFar} />}
       {now && nowX !== null && <circle className="pk-chart-dot" cx={nowX} cy={y(now.kg)} r={3.5} />}
-      {now && nowX !== null && (
-        <text className="pk-chart-label pk-chart-label--strong" x={nowX} y={y(now.kg) - 8} textAnchor={anchorAt(nowX)}>
-          {formatWeight(now.kg, unit)}
+      {now && nowX !== null && nowSide && (
+        <text className="pk-chart-label pk-chart-label--strong" x={nowX + nowSide.dx} y={nowBelow ? y(now.kg) + 15 : y(now.kg) - 8} textAnchor={nowSide.anchor}>
+          {fmt(now.kg)}
         </text>
       )}
       {end && endX !== null && (end.week !== now?.week || end.kg !== now?.kg) && (
-        <text className="pk-chart-label" x={endX} y={endBelow ? y(end.kg) + 15 : y(end.kg) - 8} textAnchor={anchorAt(endX)}>
-          {formatWeight(end.kg, unit)}
+        <text className="pk-chart-label" x={endX + sideAt(endX).dx} y={endBelow ? y(end.kg) + 15 : y(end.kg) - 8} textAnchor={sideAt(endX).anchor}>
+          {fmt(end.kg)}
         </text>
       )}
-      <text className="pk-chart-label pk-chart-label--weak" x={PAD.left} y={CHART_H - 3} textAnchor="start">
+      <text className="pk-chart-label pk-chart-label--weak" x={PAD.left} y={CHART_H - 2} textAnchor="start">
         Week 1
       </text>
-      <text className="pk-chart-label pk-chart-label--weak" x={CHART_W - PAD.right} y={CHART_H - 3} textAnchor="end">
+      <text className="pk-chart-label pk-chart-label--weak" x={CHART_W - PAD.right} y={CHART_H - 2} textAnchor="end">
         {`Week ${Math.max(totalWeeks, 1)}`}
       </text>
     </svg>

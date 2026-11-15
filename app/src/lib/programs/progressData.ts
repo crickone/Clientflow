@@ -14,6 +14,7 @@ import {
   plannedSeries,
   plusSetRows,
   soFarSeries,
+  type ChartKind,
   type LoggedExercise,
   type PlusSetRow,
   type SeriesPoint,
@@ -38,6 +39,10 @@ export interface LiftChart {
 }
 
 export interface ProgramProgressData {
+  /** What the charts plot: a training max, a working weight or a top set. */
+  kind: ChartKind;
+  /** The program has + sets (AMRAP or drives): the dashed note and the row list read from it. */
+  plus: boolean;
   /** "Training max" | "Working weight" | "Top set". */
   kindLabel: string;
   /** What the dashed line means. */
@@ -155,6 +160,8 @@ export function programProgress(view: EnrolmentView): ProgramProgressData {
   });
   const rows = plusSetRows(loggedExercises(view, events), plus, (kg) => formatWeight(kg, view.unit)).slice(0, MAX_ROWS);
   return {
+    kind: chartKind(t),
+    plus,
     kindLabel: CHART_LABEL[chartKind(t)],
     plannedNote: plus ? "Dashed: if each + set hits its reps" : "Dashed: if you get every rep",
     totalWeeks: weekInRound(t, view.state).round * t.lengthWeeks,

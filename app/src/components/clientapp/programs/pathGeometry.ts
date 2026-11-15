@@ -5,8 +5,8 @@
  */
 import type { LiftChart } from "@/lib/programs/progressData";
 
-// The path chart. A fixed viewBox with room for a label above the highest point and the week numbers under the axis.
-export const PAD = { top: 24, right: 10, bottom: 22, left: 10 };
+// The path chart. A fixed viewBox with room for a label above the highest point and one below the lowest, and the axis and week numbers under that.
+export const PAD = { top: 24, right: 10, bottom: 34, left: 10 };
 
 type Pt = { week: number; kg: number };
 

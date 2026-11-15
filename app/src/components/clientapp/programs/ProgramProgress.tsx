@@ -10,7 +10,7 @@ import { PathChart, PkSection, QuietRow } from "./kit";
 
 export function ProgramProgress({ data }: { data: ProgramProgressData }) {
   const { charts, rows } = data;
-  const empty = data.rowsTitle === "Your + sets" ? "Your + sets show here after your first session." : "Your top sets show here after your first session.";
+  const empty = data.plus ? "Your + sets show here after your first session." : "Your top sets show here after your first session.";
   return (
     <>
       {charts.length > 0 && (
@@ -18,7 +18,7 @@ export function ProgramProgress({ data }: { data: ProgramProgressData }) {
           {charts.length === 1 && <b className="pk-chart-name">{charts[0].label}</b>}
           <LiftSwitch lifts={charts.map((c) => ({ lift: c.lift, label: c.label }))}>
             {charts.map((c) => (
-              <PathChart key={c.lift} chart={c} totalWeeks={data.totalWeeks} unit={data.unit} kind={data.kindLabel.toLowerCase()} />
+              <PathChart key={c.lift} chart={c} totalWeeks={data.totalWeeks} unit={data.unit} kind={data.kind} />
             ))}
           </LiftSwitch>
           <span className="pk-small">{data.plannedNote}</span>
