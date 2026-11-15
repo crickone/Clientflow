@@ -46,6 +46,31 @@ assert.equal(CHART_LABEL.tm, "Training max");
   const p = plannedSeries(t, s, "squat", 2.5, "kg");
   assert.ok(p.at(-1)!.kg > p[0].kg);
   assert.equal(p.at(-1)!.week, t.lengthWeeks);
+  assert.equal(p.at(-1)!.kg, 137.5, "squat rises 2.5 kg every session, to 137.5 kg by week 12");
+  assert.equal(p[0].kg, 50, "the planned line starts at the current weight, not after this week's sessions");
+}
+
+// the planned line starts where the so-far line ends: day one and mid-week
+{
+  const maxes = { squat: 100, bench: 80, row: 70, press: 50, deadlift: 120 };
+  for (const key of ["stronglifts-5x5", "gzclp"]) {
+    const t = get(key);
+    const s = initState(t, maxes, 2.5);
+    const before = structuredClone(s);
+    const sf = soFarSeries(t, [snap(s)], "squat", 2.5);
+    const p = plannedSeries(t, s, "squat", 2.5, "kg");
+    assert.deepEqual(p[0], sf.at(-1), `${key}: day one, planned starts at the so-far end`);
+    assert.deepEqual(s, before, `${key}: plannedSeries leaves the caller's state unchanged`);
+  }
+  assert.equal(plannedSeries(get("gzclp"), initState(get("gzclp"), maxes, 2.5), "squat", 2.5, "kg")[0].kg, 72.5);
+  const t = get("stronglifts-5x5");
+  const run = simulate(t, { maxes, sessions: 7 });
+  assert.ok(run.final.day > 0, "seven sessions of a three-day week ends mid-week");
+  const snaps = [snap(initState(t, maxes, 2.5)), ...run.states.map(snap)];
+  const sf = soFarSeries(t, snaps, "squat", 2.5);
+  const p = plannedSeries(t, run.final, "squat", 2.5, "kg");
+  assert.deepEqual(p[0], sf.at(-1), "mid-week: planned starts at the so-far end");
+  assert.deepEqual(p[0], { week: 3, kg: 67.5 });
 }
 
 // Smolov: the planned top set each week; it does not need a session to show
@@ -89,6 +114,9 @@ assert.equal(hasPlusSets(get("stronglifts-5x5")), false, "StrongLifts is five fi
   assert.deepEqual(rows.map((r) => [r.week, r.planned, r.got]), [[2, "95% x 5+", "95 kg x 6"], [1, "95% x 5+", "95 kg x 8"]], "only + sets, newest first");
   const tops = plusSetRows([{ at: 3, week: 2, plan: plan(false), sets: [{ kg: 85, reps: 5, done: true }, { kg: 95, reps: 5, done: true }, { kg: 100, reps: 3, done: false }] }], false, (kg) => `${kg} kg`);
   assert.deepEqual(tops.map((r) => r.got), ["95 kg x 5"], "top set = heaviest DONE set");
+  const chin = { ...plan(true), name: "Chin-up", lift: null, bodyweight: true, sets: [{ kg: null, reps: 5, repsMax: null, amrap: true, rpe: null, pct: null, rest: 120, drives: false }] };
+  const bw = plusSetRows([{ at: 4, week: 3, plan: chin, sets: [{ kg: null, reps: 9, done: true }] }], true, (kg) => `${kg} kg`);
+  assert.deepEqual(bw.map((r) => [r.lift, r.planned, r.got]), [["Chin-up", "5+", "Bodyweight x 9"]], "a bodyweight + set is kept");
 }
 
 console.log("programs/progressSeries: ok");

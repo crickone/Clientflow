@@ -5,7 +5,7 @@
  * be to the end of this round if every rep is hit (from the engine). Also the
  * + set rows the Progress screen lists. Pure: no db, no server imports.
  */
-import { initState, progress } from "./engines";
+import { progress } from "./engines";
 import { planSession, progresses, stateKey, weekInRound, weekNumber } from "./planner";
 import { perfect } from "./simulate";
 import { emptyState, type EngineState, type LiftKey, type PlannedExercise, type PlannedSession, type ProgramTemplate, type SessionResult, type SetRx, type WeightUnit } from "./types";
@@ -97,13 +97,18 @@ export function plannedSeries(t: ProgramTemplate, state: EngineState, lift: Lift
   let s: EngineState = structuredClone(state);
   const end = weekInRound(t, s).round * t.lengthWeeks;
   const byWeek = new Map<number, number>();
+  // The first point is the value as it stands now, so the planned line starts where the so-far line ends.
+  // Later sessions in the same week never overwrite it; later weeks keep the last value in the week.
+  const startWeek = weekNumber(t, s);
+  const startKg = liftValue(t, s, lift, stepKg);
+  if (startKg !== null && startWeek <= end) byWeek.set(startWeek, startKg);
+  const pinned = byWeek.has(startWeek);
   const record = () => {
     const week = weekNumber(t, s);
-    if (week > end) return;
+    if (week > end || (pinned && week === startWeek)) return;
     const kg = liftValue(t, s, lift, stepKg);
     if (kg !== null) byWeek.set(week, kg);
   };
-  record();
   for (let n = 0; n < MAX_SESSIONS; n++) {
     const plan = planSession(t, s, { stepKg });
     if (!plan || weekNumber(t, s) > end) break;
@@ -157,9 +162,10 @@ export function plusSetRows(rows: LoggedExercise[], plus: boolean, fmt: (kg: num
     if (plus) {
       row.plan.sets.forEach((p, i) => {
         const d = row.sets[i];
-        if (!(p.amrap || p.drives) || !d || !d.done || d.reps === null || d.kg === null) return;
+        if (!(p.amrap || p.drives) || !d || !d.done || d.reps === null) return;
         const planned = p.pct !== null ? `${Math.round(p.pct * 1000) / 10}% x ${p.reps}+` : `${p.reps}+`;
-        out.push({ at: row.at, week: row.week, lift: row.plan.name, planned, got: `${fmt(d.kg)} x ${d.reps}` });
+        const load = d.kg === null ? "Bodyweight" : fmt(d.kg);
+        out.push({ at: row.at, week: row.week, lift: row.plan.name, planned, got: `${load} x ${d.reps}` });
       });
     } else if (row.plan.lift) {
       let best: { kg: number; reps: number } | null = null;
