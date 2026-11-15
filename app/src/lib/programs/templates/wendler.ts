@@ -10,10 +10,11 @@ const WAVES: [number, number, boolean][][] = [
   [[0.4, 5, false], [0.5, 5, false], [0.6, 5, false]],
 ];
 const WEEK_LABELS = ["5s week", "3s week", "5/3/1 week", "Deload"];
+// Bench first (2026-11-16, at the gym's request); upper and lower days still alternate.
 const DAYS: { lift: LiftKey; name: string; day: string }[] = [
-  { lift: "press", name: "Overhead press", day: "Press day" },
-  { lift: "deadlift", name: "Deadlift", day: "Deadlift day" },
   { lift: "bench", name: "Bench press", day: "Bench day" },
+  { lift: "deadlift", name: "Deadlift", day: "Deadlift day" },
+  { lift: "press", name: "Overhead press", day: "Press day" },
   { lift: "squat", name: "Back squat", day: "Squat day" },
 ];
 
@@ -34,14 +35,14 @@ const shared = {
   level: "intermediate" as const,
   daysPerWeek: 4,
   lengthWeeks: 12,
-  lifts: ["press", "deadlift", "bench", "squat"] as LiftKey[],
+  lifts: ["bench", "deadlift", "press", "squat"] as LiftKey[],
   // Wendler sets the training max at 90% of the max; members asked for the full max (2026-11-15), so every set is heavier than his.
   tmPct: 1,
   engine: { key: "tm_cycle" as const, rule: "cycle" as const, increment: 2.5, increments: { squat: 5, deadlift: 5 } },
 };
 
 const WAVE_TEXT =
-  "Four days a week, one main lift a day: press, deadlift, bench, squat. Three weeks of waves (5s, 3s, then 5/3/1) at percentages of a training max that starts at the one-rep max you enter, then a deload week. Wendler starts it at 90% of your max; this version uses your full max, so every set is heavier than his. The last set of each wave is as many reps as you can.";
+  "Four days a week, one main lift a day: bench, deadlift, press, squat. Three weeks of waves (5s, 3s, then 5/3/1) at percentages of a training max that starts at the one-rep max you enter, then a deload week. Wendler starts it at 90% of your max; this version uses your full max, so every set is heavier than his. The last set of each wave is as many reps as you can.";
 const TM_TEXT =
   "The training max goes up after each four-week cycle: 2.5 kg on press and bench, 5 kg on squat and deadlift. If you miss the minimum reps on a lift's + set (the last set of a wave), that lift's training max stays the same for the next cycle. This hold is our rule.";
 

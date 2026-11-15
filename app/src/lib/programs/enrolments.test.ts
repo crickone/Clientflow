@@ -433,9 +433,9 @@ const requireLocal = createRequire(import.meta.url);
     const moved = en.enrolmentEvents(id).find((x) => x.kind === "week")!;
     assert.equal(moved.reason, "Coach Ann moved the program to week 7 of 12.");
     const v = en.liveEnrolment(clientId)!;
-    assert.equal(en.sessionTitle(v, en.planFor(v)!), "Press day, week 7 of 12");
+    assert.equal(en.sessionTitle(v, en.planFor(v)!), "Bench day, week 7 of 12");
     const skips = en.enrolmentEvents(id, 500).filter((x) => x.kind === "skip").sort((x, y) => x.id - y.id);
-    assert.match(skips[0].reason, /^Skipped Press day, week 1 of 12\./);
+    assert.match(skips[0].reason, /^Skipped Bench day, week 1 of 12\./);
     assert.match(skips[skips.length - 1].reason, /^Skipped Squat day, week 4 of 12\./);
   });
 

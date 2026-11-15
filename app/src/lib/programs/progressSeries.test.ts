@@ -23,7 +23,7 @@ assert.equal(CHART_LABEL.tm, "Training max");
 {
   const t = get("531-bbb");
   const s = initState(t, { squat: 100, bench: 80, deadlift: 120, press: 50 }, 2.5);
-  assert.deepEqual(liftSeries(t, [snap(s)], s, 2.5, "kg").map((l) => l.lift), ["press", "deadlift", "bench", "squat"]);
+  assert.deepEqual(liftSeries(t, [snap(s)], s, 2.5, "kg").map((l) => l.lift), ["bench", "deadlift", "press", "squat"]);
   assert.equal(liftValue(t, s, "squat", 2.5), 100);
   const p = plannedSeries(t, s, "squat", 2.5, "kg");
   assert.equal(p[0].week, 1);

@@ -93,7 +93,7 @@ assert.deepEqual(howWeightsMove(get("531-bbb"), "kg", 2.5), [
   "After each four-week cycle, your training max goes up 2.5 kg, or 5 kg on the deadlift and squat.",
   "If you finish a session and its + set falls short, isn't ticked, or is more than one jump lighter than planned, that lift's training max stays the same for the next cycle. Skipped sessions don't hold it back.",
   "You pick the weight for dumbbell row and lying leg curl. The program does not change it.",
-  "Chin-up and hanging leg raise are bodyweight. Add reps when you can.",
+  "Hanging leg raise and chin-up are bodyweight. Add reps when you can.",
 ]);
 // 5/3/1 against the engine: what holds a training max, and what does not.
 {
@@ -101,7 +101,7 @@ assert.deepEqual(howWeightsMove(get("531-bbb"), "kg", 2.5), [
   const maxes = { press: 60, deadlift: 160, bench: 100, squat: 140 };
   const st0 = initState(t, maxes, 2.5);
   const press0 = st0.tms.press!;
-  const firstPress = (hook: Hook) => (pos: number, lift: LiftKey | null) => (lift === "press" && pos === 0 ? hook : () => undefined);
+  const firstPress = (hook: Hook) => (pos: number, lift: LiftKey | null) => (lift === "press" && pos === 2 ? hook : () => undefined);
   const plus = (fn: (kg: number | null, reps: number) => ReturnType<Hook>): Hook => (n, i, p) => (n === "Overhead press" && i === 2 ? fn(p.kg, p.reps) : undefined);
   assert.equal(cycle(t, st0, 2.5, "kg").tms.press, press0 + 2.5, "a full cycle raises it");
   assert.equal(cycle(t, st0, 2.5, "kg", firstPress(plus((_kg, r) => ({ reps: r - 1 })))).tms.press, press0, "a short + set holds it");

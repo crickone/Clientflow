@@ -43,9 +43,9 @@ assert.equal(b.live!.next, null);
 
 // ...until the training max rises above the max over the cycles
 const bbbRisen = initState(bbb, { press: 100, deadlift: 100, bench: 100, squat: 100 }, 2.5);
-bbbRisen.tms.press = 102.5;
+bbbRisen.tms.bench = 102.5;
 const risen = panelFrom({ enrolment: { id: 1, status: "active", template: bbb, state: bbbRisen, unit: "kg", basedOnName: null }, plan: null, events: [], past: [] });
-assert.equal(risen.live!.lifts[0].lift, "press");
+assert.equal(risen.live!.lifts[0].lift, "bench");
 assert.equal(risen.live!.lifts[0].max, "100 kg");
 assert.equal(risen.live!.lifts[0].tm, "102.5 kg", "a raised training max is shown beside the max");
 assert.equal(risen.live!.lifts[1].tm, null, "a lift whose training max is still the max shows none");
@@ -59,7 +59,7 @@ assert.equal(tx.live!.lifts[0].tm, "189 lb");
 // the coach's week options are weeks of the member's current round: a 5/3/1
 // member in their second cycle (cycle 1) on its 3s week sees weeks 5 to 8,
 // with week 6 the one selected
-const bbbCycle1 = { ...initState(bbb, { press: 100, deadlift: 100, bench: 100, squat: 100 }, 2.5), cycle: 1, week: 1, day: 2 };
+const bbbCycle1 = { ...initState(bbb, { press: 100, deadlift: 100, bench: 100, squat: 100 }, 2.5), cycle: 1, week: 1, day: 0 };
 const c1 = panelFrom({ enrolment: { id: 3, status: "active", template: bbb, state: bbbCycle1, unit: "kg", basedOnName: null }, plan: planSession(bbb, bbbCycle1, { stepKg: 2.5 }), events: [], past: [] }).live!;
 assert.deepEqual(
   c1.weeks.map((w) => w.label),

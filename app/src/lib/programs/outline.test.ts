@@ -112,8 +112,8 @@ assert.equal(weightWhy(main, bbb.weeks[0].days[0].exercises[0], bbb.tmPct, "kg",
 const sl = get("stronglifts-5x5");
 const slPlan = planExercise(sl.weeks[0].days[0].exercises[0], 0, initState(sl, { squat: 100 }, 2.5), { stepKg: 2.5 });
 assert.equal(weightWhy(slPlan, sl.weeks[0].days[0].exercises[0], sl.tmPct, "kg"), null, "a working weight needs no line");
-const chin = planExercise(bbb.weeks[0].days[0].exercises[2], 2, bst, { stepKg: 2.5 });
-assert.equal(weightWhy(chin, bbb.weeks[0].days[0].exercises[2], bbb.tmPct, "kg"), "Bodyweight.");
+const chin = planExercise(bbb.weeks[0].days[2].exercises[2], 2, bst, { stepKg: 2.5 });
+assert.equal(weightWhy(chin, bbb.weeks[0].days[2].exercises[2], bbb.tmPct, "kg"), "Bodyweight.");
 
 // ── weights between sessions, repeat note, session time, lb add-on ──
 assert.equal(weightsMoveBetweenSessions(get("stronglifts-5x5")), true);

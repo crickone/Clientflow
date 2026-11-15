@@ -15,14 +15,14 @@ const nsMax = { squat: 111.11, bench: 111.11, deadlift: 111.11, press: 111.11 };
 
 // ── 5/3/1 Boring But Big ──────────────────────────────────────────────────
 const bbb = platformProgram("531-bbb")!;
-assert.deepEqual(bbb.weeks[0].days.map((d) => d.name), ["Press day", "Deadlift day", "Bench day", "Squat day"]);
-assert.deepEqual(planAt(bbb, tm100, 0, 0).exercises.map((e) => line(e)), [
+assert.deepEqual(bbb.weeks[0].days.map((d) => d.name), ["Bench day", "Deadlift day", "Press day", "Squat day"]);
+assert.deepEqual(planAt(bbb, tm100, 0, 2).exercises.map((e) => line(e)), [
   "Overhead press 1 x 5 at 65 kg, then 1 x 5 at 75 kg, then 1 x 5+ at 85 kg",
   "Overhead press 5 x 10 at 50 kg",
   "Chin-up 5 x 10",
 ]);
 assert.equal(line(planAt(bbb, tm100, 1, 3).exercises[0]), "Back squat 1 x 3 at 70 kg, then 1 x 3 at 80 kg, then 1 x 3+ at 90 kg");
-assert.equal(line(planAt(bbb, tm100, 2, 2).exercises[0]), "Bench press 1 x 5 at 75 kg, then 1 x 3 at 85 kg, then 1 x 1+ at 95 kg");
+assert.equal(line(planAt(bbb, tm100, 2, 0).exercises[0]), "Bench press 1 x 5 at 75 kg, then 1 x 3 at 85 kg, then 1 x 1+ at 95 kg");
 const deload = planAt(bbb, tm100, 3, 1);
 assert.deepEqual(deload.exercises.map((e) => line(e)), ["Deadlift 1 x 5 at 40 kg, then 1 x 5 at 50 kg, then 1 x 5 at 60 kg", "Hanging leg raise 5 x 15"]);
 // three cycles, every rep: +2.5 kg upper, +5 kg lower per cycle
@@ -32,7 +32,7 @@ assert.deepEqual(bbbRun.final.tms, { squat: 115, bench: 107.5, deadlift: 115, pr
 
 // ── 5/3/1 First Set Last ──────────────────────────────────────────────────
 const fsl = platformProgram("531-fsl")!;
-assert.equal(line(planAt(fsl, tm100, 1, 0).exercises[1]), "Overhead press 5 x 5 at 70 kg");
+assert.equal(line(planAt(fsl, tm100, 1, 2).exercises[1]), "Overhead press 5 x 5 at 70 kg");
 assert.equal(line(planAt(fsl, tm100, 2, 3).exercises[1]), "Back squat 5 x 5 at 75 kg");
 assert.equal(planAt(fsl, tm100, 3, 0).exercises.length, 2, "no supplemental sets on the deload");
 
