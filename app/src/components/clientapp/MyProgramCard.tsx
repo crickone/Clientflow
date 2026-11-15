@@ -56,7 +56,7 @@ export function MyProgramCard({ clientId, variant = "full" }: { clientId: number
         <>
           <span className="pk-small">About {sessionMinutes(view.template)} minutes</span>
           <SessionTable exercises={plan.exercises} unit={view.unit} />
-          <StartProgramSessionButton label={inProgress ? "Continue session" : "Start session"} />
+          <StartProgramSessionButton label={inProgress ? "Continue session" : "Start session"} tall />
         </>
       ) : (
         <Link href="/app/programs/mine" className="pk-ghost">

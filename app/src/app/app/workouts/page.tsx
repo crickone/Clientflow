@@ -50,19 +50,24 @@ export default async function ClientWorkoutsPage() {
       ? { label: `${LIFT_LABEL[lift]} TM`, value: formatMax(diy.state.tms[lift]!, diy.unit), sub: undefined }
       : { label: "Last 30 days", value: String(t.workouts30), sub: t.workouts30 === 1 ? "workout" : "workouts" };
 
+  // A brand-new member has nothing to count yet: no strip of zeros, just the empty row below.
+  const hasNumbers = planned > 0 || thisWeek > 0 || t.workouts30 > 0 || t.streak > 0 || !!diy;
+
   const trainingDays = t.plan ? (t.plan.weekdays.length ? t.plan.weekdays.map((d) => WEEKDAY_SHORT[d - 1]).join(", ") : "Set days") : null;
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
       <PkHeader title="Workouts" />
 
-      <StatStrip
-        items={[
-          { label: "This week", value: sessions.value, sub: sessions.sub },
-          headline,
-          { label: "Streak", value: String(t.streak), sub: t.streak === 1 ? "week" : "weeks" },
-        ]}
-      />
+      {hasNumbers && (
+        <StatStrip
+          items={[
+            { label: "This week", value: sessions.value, sub: sessions.sub },
+            headline,
+            { label: "Streak", value: String(t.streak), sub: t.streak === 1 ? "week" : "weeks" },
+          ]}
+        />
+      )}
 
       {weekDays && <WeekStrip days={weekDays} todayKey={today} />}
 
@@ -91,9 +96,9 @@ export default async function ClientWorkoutsPage() {
               <span className="pk-small">{t.next.programTitle}</span>
             </div>
           </div>
-          <StartWorkoutButton programId={t.next.programId} dayPosition={t.next.dayPosition} label={`Start ${t.next.dayName}`} />
+          <StartWorkoutButton programId={t.next.programId} dayPosition={t.next.dayPosition} label={`Start ${t.next.dayName}`} tall />
         </PkCard>
-      ) : !t.plan && programs.length === 0 ? (
+      ) : !t.plan && programs.length === 0 && !view ? (
         <QuietRow label="No program yet. Your coach can add one, or log your own." />
       ) : null}
 
