@@ -6,7 +6,6 @@ import { Pause, Pencil } from "lucide-react";
 import { requireProgramsPage } from "@/lib/programs/access";
 import { actorLabel } from "@/lib/programs/cards";
 import { currentPhase, programContent, withContentFrom } from "@/lib/programs/content";
-import { isFullBlock } from "@/lib/programs/editing";
 import { enrolmentCounts, enrolmentEvents, liveEnrolment, planFor, programWeek, sessionTitle } from "@/lib/programs/enrolments";
 import { copyKey, programByKey } from "@/lib/programs/library";
 import { memberKey, parseMemberKey } from "@/lib/programs/memberTemplate";
@@ -16,7 +15,9 @@ import { LIFT_LABEL } from "@/lib/programs/types";
 import { formatMax, showsTrainingMax } from "@/lib/programs/units";
 import { dateKey } from "@/lib/trainingProgress";
 import { openSession } from "@/lib/workoutLog";
-import { PhaseBar, PkCard, PkHeader, PkSection, StatTiles, Timeline, Warn } from "@/components/clientapp/programs/kit";
+import { programProgress, type ProgramProgressData } from "@/lib/programs/progressData";
+import { PhaseBar, PkCard, PkHeader, PkSection, SessionTable, StatStrip, StatTiles, Timeline, Warn } from "@/components/clientapp/programs/kit";
+import { ProgramProgress } from "@/components/clientapp/programs/ProgramProgress";
 import { WeekStrip } from "@/components/clientapp/WeekStrip";
 import { StartProgramSessionButton } from "@/components/clientapp/StartProgramSessionButton";
 import { MyProgramControls } from "@/components/clientapp/MyProgramControls";
@@ -65,6 +66,22 @@ export default async function MyProgramPage() {
   const startsLater = view.startDate > today ? ` · Starts ${new Date(`${view.startDate}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}` : "";
   const where = view.state.finished ? "Program done" : `${weekLabel(t, view.state)}${phase !== null ? ` · ${content.phases[phase].name}` : ""}${startsLater}`;
 
+  // Sessions done in this round out of the round's total: a cycle shorter than the program's length runs on, so its total is the cycle times the repeats.
+  const roundTotal = t.weeks.length > 0 ? Math.round((sessionCount(t) * Math.max(1, t.lengthWeeks)) / t.weeks.length) : 0;
+  const strip: { label: string; value: string; sub?: string }[] = [
+    { label: "Sessions", value: roundTotal > 0 ? `${counts.done} of ${roundTotal}` : String(counts.done) },
+  ];
+  if (counts.skipped > 0) strip.push({ label: "Skipped", value: String(counts.skipped) });
+  if (phase !== null) strip.push({ label: "Phase", value: content.phases[phase].name });
+
+  // A row that will not read must never take the page down: log it and leave the progress section out.
+  let progress: ProgramProgressData | null = null;
+  try {
+    progress = programProgress(view);
+  } catch (e) {
+    console.error("[my program] progress failed", view.id, e);
+  }
+
   return (
     <div className="pk">
       <PkHeader title={t.name} lead={where}>
@@ -82,24 +99,23 @@ export default async function MyProgramPage() {
         </PkCard>
       )}
 
+      <StatStrip items={strip} />
+
       {plan && (
-        <PkCard accent>
+        <PkCard>
           <span className="pk-small">{inProgress ? "In progress" : next ? `Next session · ${next.status === "today" ? "Today" : next.label}` : "Next session"}</span>
           <h2 className="pk-card-title">{sessionTitle(view, plan)}</h2>
           {plan.test && <Warn>Test day. Work up to a new max with a spotter or safety bars.</Warn>}
+          <SessionTable exercises={plan.exercises} unit={view.unit} />
           {plan.exercises.map((ex) => {
             const why = weightWhy(ex, day?.exercises[ex.index], t.tmPct, view.unit, t.engine.key === "tm_cycle" && t.engine.rule !== "gzclp");
-            return (
-              <div key={ex.index}>
-                <div className="pk-line">
-                  <span>{ex.name}</span>
-                  <span>{summarisePlanned(ex.sets, view.unit)}</span>
-                </div>
-                {why && <span className="pk-small">{why}</span>}
-              </div>
-            );
+            return why ? (
+              <span key={ex.index} className="pk-small">
+                {ex.name}: {why}
+              </span>
+            ) : null;
           })}
-          <StartProgramSessionButton label={inProgress ? "Continue session" : "Start session"} />
+          <StartProgramSessionButton label={inProgress ? "Continue session" : "Start session"} tall />
         </PkCard>
       )}
 
@@ -117,27 +133,24 @@ export default async function MyProgramPage() {
         </PkCard>
       )}
 
-      <PkSection label="Your numbers">
-        <StatTiles
-          tiles={[
-            ...t.lifts.map((l) => ({
+      {week.length > 0 && (
+        <PkSection label="This week">
+          <WeekStrip days={week} todayKey={today} />
+        </PkSection>
+      )}
+
+      {progress && <ProgramProgress data={progress} />}
+
+      {t.lifts.length > 0 && (
+        <PkSection label="Your numbers">
+          <StatTiles
+            tiles={t.lifts.map((l) => ({
               label: `${LIFT_LABEL[l]} max`,
               value: view.state.maxes[l] !== undefined ? formatMax(view.state.maxes[l]!, view.unit) : "-",
               // Shown when it differs from the max: set below it (Texas), or risen past it over the cycles.
               sub: showsTrainingMax(t.tmPct, view.state.maxes[l], view.state.tms[l]) ? `Training max ${formatMax(view.state.tms[l]!, view.unit)}` : undefined,
-            })),
-            {
-              label: "Sessions",
-              value: isFullBlock(t) ? `${counts.done} of ${sessionCount(t)}` : `${counts.done} done`,
-              sub: counts.skipped === 0 ? "None skipped" : `${counts.skipped} skipped`,
-            },
-          ]}
-        />
-      </PkSection>
-
-      {week.length > 0 && (
-        <PkSection label="This week">
-          <WeekStrip days={week} todayKey={today} />
+            }))}
+          />
         </PkSection>
       )}
 
