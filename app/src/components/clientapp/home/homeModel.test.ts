@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { initState } from "@/lib/programs/engines";
 import { planSession } from "@/lib/programs/planner";
 import { wendlerBbb } from "@/lib/programs/templates/wendler";
-import { clockLabel, greeting, heroChips, homeTiles, pickHero, dublinHour } from "./homeModel";
+import { clockLabel, dublinHour, featureButtons, greeting, heroChips, heroSets, homeTiles, pickHero, ringStats, roundTotal, strengthTrend, weekShort } from "./homeModel";
 
 // greeting by hour, and a plain one without a name
 assert.equal(greeting(6, "Chris"), "Morning, Chris");
@@ -85,20 +85,25 @@ const drives = ex("Squat", "squat", [100]);
 drives.sets[0].drives = true;
 drives.sets[0].repsMax = null;
 drives.sets[0].reps = 5;
-assert.deepEqual(heroChips([drives], kg), [{ kg: "100", reps: "5+", plus: true }]);
+assert.deepEqual(heroChips([drives], kg), [{ n: 1, kg: "100", reps: "5+", plus: true }]);
+// chips know their place in the exercise: the last three of five are sets 3, 4 and 5
+assert.deepEqual(heroChips([ex("Squat", "squat", [60, 70, 80, 90, 100])], kg).map((c) => c.n), [3, 4, 5]);
+// a warm-up with no weight still counts as a set
+assert.deepEqual(heroChips([ex("Squat", "squat", [null, 70, 80])], kg).map((c) => c.n), [2, 3]);
 
 // the hero state for each member case
 const planDay = { dayName: "Press day", weekLabel: "Week 1 of 12", chips, today: true };
+const prog = (over: object = {}) => ({ plan: planDay, inProgress: false, sessionsDone: 10, roundTotal: 48, ...over });
 const none = { open: null, program: null, next: null, programsVisible: true };
 const cases = [
-  { name: "program, a training day", in: { ...none, program: { plan: planDay, inProgress: false } }, want: { kind: "program", eyebrow: "Today · Week 1 of 12", title: "Press day", action: "start" } },
-  { name: "program, a rest day", in: { ...none, program: { plan: { ...planDay, today: false }, inProgress: false } }, want: { kind: "program", eyebrow: "Next up · Week 1 of 12", title: "Press day", action: "start" } },
-  { name: "program session open", in: { ...none, program: { plan: planDay, inProgress: true } }, want: { kind: "program", eyebrow: "Today · Week 1 of 12", title: "Press day", action: "continue" } },
-  { name: "block done", in: { ...none, program: { plan: null, inProgress: false } }, want: { kind: "block_done", title: "Block done" } },
+  { name: "program, a training day", in: { ...none, program: prog() }, want: { kind: "program", eyebrow: "Today · Week 1", title: "Press day", action: "start" } },
+  { name: "program, a rest day", in: { ...none, program: prog({ plan: { ...planDay, today: false } }) }, want: { kind: "program", eyebrow: "Next up · Week 1", title: "Press day", action: "start" } },
+  { name: "program session open", in: { ...none, program: prog({ inProgress: true }) }, want: { kind: "program", eyebrow: "Today · Week 1", title: "Press day", action: "continue" } },
+  { name: "block done", in: { ...none, program: prog({ plan: null }) }, want: { kind: "block_done", title: "Block done" } },
   { name: "coach plan", in: { ...none, next: { programId: 4, dayPosition: 2, dayName: "Legs" } }, want: { kind: "plan", title: "Legs", programId: 4, dayPosition: 2 } },
   { name: "open workout", in: { ...none, open: { id: 9, dayName: "Legs" } }, want: { kind: "open", title: "Legs", sessionId: 9 } },
-  { name: "open workout beats a program start", in: { ...none, open: { id: 9, dayName: "Legs" }, program: { plan: planDay, inProgress: false } }, want: { kind: "open", title: "Legs", sessionId: 9 } },
-  { name: "program beats a coach plan", in: { ...none, program: { plan: planDay, inProgress: false }, next: { programId: 4, dayPosition: 2, dayName: "Legs" } }, want: { kind: "program" } },
+  { name: "open workout beats a program start", in: { ...none, open: { id: 9, dayName: "Legs" }, program: prog() }, want: { kind: "open", title: "Legs", sessionId: 9 } },
+  { name: "program beats a coach plan", in: { ...none, program: prog(), next: { programId: 4, dayPosition: 2, dayName: "Legs" } }, want: { kind: "program" } },
   { name: "nothing, programs on", in: none, want: { kind: "empty", programsVisible: true } },
   { name: "paused program, nothing else: no hero", in: { ...none, paused: true }, want: null },
   { name: "paused program with a coach plan still shows the plan", in: { ...none, paused: true, next: { programId: 4, dayPosition: 2, dayName: "Legs" } }, want: { kind: "plan" } },
@@ -114,8 +119,70 @@ for (const c of cases) {
   assert.equal(got.kind, c.want.kind, c.name);
   for (const [k, v] of Object.entries(c.want)) assert.deepEqual((got as unknown as Record<string, unknown>)[k], v, `${c.name}: ${k}`);
 }
-const programHero = pickHero({ ...none, program: { plan: planDay, inProgress: false } });
+const programHero = pickHero({ ...none, program: prog() });
 assert.ok(programHero && programHero.kind === "program" && programHero.chips.length === 3, "the program hero carries its chips");
+assert.deepEqual(programHero.kind === "program" && programHero.ring, { done: 10, total: 48, pct: 10 / 48, caption: "of 48 done" }, "the program hero carries its ring");
+
+// the week in the eyebrow
+assert.equal(weekShort("Week 3 of 12"), "Week 3");
+assert.equal(weekShort("Week 1 of 8, round 2"), "Week 1, round 2");
+assert.equal(weekShort("Test week"), "Test week");
+
+// the round total, as My program works it out
+assert.equal(roundTotal({ sessions: 16, lengthWeeks: 12, weeks: 4 }), 48, "a 4-week cycle run for 12 weeks");
+assert.equal(roundTotal({ sessions: 12, lengthWeeks: 12, weeks: 12 }), 12);
+assert.equal(roundTotal({ sessions: 0, lengthWeeks: 12, weeks: 0 }), 0, "no weeks, no total");
+
+// the ring: sessions done of the round, full once past it
+assert.deepEqual(ringStats(10, 48), { done: 10, total: 48, pct: 10 / 48, caption: "of 48 done" });
+assert.deepEqual(ringStats(0, 48), { done: 0, total: 48, pct: 0, caption: "of 48 done" });
+assert.deepEqual(ringStats(48, 48), { done: 48, total: 48, pct: 1, caption: "of 48 done" });
+assert.deepEqual(ringStats(52, 48), { done: 52, total: null, pct: 1, caption: "done" }, "past the total the ring is full and reads N done");
+assert.deepEqual(ringStats(3, 0), { done: 3, total: null, pct: 0, caption: "done" }, "no known total: just the count");
+
+// the sets list: "Set N" for build-up sets, the last one is the top set
+assert.deepEqual(heroSets([{ n: 1, kg: "112.5", reps: "5", plus: false }, { n: 2, kg: "127.5", reps: "3", plus: false }, { n: 3, kg: "142.5", reps: "1+", plus: true }], "kg"), [
+  { label: "Set 1", value: "112.5 kg x 5", top: false },
+  { label: "Set 2", value: "127.5 kg x 3", top: false },
+  { label: "Top set", value: "142.5 kg x 1+", top: true },
+]);
+assert.deepEqual(heroSets([{ n: 4, kg: "60", reps: "8", plus: false }], "lb"), [{ label: "Top set", value: "60 lb x 8", top: true }], "one set is the top set");
+assert.deepEqual(heroSets([], "kg"), []);
+
+// the four feature buttons: a meal and a class always, check-in and habits only when on
+const feat = { proteinToday: 92, nextClass: { name: "HIIT", when: "Wed 6:30pm" }, checkin: { due: true, daysLate: 0, dueSince: "Mon", next: "Mon 23 Nov" }, habits: { done: 2, total: 3 } };
+const fb = featureButtons(feat);
+assert.deepEqual(fb.map((b) => b.key), ["meal", "class", "checkin", "habits"]);
+assert.deepEqual(fb.map((b) => b.href), ["/app/nutrition", "/app/timetable", "/app/checkin", "/app/habits"]);
+assert.equal(fb[0].line, "92 g protein today");
+assert.equal(fb[1].line, "HIIT, Wed 6:30pm");
+assert.equal(fb[2].badge, "Due");
+assert.equal(fb[2].line, "Takes a couple of minutes");
+assert.equal(fb[3].line, "2 of 3 today");
+assert.equal(featureButtons({ ...feat, proteinToday: 0 })[0].line, "Add what you ate", "nothing logged: no zero protein");
+assert.equal(featureButtons({ ...feat, nextClass: null })[1].line, "See the timetable");
+const late = featureButtons({ ...feat, checkin: { due: true, daysLate: 2, dueSince: "Mon", next: "Mon 23 Nov" } })[2];
+assert.equal(late.line, "Due since Mon");
+const done = featureButtons({ ...feat, checkin: { due: false, daysLate: 0, dueSince: "Mon", next: "Mon 23 Nov" } })[2];
+assert.equal(done.badge, undefined, "no badge when it is not due");
+assert.equal(done.line, "Next Mon 23 Nov");
+assert.deepEqual(featureButtons({ ...feat, checkin: null }).map((b) => b.key), ["meal", "class", "habits"], "no check-in set up, no button");
+assert.deepEqual(featureButtons({ ...feat, habits: null }).map((b) => b.key), ["meal", "class", "checkin"], "habits off, no button");
+assert.deepEqual(featureButtons({ ...feat, checkin: null, habits: null }).map((b) => b.key), ["meal", "class"]);
+assert.deepEqual(featureButtons({ ...feat, habits: { done: 0, total: 0 } }).map((b) => b.key), ["meal", "class", "checkin"], "no habits to tick, no button");
+assert.equal(featureButtons({ ...feat, habits: { done: 0, total: 3 } })[3].line, "0 of 3 today", "0 of 3 is a count of habits to do");
+
+// the strength chart: two points and a lift logged twice, else nothing to draw
+const pts = [{ at: 1, value: 0 }, { at: 2, value: 3.2 }, { at: 3, value: 6.44 }];
+const st = strengthTrend(pts, 2);
+assert.ok(st);
+assert.equal(st.value, "+6.4%");
+assert.equal(st.points, pts);
+assert.equal(strengthTrend([{ at: 1, value: 4 }], 2), null, "one point is no trend");
+assert.equal(strengthTrend([], 0), null);
+assert.equal(strengthTrend(pts, 0), null, "no lift logged twice, no trend");
+assert.equal(strengthTrend([{ at: 1, value: 0 }, { at: 2, value: 0 }], 1)?.value, "0%");
+assert.equal(strengthTrend([{ at: 1, value: 2 }, { at: 2, value: -1.25 }], 1)?.value, "-1.3%");
 
 // tiles: only real data, in order, never a zero
 const all = { protein: { got: 92, target: 160 }, habits: { done: 2, total: 3 }, week: { done: 1, planned: 4 }, streak: 3, nextClass: "Wed 6:30pm" };

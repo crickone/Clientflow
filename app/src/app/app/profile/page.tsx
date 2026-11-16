@@ -4,7 +4,8 @@ import { ChevronRight, Mail, Phone } from "lucide-react";
 import { requireClientPage } from "@/lib/clientAuth";
 import { clientHistory, clientMembership } from "@/lib/clientApp";
 import { Badge } from "@/components/ui/Badge";
-import { Card, dayLabel, PageTitle, SectionTitle } from "@/components/clientapp/ui";
+import { Card, dayLabel, euros, PageTitle, SectionTitle } from "@/components/clientapp/ui";
+import { QuietRow } from "@/components/clientapp/programs/kit";
 import { LogoutButton } from "@/components/clientapp/LogoutButton";
 import { MessagePrefs } from "@/components/clientapp/MessagePrefs";
 import { PushSetup } from "@/components/clientapp/PushSetup";
@@ -15,7 +16,12 @@ import { isProviderId, PROVIDER_NAME, PROVIDERS } from "@/lib/wearables/model";
 import { isProviderConfigured } from "@/lib/wearables/providers";
 import { businessContact } from "@/lib/agreements";
 import { consentsFor } from "@/lib/marketingConsent";
-import { cycleSettingsFor } from "@/lib/cycle";
+import { memberCycle } from "@/lib/cycle";
+import { PHASE_LABEL, statusLine } from "@/lib/cycleModel";
+import { goalTarget } from "@/lib/goals";
+import { GOAL_BY_KEY } from "@/lib/goalsModel";
+import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
+import { formatMetric } from "@/lib/inbody/metrics";
 import { CONSENT_CHANNELS, CONSENT_LABEL, consentStatement } from "@/lib/memberChoicesModel";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +36,11 @@ export default async function ClientProfilePage(props: { searchParams: Promise<{
   const searchParams = await props.searchParams;
   const { clientId, client, tenantId } = requireClientPage();
   const m = clientMembership(clientId);
-  const cycle = cycleSettingsFor(clientId);
+  const cycle = memberCycle(clientId);
+  const goal = goalTarget(clientId);
+  const scansOn = bodyScansEnabled(tenantId);
+  const scanConsent = scansOn ? getScanProfile(clientId).consentAt !== null : false;
+  const latestScan = scanConsent ? listClientScans(clientId).filter((s) => Object.keys(s.metrics).length > 0)[0] : undefined;
   const history = clientHistory(clientId, 12);
   const initials = `${client.firstName?.[0] ?? ""}${client.lastName?.[0] ?? ""}`.toUpperCase();
   const business = businessContact().name;
@@ -70,7 +80,7 @@ export default async function ClientProfilePage(props: { searchParams: Promise<{
         <Card style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{m ? m.name : "No active membership"}</div>
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{m ? m.status : "Tap to view"}</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{m ? `${euros(m.priceCents)} · ${m.status}` : "Ask your coach"}</div>
           </div>
           <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
         </Card>
@@ -80,11 +90,30 @@ export default async function ClientProfilePage(props: { searchParams: Promise<{
         <Card style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Cycle tracking</div>
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{cycle ? (cycle.shareWithCoach ? "On, shared with your coach" : "On, private to you") : "Off. Periods, how you feel, what to expect"}</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{cycle
+                ? `${cycle.settings.mode === "cycle" ? `${cycle.status.phase ? `Cycle: ${PHASE_LABEL[cycle.status.phase]}` : "Cycle"} · ${statusLine(cycle.status)}` : `${cycle.todayLog.energy || cycle.todayLog.mood ? "Checked in today" : "How are you today?"}`} · ${cycle.settings.shareWithCoach ? "shared with your coach" : "private to you"}`
+                : "Off. Periods, how you feel, what to expect"}</div>
           </div>
           <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
         </Card>
       </Link>
+
+      <div>
+        <QuietRow
+          href="/app/goal"
+          label={goal ? `Goal: ${GOAL_BY_KEY[goal.goal.goal].label} · ${goal.target.protein} g protein` : "Set a goal"}
+          value={goal ? `${goal.target.calories.toLocaleString("en-IE")} kcal` : undefined}
+          icon="chevron"
+        />
+        {scansOn && (
+          <QuietRow
+            href="/app/body"
+            label={latestScan ? `Body scans · ${formatMetric("smm", latestScan.metrics.smm)} muscle · ${formatMetric("pbf", latestScan.metrics.pbf)} body fat` : "Body scans"}
+            value={latestScan ? formatMetric("weight", latestScan.metrics.weight) : undefined}
+            icon="chevron"
+          />
+        )}
+      </div>
 
       {vapid && (
         <div>

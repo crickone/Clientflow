@@ -32,6 +32,8 @@ export function clockLabel(hhmm: string): string {
 }
 
 export interface HeroChip {
+  /** The set's place in its exercise, from 1, counting sets with no weight. */
+  n: number;
   kg: string;
   reps: string;
   plus: boolean;
@@ -49,13 +51,54 @@ export function heroChips(exercises: PlannedExercise[], fmtKg: (kg: number) => s
   const main = exercises.find((e) => e.lift !== null && e.sets.some(weighted)) ?? exercises.find((e) => e.sets.some(weighted));
   if (!main) return [];
   return main.sets
-    .filter(weighted)
+    .map((s, i) => ({ s, n: i + 1 }))
+    .filter((x) => weighted(x.s))
     .slice(-3)
-    .map((s) => ({ kg: fmtKg(s.kg!), reps: repsText(s), plus: s.amrap || s.drives }));
+    .map(({ s, n }) => ({ n, kg: fmtKg(s.kg!), reps: repsText(s), plus: s.amrap || s.drives }));
+}
+
+/** "Week 3 of 12" as the eyebrow writes it: "Week 3". A repeat keeps its round: "Week 1, round 2". */
+export function weekShort(label: string): string {
+  return label.replace(/ of \d+/, "");
+}
+
+/** Sessions in a full round of the program: a cycle shorter than the program's length runs on, so its total is the cycle times the repeats (as My program counts it). 0 when it has no weeks. */
+export function roundTotal(t: { sessions: number; lengthWeeks: number; weeks: number }): number {
+  return t.weeks > 0 ? Math.round((t.sessions * Math.max(1, t.lengthWeeks)) / t.weeks) : 0;
+}
+
+export interface Ring {
+  done: number;
+  /** The round's total while the count fits inside it, else null. */
+  total: number | null;
+  /** How far round the ring goes, 0 to 1. */
+  pct: number;
+  /** The line under the number: "of 48 done", or "done" with no total to count against. */
+  caption: string;
+}
+
+/** The program ring: sessions done of the round. Past the total (a repeating program runs on) it is full and reads "N done". */
+export function ringStats(done: number, total: number): Ring {
+  if (total > 0 && done <= total) return { done, total, pct: done / total, caption: `of ${total} done` };
+  return { done, total: null, pct: total > 0 ? 1 : 0, caption: "done" };
+}
+
+export interface HeroSet {
+  label: string;
+  value: string;
+  top: boolean;
+}
+
+/** The chips as a list: "Set 2  127.5 kg x 3", the last one "Top set" (the + set when the lift has one). */
+export function heroSets(chips: HeroChip[], unit: string): HeroSet[] {
+  return chips.map((c, i) => {
+    const top = i === chips.length - 1;
+    return { label: top ? "Top set" : `Set ${c.n}`, value: `${c.kg} ${unit} x ${c.reps}`, top };
+  });
 }
 
 export type Hero =
-  | { kind: "program"; eyebrow: string; title: string; chips: HeroChip[]; action: "start" | "continue" }
+  | { kind: "program"; eyebrow: string; title: string; chips: HeroChip[]; ring: Ring; action: "start" | "continue" }
   | { kind: "block_done"; title: "Block done" }
   | { kind: "plan"; title: string; programId: number; dayPosition: number }
   | { kind: "open"; title: string; sessionId: number }
@@ -69,7 +112,7 @@ export type Hero =
  */
 export function pickHero(input: {
   open: { id: number; dayName: string } | null;
-  program: { plan: { dayName: string; weekLabel: string; chips: HeroChip[]; today: boolean } | null; inProgress: boolean } | null;
+  program: { plan: { dayName: string; weekLabel: string; chips: HeroChip[]; today: boolean } | null; inProgress: boolean; sessionsDone: number; roundTotal: number } | null;
   next: { programId: number; dayPosition: number; dayName: string } | null;
   programsVisible: boolean;
   /** The member's program is paused (coach guided): nothing for them to start here, so no invitation to start. */
@@ -79,7 +122,7 @@ export function pickHero(input: {
   if (input.program) {
     const p = input.program.plan;
     if (!p) return { kind: "block_done", title: "Block done" };
-    return { kind: "program", eyebrow: `${p.today ? "Today" : "Next up"} · ${p.weekLabel}`, title: p.dayName, chips: p.chips, action: input.program.inProgress ? "continue" : "start" };
+    return { kind: "program", eyebrow: `${p.today ? "Today" : "Next up"} · ${weekShort(p.weekLabel)}`, title: p.dayName, chips: p.chips, ring: ringStats(input.program.sessionsDone, input.program.roundTotal), action: input.program.inProgress ? "continue" : "start" };
   }
   if (input.next) return { kind: "plan", title: input.next.dayName, programId: input.next.programId, dayPosition: input.next.dayPosition };
   if (input.paused) return null;
@@ -114,4 +157,59 @@ export function homeTiles(input: {
   if (input.streak > 0) out.push({ key: "streak", label: "Streak", value: `${input.streak} ${input.streak === 1 ? "week" : "weeks"}`, pct: null });
   if (input.nextClass) out.push({ key: "class", label: "Next class", value: input.nextClass, pct: null });
   return out;
+}
+
+export interface FeatureButton {
+  key: "meal" | "class" | "checkin" | "habits";
+  label: string;
+  line: string;
+  href: string;
+  /** A small pill beside the label. */
+  badge?: string;
+}
+
+/**
+ * The plain buttons under the tiles. A meal and a class are always there (the
+ * member app has both screens); the check-in and habits only where the business
+ * has set them up.
+ */
+export function featureButtons(input: {
+  proteinToday: number;
+  nextClass: { name: string; when: string } | null;
+  checkin: { due: boolean; daysLate: number; dueSince: string; next: string } | null;
+  habits: { done: number; total: number } | null;
+}): FeatureButton[] {
+  const out: FeatureButton[] = [
+    { key: "meal", label: "Log a meal", line: input.proteinToday > 0 ? `${Math.round(input.proteinToday)} g protein today` : "Add what you ate", href: "/app/nutrition" },
+    { key: "class", label: "Book a class", line: input.nextClass ? `${input.nextClass.name}, ${input.nextClass.when}` : "See the timetable", href: "/app/timetable" },
+  ];
+  const c = input.checkin;
+  if (c) {
+    out.push({
+      key: "checkin",
+      label: "Check-in",
+      line: c.due ? (c.daysLate === 0 ? "Takes a couple of minutes" : `Due since ${c.dueSince}`) : `Next ${c.next}`,
+      href: "/app/checkin",
+      ...(c.due ? { badge: "Due" } : {}),
+    });
+  }
+  if (input.habits && input.habits.total > 0) out.push({ key: "habits", label: "Habits", line: `${input.habits.done} of ${input.habits.total} today`, href: "/app/habits" });
+  return out;
+}
+
+/** "+6.4%", "-1.3%", "0%". */
+function signedPct(n: number): string {
+  const v = Number(n.toFixed(1));
+  return v === 0 ? "0%" : `${v > 0 ? "+" : "-"}${Math.abs(v)}%`;
+}
+
+export interface StrengthTrend {
+  value: string;
+  points: { at: number; value: number }[];
+}
+
+/** The overall strength chart: the average rise in estimated max across the lifts logged twice. Null (the chart gives way to one quiet row) with fewer than two points or no lift logged twice. */
+export function strengthTrend(points: { at: number; value: number }[], liftsLoggedTwice: number): StrengthTrend | null {
+  if (points.length < 2 || liftsLoggedTwice < 1) return null;
+  return { value: signedPct(points[points.length - 1].value), points };
 }

@@ -1,35 +1,25 @@
-import { ChevronRight } from "lucide-react";
-import Link from "next/link";
 import { memberCheckin } from "@/lib/checkins";
 import { memberHabits } from "@/lib/habits";
-import { HabitTicks } from "@/components/clientapp/HabitTicks";
-import { PushSetup } from "@/components/clientapp/PushSetup";
-import { getPrefs, vapidPublicKey } from "@/lib/push";
 import { WEEKDAYS } from "@/lib/memberChoicesModel";
 
 import { requireClientPage } from "@/lib/clientAuth";
-import { PkCard, PkSection, QuietRow } from "@/components/clientapp/programs/kit";
+import { PkSection, QuietRow } from "@/components/clientapp/programs/kit";
+import { HomeButtons } from "@/components/clientapp/home/HomeButtons";
 import { HomeHero } from "@/components/clientapp/home/HomeHero";
+import { HomeStrength } from "@/components/clientapp/home/HomeStrength";
 import { HomeTiles } from "@/components/clientapp/home/HomeTiles";
-import { clockLabel, dublinHour, greeting, heroChips, homeTiles, pickHero } from "@/components/clientapp/home/homeModel";
+import { clockLabel, dublinHour, featureButtons, greeting, heroChips, homeTiles, pickHero, roundTotal, strengthTrend } from "@/components/clientapp/home/homeModel";
 import { memberSeesPrograms } from "@/lib/programs/access";
-import { liveEnrolment, planFor, programWeek } from "@/lib/programs/enrolments";
-import { weekLabel } from "@/lib/programs/planner";
+import { enrolmentCounts, liveEnrolment, planFor, programWeek } from "@/lib/programs/enrolments";
+import { sessionCount, weekLabel } from "@/lib/programs/planner";
 import { kgToUnit } from "@/lib/programs/units";
 import { clientDashboard, clientUpcoming } from "@/lib/clientApp";
-import { dayLabel, euros } from "@/components/clientapp/ui";
+import { dayLabel } from "@/components/clientapp/ui";
 import { todayIso } from "@/lib/timetable";
 import { dailyTarget, mealsForDay } from "@/lib/meals";
-import { getManualBody, goalTarget } from "@/lib/goals";
-import { memberCycle } from "@/lib/cycle";
-import { PHASE_LABEL, statusLine } from "@/lib/cycleModel";
-import { GOAL_BY_KEY } from "@/lib/goalsModel";
-import { dayTotals, kcal } from "@/lib/mealsModel";
-import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
-import { formatChange, formatMetric } from "@/lib/inbody/metrics";
+import { dayTotals } from "@/lib/mealsModel";
 import { trainingOverview } from "@/lib/trainingOverview";
-import { dateKey, signed } from "@/lib/trainingProgress";
-import { formatSet } from "@/lib/workoutLogModel";
+import { dateKey } from "@/lib/trainingProgress";
 import { openSession } from "@/lib/workoutLog";
 
 export const dynamic = "force-dynamic";
@@ -38,33 +28,19 @@ function shortDate(ms: number) {
   return new Date(ms).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Dublin" });
 }
 
-/** Home: one glance at your week. The full session table lives on Workouts. */
+/** Home: today's session, four quick buttons and your strength. Membership, goal, body scans, cycle and notifications live on Profile. */
 export default async function ClientHome() {
   const { clientId, client, tenantId } = requireClientPage();
   const programsVisible = memberSeesPrograms({ tenantId, client, clientId });
-  const scansOn = bodyScansEnabled(tenantId);
-  const scanConsent = scansOn ? getScanProfile(clientId).consentAt !== null : false;
-  const scans = scanConsent ? listClientScans(clientId).filter((s) => Object.keys(s.metrics).length > 0) : [];
-  const latestScan = scans[0];
-  const firstScan = scans[scans.length - 1];
   const d = clientDashboard(clientId);
   const upcoming = clientUpcoming(clientId, 3);
   const t = trainingOverview(clientId);
   const today = dateKey(Date.now());
   const mealsToday = dayTotals(mealsForDay(clientId, today));
   const mealTarget = dailyTarget(clientId);
-  const goal = goalTarget(clientId);
   const checkin = memberCheckin(clientId);
   const habits = memberHabits(clientId);
-  const cycle = memberCycle(clientId);
-  // The invite shows only where the member said they're female; the Profile page offers it to everyone.
-  const inviteCycle = !cycle && getManualBody(clientId)?.sex === "female";
-  const vapid = vapidPublicKey();
   const showTraining = t.programs.length > 0 || t.totalWorkouts > 0;
-  const strengthNow = t.strength.length && t.lifts.some((l) => l.sessions > 1) ? t.strength[t.strength.length - 1].value : null;
-  const muscle = latestScan && firstScan && latestScan !== firstScan ? formatChange("smm", latestScan.metrics.smm, firstScan.metrics.smm) : null;
-  const fat = latestScan && firstScan && latestScan !== firstScan ? formatChange("pbf", latestScan.metrics.pbf, firstScan.metrics.pbf) : null;
-  const showProgress = strengthNow !== null || muscle !== null || fat !== null;
 
   // A running DIY program leads; otherwise the coach's plan does (the same rule as Workouts).
   const view = programsVisible ? liveEnrolment(clientId) : null;
@@ -93,19 +69,36 @@ export default async function ClientHome() {
               }
             : null,
           inProgress: openIsProgram,
+          sessionsDone: enrolmentCounts(diy.id).done,
+          roundTotal: roundTotal({ sessions: sessionCount(diy.template), lengthWeeks: diy.template.lengthWeeks, weeks: diy.template.weeks.length }),
         }
       : null,
     next: !diy && t.next ? { programId: t.next.programId, dayPosition: t.next.dayPosition, dayName: t.next.dayName } : null,
     programsVisible,
     paused: view?.status === "paused",
   });
+  const nextWhen = next ? `${next.date === todayIso() ? "Today" : dayLabel(next.date, { weekday: "short" })} ${clockLabel(next.startTime)}` : null;
   const tiles = homeTiles({
     protein: { got: mealsToday.protein, target: mealTarget?.protein ?? null },
     habits: habits ? { done: habits.tickedToday.size, total: habits.habits.length } : null,
     week: { done, planned },
     streak: t.streak,
-    nextClass: next ? `${next.date === todayIso() ? "Today" : dayLabel(next.date, { weekday: "short" })} ${clockLabel(next.startTime)}` : null,
+    nextClass: nextWhen,
   });
+  const buttons = featureButtons({
+    proteinToday: mealsToday.protein,
+    nextClass: next && nextWhen ? { name: next.name, when: nextWhen } : null,
+    checkin: checkin
+      ? {
+          due: checkin.due,
+          daysLate: checkin.daysLate,
+          dueSince: WEEKDAYS[checkin.weekday - 1],
+          next: new Date(`${checkin.next}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }),
+        }
+      : null,
+    habits: habits ? { done: habits.tickedToday.size, total: habits.habits.length } : null,
+  });
+  const trend = strengthTrend(t.strength, t.lifts.filter((l) => l.sessions > 1).length);
   const dateLine = new Date(now).toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Dublin" });
 
   return (
@@ -126,120 +119,19 @@ export default async function ClientHome() {
 
       <HomeTiles tiles={tiles} />
 
-      {/* what is next: the check-in when it is due, the next class, the latest best lift */}
-      <PkSection label="Coming up">
-        <div>
-          {checkin?.due && (
-            <QuietRow
-              href="/app/checkin"
-              label={checkin.daysLate === 0 ? "Weekly check-in" : `Check-in, due since ${WEEKDAYS[checkin.weekday - 1]}`}
-              value="Due"
-              icon="chevron"
-            />
-          )}
-          {next ? (
-            <QuietRow href="/app/timetable" label={`${next.name}${next.instructor ? ` with ${next.instructor}` : ""}`} value={`${dayLabel(next.date, { weekday: "short", day: "numeric" })} · ${clockLabel(next.startTime)}`} icon="chevron" />
-          ) : (
-            <QuietRow href="/app/timetable" label="No class booked" value="Browse the timetable" icon="chevron" />
-          )}
-          {showTraining && t.latestBest && (
-            <QuietRow
-              href="/app/progress"
-              label={`New best: ${t.latestBest.name} ${formatSet(t.latestBest)}`}
-              icon="chevron"
-            />
-          )}
-        </div>
-      </PkSection>
+      <HomeButtons buttons={buttons} />
 
-      {/* daily habits */}
-      {habits && (
-        <PkCard>
-          <Link href="/app/habits" className="pk-linkrow">
-            <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
-              <h2 className="pk-card-title">{habits.title}</h2>
-              <span className="pk-small">Tick them off as you go</span>
-            </div>
-            <ChevronRight size={18} className="pk-chev" aria-hidden />
-          </Link>
-          <HabitTicks habits={habits.habits} ticked={[...habits.tickedToday]} day={habits.today} streak={habits.streak} compact />
-        </PkCard>
-      )}
+      <HomeStrength trend={trend} />
 
       <div>
-        {checkin && !checkin.due && (
-          <QuietRow
-            href="/app/checkin"
-            label="Check-in done"
-            value={`Next ${new Date(`${checkin.next}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}`}
-            icon="chevron"
-          />
-        )}
-
-        <QuietRow
-          href="/app/nutrition"
-          label={mealsToday.calories > 0 ? `${kcal(mealsToday.calories)} today · ${mealsToday.protein} g protein` : "Log a meal"}
-          value={mealsToday.calories > 0 && mealTarget ? `of ${kcal(mealTarget.calories)}` : undefined}
-          icon={mealsToday.calories > 0 ? "chevron" : "plus"}
-        />
-
-        {d.weekBooked > 0 && (
-          <QuietRow label="Classes this week" value={`${d.weekAttended} of ${d.weekBooked} attended`} />
-        )}
-
-        <QuietRow
-          href="/app/membership"
-          label={d.membership ? d.membership.name : "No active membership"}
-          value={d.membership ? `${euros(d.membership.priceCents)} · ${d.membership.status}` : "Ask your coach"}
-          icon="chevron"
-        />
-
-        {(cycle || inviteCycle) && (
-          <QuietRow
-            href="/app/cycle"
-            label={
-              cycle
-                ? cycle.settings.mode === "cycle"
-                  ? `${cycle.status.phase ? `Cycle: ${PHASE_LABEL[cycle.status.phase]}` : "Cycle"} · ${statusLine(cycle.status)}`
-                  : `Cycle · ${cycle.todayLog.energy || cycle.todayLog.mood ? "Checked in today" : "How are you today?"}`
-                : "Track your cycle"
-            }
-            icon="chevron"
-          />
-        )}
-
-        <QuietRow
-          href="/app/goal"
-          label={goal ? `Goal: ${GOAL_BY_KEY[goal.goal.goal].label} · ${goal.target.protein} g protein` : "Set a goal"}
-          value={goal ? `${goal.target.calories.toLocaleString("en-IE")} kcal` : undefined}
-          icon="chevron"
-        />
-
-        {scansOn && (
-          <QuietRow
-            href="/app/body"
-            label={latestScan ? `Body scans · ${formatMetric("smm", latestScan.metrics.smm)} muscle · ${formatMetric("pbf", latestScan.metrics.pbf)} body fat` : "Body scans"}
-            value={latestScan ? formatMetric("weight", latestScan.metrics.weight) : undefined}
-            icon="chevron"
-          />
-        )}
-
-        {showProgress && (
-          <QuietRow
-            href="/app/progress"
-            label="Your progress"
-            value={strengthNow !== null && Number(strengthNow.toFixed(1)) !== 0 ? `Strength ${signed(strengthNow, "%")}` : muscle ? `Muscle ${muscle.text}` : fat ? `Body fat ${fat.text}` : undefined}
-            icon="chevron"
-          />
-        )}
-
+        {d.weekBooked > 0 && <QuietRow label="Classes this week" value={`${d.weekAttended} of ${d.weekBooked} attended`} />}
         {showTraining && (
           <QuietRow href="/app/workouts" label={t.last ? `Last workout: ${t.last.dayName}, ${t.last.sets} sets` : "Workouts"} value={t.last ? shortDate(t.last.finishedAt) : undefined} icon="chevron" />
         )}
         {showTraining && !diy && t.plan && t.plan.weekdays.length === 0 && <QuietRow href="/app/workouts/plan" label="Pick your training days" icon="chevron" />}
       </div>
 
-      {/* upcoming list: the first booking is the next-class row above */}
+      {/* the first booking is the Book a class button above */}
       {upcoming.length > 1 && (
         <PkSection label="Also booked">
           <div>
@@ -249,9 +141,6 @@ export default async function ClientHome() {
           </div>
         </PkSection>
       )}
-
-      {/* reminders: shows only until notifications are on (or can't be) */}
-      {vapid && <PushSetup vapidKey={vapid} prefs={getPrefs(clientId)} compact />}
     </div>
   );
 }
