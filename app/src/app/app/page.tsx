@@ -8,11 +8,14 @@ import { getPrefs, vapidPublicKey } from "@/lib/push";
 import { WEEKDAYS } from "@/lib/memberChoicesModel";
 
 import { requireClientPage } from "@/lib/clientAuth";
-import { MyProgramCard } from "@/components/clientapp/MyProgramCard";
-import { PkCard, PkHeader, PkSection, QuietRow, StatStrip } from "@/components/clientapp/programs/kit";
-import { liveStripItems } from "@/components/clientapp/programs/screenModel";
+import { PkCard, PkSection, QuietRow } from "@/components/clientapp/programs/kit";
+import { HomeHero } from "@/components/clientapp/home/HomeHero";
+import { HomeTiles } from "@/components/clientapp/home/HomeTiles";
+import { dublinHour, greeting, heroChips, homeTiles, pickHero } from "@/components/clientapp/home/homeModel";
 import { memberSeesPrograms } from "@/lib/programs/access";
-import { liveEnrolment, programWeek } from "@/lib/programs/enrolments";
+import { liveEnrolment, planFor, programWeek } from "@/lib/programs/enrolments";
+import { weekLabel } from "@/lib/programs/planner";
+import { kgToUnit } from "@/lib/programs/units";
 import { clientDashboard, clientUpcoming } from "@/lib/clientApp";
 import { dayLabel, euros } from "@/components/clientapp/ui";
 import { todayIso } from "@/lib/timetable";
@@ -27,7 +30,6 @@ import { formatChange, formatMetric } from "@/lib/inbody/metrics";
 import { trainingOverview } from "@/lib/trainingOverview";
 import { dateKey, signed } from "@/lib/trainingProgress";
 import { formatSet } from "@/lib/workoutLogModel";
-import { StartWorkoutButton } from "@/components/clientapp/StartWorkoutButton";
 import { openSession } from "@/lib/workoutLog";
 
 export const dynamic = "force-dynamic";
@@ -70,53 +72,84 @@ export default async function ClientHome() {
   const weekDays = diy ? programWeek(diy) : t.plan?.days ?? null;
   const planned = weekDays ? weekDays.filter((x) => x.status !== "rest").length : 0;
   const done = weekDays ? weekDays.filter((x) => x.status === "done").length : 0;
-  const thisWeek = t.weeks.at(-1)?.workouts ?? 0;
-  const sessions = planned > 0 ? { value: `${done}/${planned}`, sub: "sessions" } : { value: String(thisWeek), sub: thisWeek === 1 ? "session" : "sessions" };
-  // The program line already carries "Continue" for its own open workout, so its accent card would be a second one.
+  // Only one workout can be open at a time. The program's own open session is the hero's Continue; any other open workout is the hero instead.
   const open = diy ? openSession(clientId) : null;
   const openIsProgram = !!diy && !!open && open.enrolmentId === diy.id;
   const next = d.nextClass;
-  // A brand-new member has nothing to count yet: a number of 0 (or no class) is not shown, and with nothing left there is no strip.
-  const stripItems = liveStripItems([
-    { label: "This week", value: sessions.value, sub: sessions.sub },
-    { label: "Streak", value: String(t.streak), sub: t.streak === 1 ? "week" : "weeks" },
-    next ? { label: "Next class", value: next.date === todayIso() ? "Today" : dayLabel(next.date, { weekday: "short" }), sub: next.startTime } : null,
-  ]);
 
-  // The coach's plan row: not while a program leads or a workout is already open (its card is above).
-  const showPlanRow = !diy && !t.open && !!t.next;
+  const unit = diy?.unit ?? "kg";
+  const plan = diy ? planFor(diy) : null;
+  const now = Date.now();
+  const hero = pickHero({
+    open: t.open && !openIsProgram ? { id: t.open.id, dayName: t.open.dayName } : null,
+    program: diy
+      ? {
+          plan: plan
+            ? {
+                dayName: plan.dayName,
+                weekLabel: weekLabel(diy.template, diy.state),
+                chips: heroChips(plan.exercises, (kg) => String(kgToUnit(kg, unit))),
+                today: !!weekDays?.some((x) => x.status === "today" && x.title !== null),
+              }
+            : null,
+          inProgress: openIsProgram,
+        }
+      : null,
+    next: !diy && t.next ? { programId: t.next.programId, dayPosition: t.next.dayPosition, dayName: t.next.dayName } : null,
+    programsVisible,
+  });
+  const tiles = homeTiles({
+    protein: { got: mealsToday.protein, target: mealTarget?.protein ?? null },
+    habits: habits ? { done: habits.tickedToday.size, total: habits.habits.length } : null,
+    week: { done, planned },
+    streak: t.streak,
+    nextClass: next ? `${next.date === todayIso() ? "Today" : dayLabel(next.date, { weekday: "short" })} ${next.startTime}` : null,
+  });
+  const latestBestIsBest = !!t.latestBest && t.lifts.find((l) => l.name === t.latestBest!.name)?.best.at === t.latestBest.at;
+  const dateLine = new Date(now).toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Dublin" });
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
-      <PkHeader crumb="Welcome back" title={client.firstName} />
+      <header className="pk-greet">
+        <div className="pk-greet-date">{dateLine}</div>
+        <h1 className="pk-greet-title">{greeting(dublinHour(now), client.firstName)}</h1>
+      </header>
 
-      {t.open && !openIsProgram && (
-        <PkCard href={`/app/workouts/log/${t.open.id}`} accent>
-          <div className="pk-row">
-            <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
-              <h2 className="pk-card-title">Continue {t.open.dayName}</h2>
-              <span className="pk-small">
-                {t.open.done} of {t.open.total} sets done
-              </span>
-            </div>
-            <ChevronRight size={18} className="pk-chev" aria-hidden />
-          </div>
-        </PkCard>
-      )}
+      <HomeHero
+        hero={hero}
+        unit={unit}
+        openDetail={t.open ? `${t.open.done} of ${t.open.total} sets done` : undefined}
+        blockLine={diy?.assignedBy ? "Block finished. Your coach will set what comes next." : "Program done. Enter your new max to run it again."}
+      />
 
-      {stripItems.length > 0 && <StatStrip items={stripItems} />}
+      <HomeTiles tiles={tiles} />
 
-      {/* the one start button on the page: a running program, else the coach's next workout */}
-      {diy ? (
-        <MyProgramCard clientId={clientId} variant="line" />
-      ) : showPlanRow && t.next ? (
-        <div className="pk-row pk-row--quiet">
-          <Link href="/app/workouts" className="pk-linkrow" style={{ flex: 1, minWidth: 0 }}>
-            <span>{`Next up: ${t.next.dayName}`}</span>
-          </Link>
-          <StartWorkoutButton programId={t.next.programId} dayPosition={t.next.dayPosition} label="Start" compact />
+      {/* what is next: the check-in when it is due, the next class, the latest best lift */}
+      <PkSection label="Coming up">
+        <div>
+          {checkin?.due && (
+            <QuietRow
+              href="/app/checkin"
+              label={checkin.daysLate === 0 ? "Weekly check-in" : `Check-in, due since ${WEEKDAYS[checkin.weekday - 1]}`}
+              value="Due"
+              icon="chevron"
+            />
+          )}
+          {next ? (
+            <QuietRow href="/app/timetable" label={`${next.name}${next.instructor ? ` with ${next.instructor}` : ""}`} value={`${dayLabel(next.date, { weekday: "short", day: "numeric" })} · ${next.startTime}`} icon="chevron" />
+          ) : (
+            <QuietRow href="/app/timetable" label="No class booked" value="Browse the timetable" icon="chevron" />
+          )}
+          {showTraining && t.latestBest && (
+            <QuietRow
+              href="/app/progress"
+              label={`Latest best: ${t.latestBest.name}`}
+              value={latestBestIsBest ? `${formatSet(t.latestBest)} · Best yet` : formatSet(t.latestBest)}
+              icon="chevron"
+            />
+          )}
         </div>
-      ) : null}
+      </PkSection>
 
       {/* daily habits */}
       {habits && (
@@ -129,19 +162,6 @@ export default async function ClientHome() {
             <ChevronRight size={18} className="pk-chev" aria-hidden />
           </Link>
           <HabitTicks habits={habits.habits} ticked={[...habits.tickedToday]} day={habits.today} streak={habits.streak} compact />
-        </PkCard>
-      )}
-
-      {/* weekly check-in: a card only while it is due */}
-      {checkin?.due && (
-        <PkCard href="/app/checkin" accent>
-          <div className="pk-row">
-            <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
-              <h2 className="pk-card-title">Check-in due</h2>
-              <span className="pk-small">{checkin.daysLate === 0 ? "Due today. Takes a couple of minutes." : `Due since ${WEEKDAYS[checkin.weekday - 1]}`}</span>
-            </div>
-            <ChevronRight size={18} className="pk-chev" aria-hidden />
-          </div>
         </PkCard>
       )}
 
@@ -161,12 +181,6 @@ export default async function ClientHome() {
           value={mealsToday.calories > 0 && mealTarget ? `of ${kcal(mealTarget.calories)}` : undefined}
           icon={mealsToday.calories > 0 ? "chevron" : "plus"}
         />
-
-        {next ? (
-          <QuietRow href="/app/timetable" label={`${next.name}${next.instructor ? ` with ${next.instructor}` : ""}`} value={`${dayLabel(next.date, { weekday: "short", day: "numeric" })} · ${next.startTime}`} icon="chevron" />
-        ) : (
-          <QuietRow href="/app/timetable" label="No class booked" value="Browse the timetable" icon="chevron" />
-        )}
 
         {d.weekBooked > 0 && (
           <QuietRow label="Classes this week" value={`${d.weekAttended} of ${d.weekBooked} attended`} />
@@ -221,7 +235,6 @@ export default async function ClientHome() {
         {showTraining && (
           <QuietRow href="/app/workouts" label={t.last ? `Last workout: ${t.last.dayName}, ${t.last.sets} sets` : "Workouts"} value={t.last ? shortDate(t.last.finishedAt) : undefined} icon="chevron" />
         )}
-        {showTraining && t.latestBest && <QuietRow href="/app/progress" label={`Latest best: ${t.latestBest.name}`} value={formatSet(t.latestBest)} icon="chevron" />}
         {showTraining && !diy && t.plan && t.plan.weekdays.length === 0 && <QuietRow href="/app/workouts/plan" label="Pick your training days" icon="chevron" />}
       </div>
 

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { startProgramSessionAction } from "@/app/app/programs/actions";
 
 /** Opens the member's next program session in the logger (or the one already open). */
-export function StartProgramSessionButton({ label, compact, tall }: { label: string; compact?: boolean; tall?: boolean }) {
+export function StartProgramSessionButton({ label, compact, tall, className }: { label: string; compact?: boolean; tall?: boolean; className?: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
 
@@ -24,7 +24,7 @@ export function StartProgramSessionButton({ label, compact, tall }: { label: str
   }
 
   return (
-    <Button onClick={go} loading={pending} style={compact ? { width: "auto", height: 44, flexShrink: 0 } : tall ? { width: "100%", height: 44 } : { width: "100%" }}>
+    <Button className={className} onClick={go} loading={pending} style={compact ? { width: "auto", height: 44, flexShrink: 0 } : tall ? { width: "100%", height: 44 } : { width: "100%" }}>
       <Play size={16} /> {label}
     </Button>
   );
