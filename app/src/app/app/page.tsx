@@ -11,7 +11,7 @@ import { requireClientPage } from "@/lib/clientAuth";
 import { PkCard, PkSection, QuietRow } from "@/components/clientapp/programs/kit";
 import { HomeHero } from "@/components/clientapp/home/HomeHero";
 import { HomeTiles } from "@/components/clientapp/home/HomeTiles";
-import { dublinHour, greeting, heroChips, homeTiles, pickHero } from "@/components/clientapp/home/homeModel";
+import { clockLabel, dublinHour, greeting, heroChips, homeTiles, pickHero } from "@/components/clientapp/home/homeModel";
 import { memberSeesPrograms } from "@/lib/programs/access";
 import { liveEnrolment, planFor, programWeek } from "@/lib/programs/enrolments";
 import { weekLabel } from "@/lib/programs/planner";
@@ -97,15 +97,15 @@ export default async function ClientHome() {
       : null,
     next: !diy && t.next ? { programId: t.next.programId, dayPosition: t.next.dayPosition, dayName: t.next.dayName } : null,
     programsVisible,
+    paused: view?.status === "paused",
   });
   const tiles = homeTiles({
     protein: { got: mealsToday.protein, target: mealTarget?.protein ?? null },
     habits: habits ? { done: habits.tickedToday.size, total: habits.habits.length } : null,
     week: { done, planned },
     streak: t.streak,
-    nextClass: next ? `${next.date === todayIso() ? "Today" : dayLabel(next.date, { weekday: "short" })} ${next.startTime}` : null,
+    nextClass: next ? `${next.date === todayIso() ? "Today" : dayLabel(next.date, { weekday: "short" })} ${clockLabel(next.startTime)}` : null,
   });
-  const latestBestIsBest = !!t.latestBest && t.lifts.find((l) => l.name === t.latestBest!.name)?.best.at === t.latestBest.at;
   const dateLine = new Date(now).toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Dublin" });
 
   return (
@@ -115,12 +115,14 @@ export default async function ClientHome() {
         <h1 className="pk-greet-title">{greeting(dublinHour(now), client.firstName)}</h1>
       </header>
 
-      <HomeHero
-        hero={hero}
-        unit={unit}
-        openDetail={t.open ? `${t.open.done} of ${t.open.total} sets done` : undefined}
-        blockLine={diy?.assignedBy ? "Block finished. Your coach will set what comes next." : "Program done. Enter your new max to run it again."}
-      />
+      {hero && (
+        <HomeHero
+          hero={hero}
+          unit={unit}
+          openDetail={t.open ? `${t.open.done} of ${t.open.total} sets done` : undefined}
+          blockLine={diy?.assignedBy ? "Block finished. Your coach will set what comes next." : "Program done. Enter your new max to run it again."}
+        />
+      )}
 
       <HomeTiles tiles={tiles} />
 
@@ -136,15 +138,14 @@ export default async function ClientHome() {
             />
           )}
           {next ? (
-            <QuietRow href="/app/timetable" label={`${next.name}${next.instructor ? ` with ${next.instructor}` : ""}`} value={`${dayLabel(next.date, { weekday: "short", day: "numeric" })} · ${next.startTime}`} icon="chevron" />
+            <QuietRow href="/app/timetable" label={`${next.name}${next.instructor ? ` with ${next.instructor}` : ""}`} value={`${dayLabel(next.date, { weekday: "short", day: "numeric" })} · ${clockLabel(next.startTime)}`} icon="chevron" />
           ) : (
             <QuietRow href="/app/timetable" label="No class booked" value="Browse the timetable" icon="chevron" />
           )}
           {showTraining && t.latestBest && (
             <QuietRow
               href="/app/progress"
-              label={`Latest best: ${t.latestBest.name}`}
-              value={latestBestIsBest ? `${formatSet(t.latestBest)} · Best yet` : formatSet(t.latestBest)}
+              label={`New best: ${t.latestBest.name} ${formatSet(t.latestBest)}`}
               icon="chevron"
             />
           )}
@@ -227,7 +228,7 @@ export default async function ClientHome() {
           <QuietRow
             href="/app/progress"
             label="Your progress"
-            value={strengthNow !== null ? `Strength ${signed(strengthNow, "%")}` : muscle ? `Muscle ${muscle.text}` : fat ? `Body fat ${fat.text}` : undefined}
+            value={strengthNow !== null && Number(strengthNow.toFixed(1)) !== 0 ? `Strength ${signed(strengthNow, "%")}` : muscle ? `Muscle ${muscle.text}` : fat ? `Body fat ${fat.text}` : undefined}
             icon="chevron"
           />
         )}
@@ -243,7 +244,7 @@ export default async function ClientHome() {
         <PkSection label="Also booked">
           <div>
             {upcoming.slice(1).map((b) => (
-              <QuietRow key={b.bookingId} href="/app/timetable" label={b.name} value={`${dayLabel(b.date, { weekday: "short", day: "numeric" })} · ${b.startTime}`} icon="chevron" />
+              <QuietRow key={b.bookingId} href="/app/timetable" label={b.name} value={`${dayLabel(b.date, { weekday: "short", day: "numeric" })} · ${clockLabel(b.startTime)}`} icon="chevron" />
             ))}
           </div>
         </PkSection>

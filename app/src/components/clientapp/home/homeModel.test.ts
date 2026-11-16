@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { initState } from "@/lib/programs/engines";
 import { planSession } from "@/lib/programs/planner";
 import { wendlerBbb } from "@/lib/programs/templates/wendler";
-import { greeting, heroChips, homeTiles, pickHero, dublinHour } from "./homeModel";
+import { clockLabel, greeting, heroChips, homeTiles, pickHero, dublinHour } from "./homeModel";
 
 // greeting by hour, and a plain one without a name
 assert.equal(greeting(6, "Chris"), "Morning, Chris");
@@ -21,6 +21,14 @@ assert.equal(greeting(22, "  "), "Good evening");
 // Dublin time: 23:30 UTC in July is already 00:30 the next day there
 assert.equal(dublinHour(Date.UTC(2026, 6, 1, 23, 30)), 0);
 assert.equal(dublinHour(Date.UTC(2026, 0, 1, 23, 30)), 23);
+
+// clock times as Irish clocks read them
+assert.equal(clockLabel("18:30"), "6:30pm");
+assert.equal(clockLabel("06:05"), "6:05am");
+assert.equal(clockLabel("18:00"), "6pm");
+assert.equal(clockLabel("12:00"), "12pm");
+assert.equal(clockLabel("00:15"), "12:15am");
+assert.equal(clockLabel("soon"), "soon");
 
 // the main lift's top sets as chips, from a real 5/3/1 session: week 1, deadlift day
 const kg = (n: number) => String(n);
@@ -92,15 +100,22 @@ const cases = [
   { name: "open workout beats a program start", in: { ...none, open: { id: 9, dayName: "Legs" }, program: { plan: planDay, inProgress: false } }, want: { kind: "open", title: "Legs", sessionId: 9 } },
   { name: "program beats a coach plan", in: { ...none, program: { plan: planDay, inProgress: false }, next: { programId: 4, dayPosition: 2, dayName: "Legs" } }, want: { kind: "program" } },
   { name: "nothing, programs on", in: none, want: { kind: "empty", programsVisible: true } },
+  { name: "paused program, nothing else: no hero", in: { ...none, paused: true }, want: null },
+  { name: "paused program with a coach plan still shows the plan", in: { ...none, paused: true, next: { programId: 4, dayPosition: 2, dayName: "Legs" } }, want: { kind: "plan" } },
   { name: "nothing, programs off", in: { ...none, programsVisible: false }, want: { kind: "empty", programsVisible: false } },
 ] as const;
 for (const c of cases) {
   const got = pickHero(c.in);
+  if (c.want === null) {
+    assert.equal(got, null, c.name);
+    continue;
+  }
+  assert.ok(got, c.name);
   assert.equal(got.kind, c.want.kind, c.name);
   for (const [k, v] of Object.entries(c.want)) assert.deepEqual((got as unknown as Record<string, unknown>)[k], v, `${c.name}: ${k}`);
 }
 const programHero = pickHero({ ...none, program: { plan: planDay, inProgress: false } });
-assert.ok(programHero.kind === "program" && programHero.chips.length === 3, "the program hero carries its chips");
+assert.ok(programHero && programHero.kind === "program" && programHero.chips.length === 3, "the program hero carries its chips");
 
 // tiles: only real data, in order, never a zero
 const all = { protein: { got: 92, target: 160 }, habits: { done: 2, total: 3 }, week: { done: 1, planned: 4 }, streak: 3, nextClass: "Wed 6:30pm" };
@@ -121,11 +136,12 @@ assert.equal(tiles[4].value, "Wed 6:30pm");
 assert.equal(tiles[4].pct, null);
 assert.equal(homeTiles({ ...all, streak: 1 }).find((t) => t.key === "streak")?.value, "1 week");
 assert.equal(homeTiles({ ...all, protein: { got: 200, target: 160 } })[0].pct, 1, "the bar stops at full");
-assert.equal(homeTiles({ ...all, protein: { got: 0, target: 160 } })[0].value, "0 / 160 g", "a target with nothing logged yet is still a real tile");
+assert.ok(!homeTiles({ ...all, protein: { got: 0, target: 160 } }).some((t) => t.key === "protein"), "nothing logged today, no protein tile");
 assert.ok(!homeTiles({ ...all, streak: 0 }).some((t) => t.key === "streak"), "no zero streak");
 assert.ok(!homeTiles({ ...all, protein: { got: 50, target: 0 } }).some((t) => t.key === "protein"), "no target, no protein tile");
 assert.ok(!homeTiles({ ...all, protein: { got: 50, target: null } }).some((t) => t.key === "protein"));
 assert.ok(!homeTiles({ ...all, week: { done: 0, planned: 0 } }).some((t) => t.key === "week"), "nothing planned, no week tile");
+assert.ok(!homeTiles({ ...all, week: { done: 0, planned: 4 } }).some((t) => t.key === "week"), "nothing done yet, no week tile");
 assert.ok(!homeTiles({ ...all, habits: { done: 0, total: 0 } }).some((t) => t.key === "habits"));
 assert.ok(homeTiles({ ...all, habits: { done: 0, total: 3 } }).some((t) => t.key === "habits"), "0 of 3 is a count of habits to do");
 assert.ok(!homeTiles({ ...all, nextClass: null }).some((t) => t.key === "class"));
