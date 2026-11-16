@@ -184,34 +184,25 @@ assert.equal(strengthTrend(pts, 0), null, "no lift logged twice, no trend");
 assert.equal(strengthTrend([{ at: 1, value: 0 }, { at: 2, value: 0 }], 1)?.value, "0%");
 assert.equal(strengthTrend([{ at: 1, value: 2 }, { at: 2, value: -1.25 }], 1)?.value, "-1.3%");
 
-// tiles: only real data, in order, never a zero
-const all = { protein: { got: 92, target: 160 }, habits: { done: 2, total: 3 }, week: { done: 1, planned: 4 }, streak: 3, nextClass: "Wed 6:30pm" };
+// tiles: this week and the streak only (the buttons carry protein, habits and the next class), never a zero
+const all = { week: { done: 1, planned: 4 }, streak: 3 };
 const tiles = homeTiles(all);
 assert.deepEqual(
   tiles.map((t) => t.key),
-  ["protein", "habits", "week", "streak", "class"],
+  ["week", "streak"],
+  "only two tiles exist, in this order",
 );
-assert.equal(tiles[0].value, "92 / 160 g");
-assert.equal(tiles[0].pct, 92 / 160);
-assert.equal(tiles[1].value, "2 of 3");
-assert.equal(tiles[1].pct, 2 / 3);
-assert.equal(tiles[2].value, "1 of 4");
-assert.equal(tiles[2].pct, 0.25);
-assert.equal(tiles[3].value, "3 weeks");
-assert.equal(tiles[3].pct, null);
-assert.equal(tiles[4].value, "Wed 6:30pm");
-assert.equal(tiles[4].pct, null);
+assert.equal(tiles[0].value, "1 of 4");
+assert.equal(tiles[0].pct, 0.25);
+assert.equal(tiles[1].value, "3 weeks");
+assert.equal(tiles[1].pct, null);
 assert.equal(homeTiles({ ...all, streak: 1 }).find((t) => t.key === "streak")?.value, "1 week");
-assert.equal(homeTiles({ ...all, protein: { got: 200, target: 160 } })[0].pct, 1, "the bar stops at full");
-assert.ok(!homeTiles({ ...all, protein: { got: 0, target: 160 } }).some((t) => t.key === "protein"), "nothing logged today, no protein tile");
-assert.ok(!homeTiles({ ...all, streak: 0 }).some((t) => t.key === "streak"), "no zero streak");
-assert.ok(!homeTiles({ ...all, protein: { got: 50, target: 0 } }).some((t) => t.key === "protein"), "no target, no protein tile");
-assert.ok(!homeTiles({ ...all, protein: { got: 50, target: null } }).some((t) => t.key === "protein"));
-assert.ok(!homeTiles({ ...all, week: { done: 0, planned: 0 } }).some((t) => t.key === "week"), "nothing planned, no week tile");
-assert.ok(!homeTiles({ ...all, week: { done: 0, planned: 4 } }).some((t) => t.key === "week"), "nothing done yet, no week tile");
-assert.ok(!homeTiles({ ...all, habits: { done: 0, total: 0 } }).some((t) => t.key === "habits"));
-assert.ok(homeTiles({ ...all, habits: { done: 0, total: 3 } }).some((t) => t.key === "habits"), "0 of 3 is a count of habits to do");
-assert.ok(!homeTiles({ ...all, nextClass: null }).some((t) => t.key === "class"));
-assert.deepEqual(homeTiles({ protein: null, habits: null, week: null, streak: 0, nextClass: null }), []);
+assert.equal(homeTiles({ week: { done: 9, planned: 4 }, streak: 0 })[0].pct, 1, "the bar stops at full");
+assert.deepEqual(homeTiles({ ...all, streak: 0 }).map((t) => t.key), ["week"], "no zero streak");
+assert.deepEqual(homeTiles({ ...all, week: { done: 0, planned: 4 } }).map((t) => t.key), ["streak"], "nothing done yet, no week tile");
+assert.deepEqual(homeTiles({ ...all, week: { done: 0, planned: 0 } }).map((t) => t.key), ["streak"], "nothing planned, no week tile");
+assert.deepEqual(homeTiles({ ...all, week: { done: 2, planned: 0 } }).map((t) => t.key), ["streak"], "done with nothing planned is not \"2 of 0\"");
+assert.deepEqual(homeTiles({ ...all, week: null }).map((t) => t.key), ["streak"]);
+assert.deepEqual(homeTiles({ week: null, streak: 0 }), []);
 
 console.log("home model: ok");

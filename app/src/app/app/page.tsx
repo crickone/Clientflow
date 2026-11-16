@@ -3,7 +3,7 @@ import { memberHabits } from "@/lib/habits";
 import { WEEKDAYS } from "@/lib/memberChoicesModel";
 
 import { requireClientPage } from "@/lib/clientAuth";
-import { PkSection, QuietRow } from "@/components/clientapp/programs/kit";
+import { QuietRow } from "@/components/clientapp/programs/kit";
 import { HomeButtons } from "@/components/clientapp/home/HomeButtons";
 import { HomeHero } from "@/components/clientapp/home/HomeHero";
 import { HomeStrength } from "@/components/clientapp/home/HomeStrength";
@@ -13,10 +13,10 @@ import { memberSeesPrograms } from "@/lib/programs/access";
 import { enrolmentCounts, liveEnrolment, planFor, programWeek } from "@/lib/programs/enrolments";
 import { sessionCount, weekLabel } from "@/lib/programs/planner";
 import { kgToUnit } from "@/lib/programs/units";
-import { clientDashboard, clientUpcoming } from "@/lib/clientApp";
+import { clientDashboard } from "@/lib/clientApp";
 import { dayLabel } from "@/components/clientapp/ui";
 import { todayIso } from "@/lib/timetable";
-import { dailyTarget, mealsForDay } from "@/lib/meals";
+import { mealsForDay } from "@/lib/meals";
 import { dayTotals } from "@/lib/mealsModel";
 import { trainingOverview } from "@/lib/trainingOverview";
 import { dateKey } from "@/lib/trainingProgress";
@@ -24,23 +24,16 @@ import { openSession } from "@/lib/workoutLog";
 
 export const dynamic = "force-dynamic";
 
-function shortDate(ms: number) {
-  return new Date(ms).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Dublin" });
-}
-
 /** Home: today's session, four quick buttons and your strength. Membership, goal, body scans, cycle and notifications live on Profile. */
 export default async function ClientHome() {
   const { clientId, client, tenantId } = requireClientPage();
   const programsVisible = memberSeesPrograms({ tenantId, client, clientId });
   const d = clientDashboard(clientId);
-  const upcoming = clientUpcoming(clientId, 3);
   const t = trainingOverview(clientId);
   const today = dateKey(Date.now());
   const mealsToday = dayTotals(mealsForDay(clientId, today));
-  const mealTarget = dailyTarget(clientId);
   const checkin = memberCheckin(clientId);
   const habits = memberHabits(clientId);
-  const showTraining = t.programs.length > 0 || t.totalWorkouts > 0;
 
   // A running DIY program leads; otherwise the coach's plan does (the same rule as Workouts).
   const view = programsVisible ? liveEnrolment(clientId) : null;
@@ -78,13 +71,7 @@ export default async function ClientHome() {
     paused: view?.status === "paused",
   });
   const nextWhen = next ? `${next.date === todayIso() ? "Today" : dayLabel(next.date, { weekday: "short" })} ${clockLabel(next.startTime)}` : null;
-  const tiles = homeTiles({
-    protein: { got: mealsToday.protein, target: mealTarget?.protein ?? null },
-    habits: habits ? { done: habits.tickedToday.size, total: habits.habits.length } : null,
-    week: { done, planned },
-    streak: t.streak,
-    nextClass: nextWhen,
-  });
+  const tiles = homeTiles({ week: { done, planned }, streak: t.streak });
   const buttons = featureButtons({
     proteinToday: mealsToday.protein,
     nextClass: next && nextWhen ? { name: next.name, when: nextWhen } : null,
@@ -123,24 +110,7 @@ export default async function ClientHome() {
 
       <HomeStrength trend={trend} />
 
-      <div>
-        {d.weekBooked > 0 && <QuietRow label="Classes this week" value={`${d.weekAttended} of ${d.weekBooked} attended`} />}
-        {showTraining && (
-          <QuietRow href="/app/workouts" label={t.last ? `Last workout: ${t.last.dayName}, ${t.last.sets} sets` : "Workouts"} value={t.last ? shortDate(t.last.finishedAt) : undefined} icon="chevron" />
-        )}
-        {showTraining && !diy && t.plan && t.plan.weekdays.length === 0 && <QuietRow href="/app/workouts/plan" label="Pick your training days" icon="chevron" />}
-      </div>
-
-      {/* the first booking is the Book a class button above */}
-      {upcoming.length > 1 && (
-        <PkSection label="Also booked">
-          <div>
-            {upcoming.slice(1).map((b) => (
-              <QuietRow key={b.bookingId} href="/app/timetable" label={b.name} value={`${dayLabel(b.date, { weekday: "short", day: "numeric" })} · ${clockLabel(b.startTime)}`} icon="chevron" />
-            ))}
-          </div>
-        </PkSection>
-      )}
+      {d.weekBooked > 0 && <QuietRow label="Classes this week" value={`${d.weekAttended} of ${d.weekBooked} attended`} />}
     </div>
   );
 }

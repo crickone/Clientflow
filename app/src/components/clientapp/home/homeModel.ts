@@ -130,7 +130,7 @@ export function pickHero(input: {
 }
 
 export interface Tile {
-  key: "protein" | "habits" | "week" | "streak" | "class";
+  key: "week" | "streak";
   label: string;
   value: string;
   /** How far along, 0 to 1, or null where there is no target. */
@@ -139,23 +139,12 @@ export interface Tile {
 
 const fraction = (done: number, of: number): number => Math.min(1, Math.max(0, of > 0 ? done / of : 0));
 
-/** Only tiles with real data, in this order: protein, habits, week, streak, class. A tile that would read zero (nothing logged, nothing done yet) is left out. */
-export function homeTiles(input: {
-  protein: { got: number; target: number | null } | null;
-  habits: { done: number; total: number } | null;
-  week: { done: number; planned: number } | null;
-  streak: number;
-  nextClass: string | null;
-}): Tile[] {
+/** The tiles under the card: this week's sessions and the streak. A tile that would read zero (nothing done yet, no streak) is left out. */
+export function homeTiles(input: { week: { done: number; planned: number } | null; streak: number }): Tile[] {
   const out: Tile[] = [];
-  const { protein, habits, week } = input;
-  if (protein && protein.target !== null && protein.target > 0 && protein.got > 0) {
-    out.push({ key: "protein", label: "Protein today", value: `${Math.round(protein.got)} / ${Math.round(protein.target)} g`, pct: fraction(protein.got, protein.target) });
-  }
-  if (habits && habits.total > 0) out.push({ key: "habits", label: "Habits", value: `${habits.done} of ${habits.total}`, pct: fraction(habits.done, habits.total) });
+  const { week } = input;
   if (week && week.planned > 0 && week.done > 0) out.push({ key: "week", label: "This week", value: `${week.done} of ${week.planned}`, pct: fraction(week.done, week.planned) });
   if (input.streak > 0) out.push({ key: "streak", label: "Streak", value: `${input.streak} ${input.streak === 1 ? "week" : "weeks"}`, pct: null });
-  if (input.nextClass) out.push({ key: "class", label: "Next class", value: input.nextClass, pct: null });
   return out;
 }
 
