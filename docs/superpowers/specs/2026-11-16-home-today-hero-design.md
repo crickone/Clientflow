@@ -63,3 +63,28 @@ With three or more tiles the row scrolls sideways (scroll-snap, no visible scrol
   - Optimal Health (light) and Inspire (dark) at 320px and 390px;
   - three members: a new member, day 1 of a program, and logged sessions;
   - dev data only, restored afterwards.
+
+## Revision, 2026-11-16 (after the first version went live)
+
+The user asked for a cleaner Home. These decisions are from the visual companion: mockups `home-v2.html` and `hero-options.html`, option 2.
+
+- **Hero: the "program ring" card.**
+  - A white card (`--surface-1` or the kit's card surface, not the brand gradient).
+  - Left: a ring showing how far through the program the member is. The centre number is sessions done; the line below says "of N done". N is the round total My program already uses; past the total, the ring is full and shows "N done".
+  - Right: the eyebrow "Today · Week N" (or "Next up · Week N"), the day name in large type, and the main lift's sets as a tidy list: "Set 1 / 112.5 x 5", "Set 2 / 127.5 x 3", then the top or + set labelled "Top set" in the accent colour.
+  - A full-width filled accent "Start session" (or "Continue session") button.
+  - The other states (coach plan, open workout, block done, empty) use the same white card without the ring. Paused members still get no empty hero.
+- **Tiles:** kept, with the same no-zero rules.
+- **Feature buttons:** a 2 x 2 grid of plain buttons with no icons and no letters. Each has a bold label and a small line under it, and shows only when that feature is on.
+  - Log a meal: protein today, when logged.
+  - Book a class: the next booked class in 12-hour time, else "See the timetable".
+  - Check-in: a "Due" badge when due, else the next date.
+  - Habits: "N of M today".
+- **Overall strength chart:** under the buttons. The big % change, the line from `trainingOverview(...).strength` (the series the Progress page uses, via its `TrendChart` or the kit's plain SVG), and the caption "Average estimated max across your main lifts". With fewer than two points it is one QuietRow: "Log a lift twice to see your strength trend". It links to `/app/progress`.
+- **Removed from Home:** the Coming up section, the habit-ticks card (now the Habits button), and the rows for membership, goal, body scans, cycle tracking and notifications. These move to Profile (`/app/profile`) as QuietRows with their existing gates and copy, and PushSetup moves too. Nothing is lost; it is only moved.
+- **Rules unchanged:**
+  - one filled accent button (the hero's);
+  - no zero tiles;
+  - brand variables only;
+  - 44px, 320px;
+  - no emojis.
