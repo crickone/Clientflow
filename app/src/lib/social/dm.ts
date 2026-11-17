@@ -9,8 +9,10 @@ import { GRAPH_BASE, metaApiError } from "@/lib/facebook/graph";
 import { notePageRefusal } from "@/lib/facebook/health";
 import { getPageTokenForTenant } from "@/lib/facebook/pages";
 import type { MessagingEvent } from "@/lib/facebook/webhook";
-import { addMessage, findLeadMessageByProviderId, setLeadStatus, upsertLead } from "@/lib/leads";
+import { addMessage, fillLeadContact, findLeadMessageByProviderId, setLeadStatus, upsertLead } from "@/lib/leads";
+import { hasFormDetails, parseFormDetails } from "./formDetails";
 import { addClientMessage, findClientMessageByProviderId } from "@/lib/clientMessages";
+import { splitFullName } from "@/lib/humanName";
 import { logActivity } from "@/lib/queries";
 
 /**
@@ -132,7 +134,22 @@ export async function recordDmEvent(ev: MessagingEvent, page: { pageId: string; 
   if (ev.isEcho) return null;
 
   db.update(socialContacts).set({ lastInboundAt: sentAt }).where(eq(socialContacts.id, contact.id)).run();
-  if (owner.ownerType === "lead") setLeadStatus(owner.ownerId, "replied");
+  if (owner.ownerType === "lead") {
+    setLeadStatus(owner.ownerId, "replied");
+    // A click-to-Messenger ad form arrives as "Full name: ... / Email: ... / Phone number: ..." in the message itself.
+    const form = parseFormDetails(ev.text);
+    if (hasFormDetails(form)) fillLeadContact(owner.ownerId, form);
+    // The first profile lookup can fail (Meta's name access, a slow API): try again while we still have no name.
+    if (!contact.name && !created) {
+      const profile = await fetchProfile(ev.channel, ev.customerId, page.pageAccessToken);
+      const display = profile.name || [profile.firstName, profile.lastName].filter(Boolean).join(" ") || profile.username || null;
+      if (display) {
+        db.update(socialContacts).set({ name: display, username: profile.username ?? contact.username ?? null }).where(eq(socialContacts.id, contact.id)).run();
+        const split = profile.firstName ? { firstName: profile.firstName, lastName: profile.lastName ?? null } : splitFullName(profile.name);
+        fillLeadContact(owner.ownerId, split);
+      }
+    }
+  }
   await logActivity(
     `${ev.channel}.inbound`,
     `${CHANNEL_LABEL[ev.channel]} message from ${contact.name ?? contact.username ?? "a new contact"}`,

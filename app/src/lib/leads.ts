@@ -264,6 +264,29 @@ export function setLeadStatus(id: number, status: LeadStatus) {
     .run();
 }
 
+/**
+ * Fill a lead's name, email or phone only where it is still empty: details
+ * read later (a form answer in a DM, a profile lookup that finally worked)
+ * never overwrite what the lead or a staff member already set. True when
+ * something was filled.
+ */
+export function fillLeadContact(leadId: number, d: { firstName?: string | null; lastName?: string | null; email?: string | null; phone?: string | null }): boolean {
+  const cur = db.select({ firstName: leads.firstName, lastName: leads.lastName, email: leads.email, phone: leads.phone }).from(leads).where(eq(leads.id, leadId)).get();
+  if (!cur) return false;
+  const set: Partial<{ firstName: string; lastName: string; email: string; phone: string }> = {};
+  const empty = (v: string | null) => !v || !v.trim();
+  // A name is filled as a pair: a lead that has a first name keeps its own last name too.
+  if (empty(cur.firstName) && empty(cur.lastName) && d.firstName) {
+    set.firstName = d.firstName;
+    if (d.lastName) set.lastName = d.lastName;
+  }
+  if (empty(cur.email) && d.email) set.email = d.email;
+  if (empty(cur.phone) && d.phone) set.phone = d.phone;
+  if (Object.keys(set).length === 0) return false;
+  db.update(leads).set({ ...set, updatedAt: new Date() }).where(eq(leads.id, leadId)).run();
+  return true;
+}
+
 /** Append a line to a lead's notes — a repeat enquiry from the same contact adds to the one card rather than being dropped. */
 export function appendLeadNotes(leadId: number, line: string): void {
   const existing = db.select({ notes: leads.notes }).from(leads).where(eq(leads.id, leadId)).get();
