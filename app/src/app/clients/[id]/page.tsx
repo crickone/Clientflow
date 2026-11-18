@@ -676,6 +676,7 @@ export default async function ClientProfile(
             availableNutrition={availNut}
             assignedWorkouts={assignedWk}
             availableWorkouts={availWk}
+            library={programsEnabled ? { runningName: programPanel?.live?.name ?? null, coachSet: programPanel?.live?.coachSet ?? false } : null}
           />
         </TabsContent>
       </Tabs>

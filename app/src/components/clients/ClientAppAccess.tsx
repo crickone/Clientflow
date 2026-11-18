@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Dumbbell, KeyRound, Plus, Salad, Send, Smartphone, Trash2, X } from "lucide-react";
+import { ChevronRight, Dumbbell, KeyRound, Plus, Salad, Send, Smartphone, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/Badge";
@@ -44,6 +45,7 @@ export function ClientAppAccess({
   availableNutrition,
   assignedWorkouts,
   availableWorkouts,
+  library = null,
 }: {
   clientId: number;
   clientEmail: string | null;
@@ -52,6 +54,8 @@ export function ClientAppAccess({
   availableNutrition: Item[];
   assignedWorkouts: Item[];
   availableWorkouts: Item[];
+  /** Set when Programs is on: the program library (5/3/1, GZCLP...) lives on its own page. */
+  library?: { runningName: string | null; coachSet: boolean } | null;
 }) {
   return (
     <div className="ca-grid">
@@ -73,6 +77,7 @@ export function ClientAppAccess({
         available={availableWorkouts}
         onAssign={assignWorkoutAction}
         onUnassign={unassignWorkoutAction}
+        footer={library ? <LibraryLink clientId={clientId} runningName={library.runningName} coachSet={library.coachSet} /> : null}
       />
     </div>
   );
@@ -203,6 +208,7 @@ function AssignCard({
   available,
   onAssign,
   onUnassign,
+  footer = null,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -211,6 +217,7 @@ function AssignCard({
   available: Item[];
   onAssign: (clientId: number, itemId: number) => Promise<void>;
   onUnassign: (clientId: number, itemId: number) => Promise<void>;
+  footer?: React.ReactNode;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -267,7 +274,27 @@ function AssignCard({
           <Plus size={14} /> Assign
         </Button>
       </div>
+      {footer}
     </div>
+  );
+}
+
+/** The way into the program library from the Client app tab. */
+function LibraryLink({ clientId, runningName, coachSet }: { clientId: number; runningName: string | null; coachSet: boolean }) {
+  // Only a coach-set program opens in the editor; one the member started can be replaced from the library.
+  const href = runningName && coachSet ? `/clients/${clientId}/program/edit` : `/clients/${clientId}/program/assign`;
+  const sub = !runningName ? "5/3/1, GZCLP, Texas Method and the rest" : coachSet ? "Library program running. Edit it" : "Started by the member. Set a different one";
+  return (
+    <Link
+      href={href}
+      style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 44, padding: "10px 12px", marginTop: 4, border: "1px solid var(--hairline)", borderRadius: "var(--radius)", textDecoration: "none", color: "inherit" }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-primary)" }}>{runningName ? runningName : "Set a program from the library"}</div>
+        <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{sub}</div>
+      </div>
+      <ChevronRight size={16} style={{ color: "var(--text-tertiary)" }} />
+    </Link>
   );
 }
 
