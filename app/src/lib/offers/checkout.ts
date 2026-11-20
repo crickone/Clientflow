@@ -2,7 +2,7 @@ import "server-only";
 
 import { runWithTenant } from "@/lib/db/tenant";
 import { createCheckoutSession } from "@/lib/stripe/api";
-import { getStripeConnection } from "@/lib/stripe/connection";
+import { canTakePayments, getStripeConnection } from "@/lib/stripe/connection";
 import { formatEur } from "./model";
 import { createPendingOrder, getOffer, setOrderSession, setOrderStatus } from "./store";
 import type { Arrival } from "@/lib/arrival";
@@ -22,7 +22,7 @@ export async function startCheckout(
   checkoutEventId: string | null = null,
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const conn = getStripeConnection(claim.tenantId);
-  if (!conn) return { ok: false, error: "Online payments aren't set up for this business yet." };
+  if (!conn || !canTakePayments(conn)) return { ok: false, error: "Online payments aren't set up for this business yet." };
 
   return runWithTenant(claim.tenantId, async () => {
     const offer = getOffer(claim.offerId);

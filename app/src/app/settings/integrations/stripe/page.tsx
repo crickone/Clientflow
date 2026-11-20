@@ -9,12 +9,11 @@ export const dynamic = "force-dynamic";
 
 const ERRORS: Record<string, string> = {
   cancelled: "Stripe wasn't connected: the connection was cancelled.",
-  state_mismatch: "Stripe wasn't connected: that link was for a different account or had expired. Try again.",
   not_configured: "Online payments aren't switched on for the platform yet.",
-  missing_code: "Stripe didn't send the connection back. Try again.",
+  not_connected: "Stripe isn't connected yet. Click Connect with Stripe to start.",
 };
 
-export default async function StripeSettingsPage(props: { searchParams: Promise<{ connected?: string; error?: string }> }) {
+export default async function StripeSettingsPage(props: { searchParams: Promise<{ connected?: string; unfinished?: string; error?: string }> }) {
   const searchParams = await props.searchParams;
   await requireAdminPage();
   const tenantId = getCurrentMembership()!.tenant.id;
@@ -27,6 +26,7 @@ export default async function StripeSettingsPage(props: { searchParams: Promise<
         configured={stripeConfigured()}
         connection={conn ? { accountId: conn.accountId, displayName: conn.displayName, email: conn.email, chargesEnabled: conn.chargesEnabled, livemode: conn.livemode, connectedAt: conn.connectedAt } : null}
         justConnected={searchParams.connected === "1"}
+        unfinished={searchParams.unfinished === "1"}
         error={error}
         offersOnSale={conn ? countOffersOnSale() : 0}
         recent={conn ? listRecentOrders(5).map((o) => ({ id: o.id, name: o.name || o.email || "Buyer", offer: o.offerTitle, amountCents: o.amountCents, at: o.paidAt ?? o.createdAt, refunded: o.status === "refunded", clientId: o.clientId })) : []}

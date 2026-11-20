@@ -14,12 +14,16 @@ export interface StripeSettingsProps {
   configured: boolean;
   connection: { accountId: string; displayName: string | null; email: string | null; chargesEnabled: boolean; livemode: boolean; connectedAt: number } | null;
   justConnected: boolean;
+  /** Back from Stripe's onboarding without finishing it. */
+  unfinished: boolean;
   error: string | null;
   offersOnSale: number;
   recent: { id: number; name: string; offer: string; amountCents: number; at: number; refunded: boolean; clientId: number | null }[];
 }
 
 const STRIPE_SETTINGS = "https://dashboard.stripe.com/settings/account";
+/** Makes a fresh link to Stripe's onboarding. A plain link, never a prefetching one: each visit asks Stripe for a new link. */
+const CONTINUE_IN_STRIPE = "/api/stripe/connect";
 
 function shortDate(ms: number) {
   return new Date(ms).toLocaleDateString("en-IE", { day: "numeric", month: "short", timeZone: "Europe/Dublin" });
@@ -29,7 +33,7 @@ function shortDate(ms: number) {
  * Stripe for one business: connect it, see whether it can take payments and
  * what to do next, and the latest online sales.
  */
-export function StripeSettings({ configured, connection, justConnected, error, offersOnSale, recent }: StripeSettingsProps) {
+export function StripeSettings({ configured, connection, justConnected, unfinished, error, offersOnSale, recent }: StripeSettingsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [pending, start] = useTransition();
@@ -38,10 +42,13 @@ export function StripeSettings({ configured, connection, justConnected, error, o
   // Back from Stripe: say so once, then tidy the address bar.
   useEffect(() => {
     if (justConnected) {
-      toast.success("Stripe is connected");
+      toast.success("Your details are with Stripe");
+      router.replace(pathname);
+    } else if (unfinished) {
+      toast("Your Stripe setup isn't finished. Continue when you're ready.");
       router.replace(pathname);
     }
-  }, [justConnected, pathname, router]);
+  }, [justConnected, unfinished, pathname, router]);
 
   function refresh() {
     start(async () => {
@@ -62,13 +69,15 @@ export function StripeSettings({ configured, connection, justConnected, error, o
 
   const steps = connection
     ? [
-        { done: true, title: "Connected to Stripe", detail: `Since ${shortDate(connection.connectedAt)}`, action: null },
+        { done: true, title: "Stripe account made", detail: `Since ${shortDate(connection.connectedAt)}`, action: null },
         connection.livemode
           ? {
               done: connection.chargesEnabled,
               title: connection.chargesEnabled ? "Stripe has approved your account" : "Finish your details in Stripe",
-              detail: connection.chargesEnabled ? "Card payments and payouts are switched on." : "Stripe needs your business and bank details before it takes payments.",
-              action: connection.chargesEnabled ? null : { href: STRIPE_SETTINGS, label: "Open Stripe", external: true },
+              detail: connection.chargesEnabled
+                ? "Card payments and payouts are switched on."
+                : "Stripe needs your business and bank details before it takes payments. Already sent them? Stripe may still be checking. Use Check status.",
+              action: connection.chargesEnabled ? null : { href: CONTINUE_IN_STRIPE, label: "Continue in Stripe", external: false, plain: true },
             }
           : {
               done: Boolean(connection.displayName),
@@ -121,10 +130,10 @@ export function StripeSettings({ configured, connection, justConnected, error, o
               <h2>Take payments on your campaign pages</h2>
               <p>Buyers pay by card, Apple Pay or Google Pay on Stripe&rsquo;s checkout page. The money goes into your own Stripe account.</p>
               <div className="stp-connect">
-                <a className="btn btn--primary btn--md" href="/api/stripe/connect">
+                <a className="btn btn--primary btn--md" href={CONTINUE_IN_STRIPE}>
                   Connect with Stripe
                 </a>
-                <span>You&rsquo;ll sign in to Stripe and approve the connection. No Stripe account yet? You can make one there.</span>
+                <span>This makes a Stripe account for your business. You&rsquo;ll add your business and bank details on Stripe&rsquo;s own page, and can sign in to it at stripe.com any time.</span>
               </div>
             </div>
           </div>
@@ -159,7 +168,11 @@ export function StripeSettings({ configured, connection, justConnected, error, o
                     <span className="stp-step-detail">{s.detail}</span>
                   </div>
                   {s.action &&
-                    (s.action.external ? (
+                    ("plain" in s.action && s.action.plain ? (
+                      <a className="stp-step-link" href={s.action.href}>
+                        {s.action.label}
+                      </a>
+                    ) : s.action.external ? (
                       <a className="stp-step-link" href={s.action.href} target="_blank" rel="noopener noreferrer">
                         {s.action.label} <ExternalLink size={13} />
                       </a>
@@ -182,7 +195,7 @@ export function StripeSettings({ configured, connection, justConnected, error, o
               <span className="stp-foot-gap" />
               {confirming ? (
                 <span className="stp-confirm">
-                  Buy buttons will stop working.
+                  Buy buttons will stop working. Connecting again makes a new Stripe account.
                   <Button variant="destructive" size="sm" onClick={disconnect} loading={pending}>
                     Disconnect
                   </Button>

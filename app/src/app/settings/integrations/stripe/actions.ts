@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentMembership, requireAdmin } from "@/lib/auth";
 import { logActivity } from "@/lib/queries";
-import { deauthorizeAccount, getAccount } from "@/lib/stripe/api";
+import { getAccount } from "@/lib/stripe/api";
 import { getStripeConnection, removeStripeConnection, updateStripeAccountStatus } from "@/lib/stripe/connection";
 
 export async function refreshStripeAction(): Promise<{ ok: boolean; error?: string }> {
@@ -24,9 +24,8 @@ export async function disconnectStripeAction(): Promise<{ ok: boolean }> {
   const tenantId = getCurrentMembership()!.tenant.id;
   const conn = getStripeConnection(tenantId);
   if (conn) {
-    // Best effort: revoke our access on Stripe's side too. The local record
-    // goes either way, so the Buy buttons stop at once.
-    await deauthorizeAccount(conn.accountId);
+    // Forgets the account here, so the Buy buttons stop at once. The account
+    // itself stays the business's, in their own Stripe dashboard.
     removeStripeConnection(tenantId);
     await logActivity("stripe_disconnected", `Stripe disconnected by ${me.email}`, { accountId: conn.accountId });
   }

@@ -49,7 +49,7 @@ import type { LandingOffer } from "@/components/campaigns/OfferBuyBox";
 import { listOffersForCampaign, getOrder, getOffer as getOfferById } from "@/lib/offers/store";
 import { signCheckoutToken } from "@/lib/offers/checkoutToken";
 import { fulfilCheckout } from "@/lib/offers/fulfil";
-import { getStripeConnection } from "@/lib/stripe/connection";
+import { canTakePayments, getStripeConnection } from "@/lib/stripe/connection";
 import { getCheckoutSession } from "@/lib/stripe/api";
 import { cookies, headers, type UnsafeUnwrappedCookies } from "next/headers";
 import { randomUUID } from "node:crypto";
@@ -290,7 +290,7 @@ function resolveCampaignLanding(
     const rememberKey = accessKey && searchParams.k === accessKey && cookieKey !== accessKey ? accessKey : null;
 
     let offers: LandingOffer[] = [];
-    if (allowed && getStripeConnection(resolved.tenantId)) {
+    if (allowed && canTakePayments(getStripeConnection(resolved.tenantId))) {
       const returnUrl = landingReturnUrl(resolved, params.campaignSlug, host);
       offers = listOffersForCampaign(campaign.id)
         .filter((o) => o.isActive)

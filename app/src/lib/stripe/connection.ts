@@ -3,8 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { controlDb } from "@/lib/db/control";
 import { stripeConnections } from "@/lib/db/schema";
-import { signTokenPayload, readTokenPayload } from "@/lib/signedToken";
-import type { StripeAccount } from "./api";
+import { stripeKeyMode, type StripeAccount } from "./api";
 
 /**
  * One connected Stripe account per business (control table
@@ -35,9 +34,28 @@ function toView(r: typeof stripeConnections.$inferSelect): StripeConnection {
   };
 }
 
+/**
+ * The business's connected account, or null. An account from the other mode
+ * (a test account once the platform runs on its live key, or the reverse)
+ * counts as not connected: no call can reach it, so the business connects again.
+ */
 export function getStripeConnection(tenantId: number): StripeConnection | null {
   const r = controlDb.select().from(stripeConnections).where(eq(stripeConnections.tenantId, tenantId)).get();
-  return r ? toView(r) : null;
+  if (!r) return null;
+  return usableInMode(r.livemode, stripeKeyMode()) ? toView(r) : null;
+}
+
+export function usableInMode(livemode: boolean, mode: "live" | "test" | null): boolean {
+  return mode === null || livemode === (mode === "live");
+}
+
+/**
+ * Whether Buy buttons can work. A live account takes payments only once
+ * Stripe has switched charges on (onboarding finished and checked); a test
+ * account can always take test cards.
+ */
+export function canTakePayments(conn: Pick<StripeConnection, "livemode" | "chargesEnabled"> | null): boolean {
+  return !!conn && (!conn.livemode || conn.chargesEnabled);
 }
 
 /** Which business a connected account belongs to (webhooks name the account, not the tenant). */
@@ -73,24 +91,4 @@ export function updateStripeAccountStatus(tenantId: number, a: StripeAccount): v
 
 export function removeStripeConnection(tenantId: number): void {
   controlDb.delete(stripeConnections).where(eq(stripeConnections.tenantId, tenantId)).run();
-}
-
-// ---- OAuth state ------------------------------------------------------------
-// The `state` round-trips through Stripe; signing it means the callback only
-// ever saves an account for the business and admin who started the connect.
-
-const STATE_TTL_MS = 30 * 60 * 1000;
-
-export function signConnectState(tenantId: number, userId: number): string | null {
-  return signTokenPayload({ k: "stripe-connect", t: tenantId, u: userId, e: Date.now() + STATE_TTL_MS });
-}
-
-export function readConnectState(state: string): { tenantId: number; userId: number } | null {
-  const p = readTokenPayload(state);
-  if (!p || p.k !== "stripe-connect") return null;
-  const t = Number(p.t);
-  const u = Number(p.u);
-  const e = Number(p.e);
-  if (!Number.isInteger(t) || !Number.isInteger(u) || !Number.isFinite(e) || e < Date.now()) return null;
-  return { tenantId: t, userId: u };
 }
