@@ -1,5 +1,9 @@
 import { notFound } from "next/navigation";
 import { LeadDetail } from "@/components/leads/LeadDetail";
+import { PersonLinksCard } from "@/components/people/PersonLinksCard";
+import { mapEnabled } from "@/lib/adonisMap/access";
+import { personLinksForLead } from "@/lib/adonisMap/decisions";
+import { getCurrentMembership } from "@/lib/auth";
 import { getLead, getLeadMessages } from "@/lib/leads";
 import { listStages } from "@/lib/pipeline/stageRepo";
 import { voiceAvailability } from "@/lib/voice/dial";
@@ -18,9 +22,17 @@ export default async function LeadDetailPage(
   const messages = getLeadMessages(id);
   const stages = listStages(lead.pipelineId);
   const voice = voiceAvailability();
+  const membership = getCurrentMembership();
+  const personLinks = membership && mapEnabled(membership.tenant.id) ? personLinksForLead(membership.tenant.id, id) : null;
+  const showLinks = !!personLinks && (personLinks.linked.length > 0 || personLinks.reviews.length > 0);
 
   return (
     <div className="app-page">
+      {showLinks && personLinks && (
+        <div style={{ maxWidth: 560, marginBottom: 16 }}>
+          <PersonLinksCard linked={personLinks.linked} reviews={personLinks.reviews} />
+        </div>
+      )}
       <LeadDetail lead={lead} messages={messages} stages={stages} voice={voice} />
     </div>
   );

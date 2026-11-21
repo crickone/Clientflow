@@ -62,6 +62,9 @@ import { listCheckins } from "@/lib/checkins";
 import { consentsFor } from "@/lib/marketingConsent";
 import { CONSENT_CHANNELS, CONSENT_LABEL, photoNames } from "@/lib/memberChoicesModel";
 import { CancelNoticeCard } from "@/components/clients/CancelNoticeCard";
+import { PersonLinksCard } from "@/components/people/PersonLinksCard";
+import { mapEnabled } from "@/lib/adonisMap/access";
+import { personLinksForClient } from "@/lib/adonisMap/decisions";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
 import { goalTarget } from "@/lib/goals";
 import { ACTIVITY_BY_KEY, GOAL_BY_KEY } from "@/lib/goalsModel";
@@ -111,6 +114,7 @@ export default async function ClientProfile(
   const availWk = availableWorkouts();
   const membership = getCurrentMembership();
   const programsEnabled = membership ? programsOn(membership.tenant.id) : false;
+  const personLinks = membership && mapEnabled(membership.tenant.id) ? personLinksForClient(membership.tenant.id, id) : null;
   const activeMembership = clientMembership(id);
   const agreements = clientAgreementView(id);
   const memberForms = clientForms(id);
@@ -685,6 +689,7 @@ export default async function ClientProfile(
         {cancelNotice && (
           <CancelNoticeCard clientId={id} requestId={cancelNotice.id} membershipName={cancelNotice.membershipName} when={dayOf(cancelNotice.requestedAt)} reason={cancelNotice.reason} />
         )}
+        {personLinks && <PersonLinksCard linked={personLinks.linked} reviews={personLinks.reviews} />}
 
         <Card className="cp-card">
           <CardLabel>Details</CardLabel>
