@@ -513,6 +513,26 @@ export interface FleetResponse {
 }
 
 
+/** One business's week (mirrors app/src/lib/platform/activity.ts). A null means it could not be read, not zero. */
+export interface ActivityRow {
+  tenantId: number;
+  name: string;
+  slug: string;
+  setup: { done: number; total: number } | null;
+  lastLoginAt: number | null;
+  membersActive7d: number | null;
+  bookings7d: number | null;
+  bookingsPrev7d: number | null;
+  leads7d: number | null;
+  salesCents7d: number | null;
+  aiCentsThisMonth: number | null;
+}
+
+export interface ActivityResponse {
+  rows: ActivityRow[];
+  generatedAt: number;
+}
+
 /** One hit from /search (mirrors app/src/lib/platform/search.ts). */
 export type SearchHit =
   | { kind: "business"; id: number; title: string; subtitle: string; href: string }
