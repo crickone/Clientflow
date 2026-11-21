@@ -382,4 +382,26 @@ export const CONTROL_MIGRATIONS: Migration[] = [
         .run();
     },
   },
+  {
+    id: "0005-tenant-meta-hand-set-stages",
+    description:
+      "tenant_meta.stage accepts the two hand-set stages 'not_launched' and 'internal'. SQLite cannot alter a CHECK constraint, so a database created with the old five-value check has the table rebuilt (create-new, copy, drop-old, rename). A fresh database already has the wider check and is left alone. Nothing references tenant_meta, so the rebuild is safe with foreign keys on.",
+    up: (sqlite) => {
+      const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tenant_meta'").get() as { sql: string } | undefined;
+      if (!row || row.sql.includes("not_launched")) return;
+      sqlite.exec(`
+        CREATE TABLE tenant_meta_new (
+          tenant_id INTEGER PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+          stage TEXT CHECK (stage IN ('trial','onboarding','active','at_risk','churned','not_launched','internal')),
+          owner_user_id INTEGER REFERENCES users(id),
+          tags TEXT NOT NULL DEFAULT '[]',
+          updated_at INTEGER
+        );
+        INSERT INTO tenant_meta_new (tenant_id, stage, owner_user_id, tags, updated_at)
+          SELECT tenant_id, stage, owner_user_id, tags, updated_at FROM tenant_meta;
+        DROP TABLE tenant_meta;
+        ALTER TABLE tenant_meta_new RENAME TO tenant_meta;
+      `);
+    },
+  },
 ];

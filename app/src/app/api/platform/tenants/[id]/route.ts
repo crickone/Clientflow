@@ -58,6 +58,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
       setupRequiredDone: setup.requiredDone,
       setupRequiredTotal: setup.requiredTotal,
       riskScore: risk.score,
+      members: tenantUsage(id).clients,
     });
   } catch {
     meta = null;

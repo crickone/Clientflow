@@ -6,9 +6,10 @@ import { controlSqlite } from "@/lib/db/control";
  * The platform's own view of a business: where it is in its life, who on
  * the platform side looks after it, and free tags. The stage is computed
  * from facts unless somebody has set it by hand; the console shows both.
+ * "not_launched" and "internal" are only ever set by hand, never computed.
  */
-export type Stage = "trial" | "onboarding" | "active" | "at_risk" | "churned";
-export const STAGES: Stage[] = ["trial", "onboarding", "active", "at_risk", "churned"];
+export type Stage = "trial" | "onboarding" | "active" | "at_risk" | "churned" | "not_launched" | "internal";
+export const STAGES: Stage[] = ["trial", "onboarding", "active", "at_risk", "churned", "not_launched", "internal"];
 
 export interface TenantMeta {
   tenantId: number;
@@ -26,12 +27,16 @@ export interface StageFacts {
   setupRequiredDone: number;
   setupRequiredTotal: number;
   riskScore: number;
+  /** Clients on the business's books: a business with any is in real use. */
+  members: number;
 }
 
 export function defaultStage(f: StageFacts): Stage {
   if (f.archived || f.billingStatus === "cancelled") return "churned";
   if (!f.exempt && f.billingStatus === "pending_payment") return "trial";
-  if (f.setupRequiredDone < f.setupRequiredTotal) return "onboarding";
+  // Setting up only while setup is incomplete AND nobody is using it yet: a
+  // business with members is live even with a step still open.
+  if (f.setupRequiredDone < f.setupRequiredTotal && f.members === 0) return "onboarding";
   if (f.riskScore >= 60 || f.billingStatus === "suspended" || f.billingStatus === "past_due") return "at_risk";
   return "active";
 }

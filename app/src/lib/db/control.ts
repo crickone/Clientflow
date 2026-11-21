@@ -1269,7 +1269,7 @@ export function ensureControlTables() {
     -- and staged rollouts of modules.
     CREATE TABLE IF NOT EXISTS tenant_meta (
       tenant_id INTEGER PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
-      stage TEXT CHECK (stage IN ('trial','onboarding','active','at_risk','churned')),
+      stage TEXT CHECK (stage IN ('trial','onboarding','active','at_risk','churned','not_launched','internal')),
       owner_user_id INTEGER REFERENCES users(id),
       tags TEXT NOT NULL DEFAULT '[]',
       updated_at INTEGER

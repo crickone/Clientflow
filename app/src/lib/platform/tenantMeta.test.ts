@@ -8,7 +8,7 @@ const requireLocal = createRequire(import.meta.url);
   const { controlSqlite } = requireLocal("../db/control") as typeof import("../db/control");
   const { defaultStage, getTenantMeta, setTenantMeta } = requireLocal("./tenantMeta") as typeof import("./tenantMeta");
 
-  const base = { archived: false, billingStatus: "active", exempt: false, setupRequiredDone: 4, setupRequiredTotal: 4, riskScore: 10 };
+  const base = { archived: false, billingStatus: "active", exempt: false, setupRequiredDone: 4, setupRequiredTotal: 4, riskScore: 10, members: 0 };
   assert.equal(defaultStage(base), "active");
   assert.equal(defaultStage({ ...base, archived: true }), "churned");
   assert.equal(defaultStage({ ...base, billingStatus: "cancelled" }), "churned");
@@ -38,6 +38,11 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(m.stage, "at_risk", "a partial patch leaves other fields alone");
     setTenantMeta(t.id, { stage: null });
     assert.equal(getTenantMeta(t.id, base).stage, null);
+    // The two hand-set stages are accepted by the table's CHECK (rebuilt by migration 0005 on older databases).
+    for (const hand of ["not_launched", "internal"] as const) {
+      setTenantMeta(t.id, { stage: hand });
+      assert.equal(getTenantMeta(t.id, base).stage, hand, `${hand} can be stored`);
+    }
     console.log("tenantMeta.test.ts: ok");
   } finally {
     controlSqlite.prepare("DELETE FROM tenant_meta WHERE tenant_id = ?").run(t.id);

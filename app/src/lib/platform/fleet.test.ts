@@ -169,6 +169,11 @@ const requireLocal = createRequire(import.meta.url);
     const row = fleet.listFleet({ q: "fleet-pastdue" })[0];
     assert.equal(row.users, 1, "the people count comes back with the row");
     assert.equal(row.billingStatus, "past_due");
+    // The three fields the console's Businesses list reads. A business whose
+    // data cannot be read still gets them, as blanks, rather than missing keys.
+    assert.equal(typeof row.members, "number", "the client count comes back with the row");
+    assert.ok(row.riskReason === null || typeof row.riskReason === "string", "riskReason is a string or null");
+    assert.ok(row.lastLoginAt === null || typeof row.lastLoginAt === "number", "lastLoginAt is ms or null");
 
     console.log("fleet.test.ts: all assertions passed");
   } finally {

@@ -501,6 +501,10 @@ export interface FleetTenantRow {
   setup: { requiredDone: number; requiredTotal: number };
   risk: { score: number; level: "low" | "medium" | "high" };
   stage: string | null;
+  // Optional so an older app deploy (without these fields) does not break the console.
+  members?: number;
+  riskReason?: string | null;
+  lastLoginAt?: number | null;
 }
 
 export interface FleetResponse {

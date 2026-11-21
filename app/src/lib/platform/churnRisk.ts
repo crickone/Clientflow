@@ -50,10 +50,16 @@ export function churnRisk(f: RiskFacts): Risk {
   return { score, level: score >= 60 ? "high" : score >= 30 ? "medium" : "low", reasons };
 }
 
-export function riskFacts(tenantId: number, setup: { requiredDone: number; requiredTotal: number }, now: number = Date.now()): RiskFacts {
-  const login = controlSqlite
+/** The latest sign-in (ms) by anyone who works at the business; platform admins do not count. */
+export function lastStaffLoginAt(tenantId: number): number | null {
+  const row = controlSqlite
     .prepare("SELECT MAX(u.last_login_at) AS last FROM users u JOIN memberships m ON m.user_id = u.id WHERE m.tenant_id = ? AND m.is_active = 1 AND u.is_platform_admin = 0")
     .get(tenantId) as { last: number | null };
+  return row.last ?? null;
+}
+
+export function riskFacts(tenantId: number, setup: { requiredDone: number; requiredTotal: number }, now: number = Date.now()): RiskFacts {
+  const login = { last: lastStaffLoginAt(tenantId) };
   const tenant = controlSqlite.prepare("SELECT created_at FROM tenants WHERE id = ?").get(tenantId) as { created_at: number } | undefined;
   const billing = controlSqlite.prepare("SELECT status, billing_exempt, failed_attempts FROM tenant_billing WHERE tenant_id = ?").get(tenantId) as { status: string; billing_exempt: number; failed_attempts: number } | undefined;
   const reconnects = (controlSqlite.prepare("SELECT (SELECT count(*) FROM facebook_pages WHERE tenant_id = ? AND needs_reconnect_at IS NOT NULL AND revoked_at IS NULL) + (SELECT count(*) FROM meta_grants WHERE tenant_id = ? AND needs_reconnect_at IS NOT NULL) AS n").get(tenantId, tenantId) as { n: number }).n;
