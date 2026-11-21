@@ -279,11 +279,11 @@ table.tbl { border-collapse: collapse; width: 100%; }
   text-transform: uppercase;
   color: var(--text-tertiary);
   font-weight: 400;
-  padding: 0 14px 12px;
+  padding: 0 12px 11px;
   border-bottom: 1px solid var(--hairline);
 }
 .tbl td {
-  padding: 14px;
+  padding: 11px 12px;
   border-bottom: 1px solid var(--grid);
   font-size: 13.5px;
   vertical-align: middle;
@@ -472,7 +472,7 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.45; c
   overflow-x: hidden;
 }
 .app-page {
-  max-width: 1160px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 44px 48px 96px;
 }
@@ -1234,3 +1234,29 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.45; c
 .flag input[type="range"] { accent-color: #ffffff; width: 180px; max-width: 100%; }
 .flag-pct { font-family: var(--font-mono), ui-monospace, monospace; min-width: 40px; }
 .flag-hint { font-size: 12.5px; color: var(--text-tertiary); }
+
+/* Platform switches page and the banner shown while one is stopped. */
+.switch-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 9px 48px;
+  background-color: rgba(240, 128, 154, 0.12);
+  border-bottom: 1px solid rgba(240, 128, 154, 0.35);
+  color: var(--red);
+  font-size: 13px;
+}
+.switch-banner a { color: var(--red); font-weight: 500; text-decoration: underline; }
+.switch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.switch-card { padding: 18px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.switch-card.is-stopped { border-color: rgba(240, 128, 154, 0.4); }
+.switch-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; }
+.switch-copy { flex: 1; font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; }
+.switch-copy p { margin: 0 0 4px; }
+.switch-copy span { color: var(--text-tertiary); }
+.switch-stopped-note { margin: 0; font-size: 12.5px; color: var(--red); }
+.switch-owner-note { margin: 0; font-size: 12.5px; color: var(--text-tertiary); }
+@media (max-width: 1100px) { .switch-banner { padding: 9px 24px; } }
+@media (max-width: 640px) { .switch-banner { padding: 9px 16px; } }

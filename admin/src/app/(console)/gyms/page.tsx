@@ -6,7 +6,6 @@ import { SaveViewButton } from "@/components/SaveViewButton";
 import { requireAdminSession } from "@/lib/session";
 import { BusinessesTable } from "@/components/BusinessesTable";
 import { Card } from "@/components/ui/Card";
-import { KillSwitches } from "@/components/fleet/KillSwitches";
 import type { FleetResponse } from "@/lib/types";
 import { openTenant } from "./[id]/actions";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -14,8 +13,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 export const dynamic = "force-dynamic";
 
 /**
- * The console's front door: every business, filtered, with the platform
- * switches above them.
+ * The console's front door: every business, filtered.
  *
  * Filters are query parameters rather than client state, so a view worth
  * looking at twice ("everything past due", "every archived account") is a
@@ -37,13 +35,13 @@ export default async function GymsPage(
   }
 ) {
   const searchParams = await props.searchParams;
-  const me = await requireAdminSession();
+  await requireAdminSession();
   const qs = new URLSearchParams();
   if (searchParams.q) qs.set("q", searchParams.q);
   if (searchParams.status) qs.set("status", searchParams.status);
   if (searchParams.venueType) qs.set("venueType", searchParams.venueType);
 
-  const { tenants, killSwitches } = await api<FleetResponse>(`/fleet${qs.toString() ? `?${qs}` : ""}`, { revalidate: 30, tags: ["fleet"] });
+  const { tenants } = await api<FleetResponse>(`/fleet${qs.toString() ? `?${qs}` : ""}`, { revalidate: 30, tags: ["fleet"] });
   const filtered = Boolean(searchParams.q || searchParams.status || searchParams.venueType);
 
   return (
@@ -58,8 +56,6 @@ export default async function GymsPage(
           </Link>
         }
       />
-
-      <KillSwitches switches={killSwitches} isOwner={me.role === "owner"} />
 
       <form method="GET" className="toolbar">
         <input

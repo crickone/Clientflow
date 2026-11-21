@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { api } from "@/lib/api";
 import { requireAdminSession } from "@/lib/session";
+import { SwitchesBanner } from "@/components/fleet/SwitchesBanner";
 import { Shell } from "@/components/Shell";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import type { ConsoleView } from "@/lib/views";
@@ -22,7 +23,7 @@ export default async function ConsoleLayout({ children }: { children: ReactNode 
   }
   return (
     <ConfirmProvider>
-      <Shell user={user} views={views} inboxCount={inboxCount}>{children}</Shell>
+      <Shell user={user} views={views} inboxCount={inboxCount} banner={<SwitchesBanner />}>{children}</Shell>
     </ConfirmProvider>
   );
 }

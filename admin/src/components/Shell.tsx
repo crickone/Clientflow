@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Power,
   Rocket,
   Search as SearchIcon,
   ScrollText,
@@ -58,6 +59,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/staff", label: "Platform staff", icon: Users },
       { href: "/flags", label: "Feature flags", icon: ToggleLeft },
+      { href: "/switches", label: "Platform switches", icon: Power },
       { href: "/settings", label: "Settings", icon: SettingsIcon },
     ],
   },
@@ -107,7 +109,7 @@ function ViewLinks({ views }: { views: ConsoleView[] }) {
   );
 }
 
-export function Shell({ user, views, inboxCount, children }: { user: AdminUser; views: ConsoleView[]; inboxCount: { bad: number; warn: number }; children: ReactNode }) {
+export function Shell({ user, views, inboxCount, banner, children }: { user: AdminUser; views: ConsoleView[]; inboxCount: { bad: number; warn: number }; banner?: ReactNode; children: ReactNode }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
 
@@ -259,6 +261,7 @@ export function Shell({ user, views, inboxCount, children }: { user: AdminUser; 
             </span>
           </span>
         </div>
+        {banner}
         <div className="app-page">{children}</div>
       </main>
     </div>
