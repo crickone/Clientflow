@@ -57,10 +57,25 @@ const rgbAt = (img: RawImage, x: number, y: number) => Array.from(img.data.slice
   paint(img, 20, 20, 40, 40, [0, 0, 0, 255]); // full contrast: distance ~441.7
   paint(img, 19, 20, 20, 40, [128, 128, 128, 255]); // half coverage: distance ~220
   const s = logoShape(img)!;
-  // full = 441.7 * 0.92 = 406.4; (220 - 24) / (406.4 - 24) = 0.51 -> ~131
+  // Edge pixel against the black beside it: (221.7 - 24) / (441.7 - 24) = 0.47 -> ~121
   const a = alphaAt(s, 2, 10); // column 19 sits at x=2 after trimming with a 2px margin
-  assert.ok(Math.abs(a - 131) <= 5, `half-coverage edge alpha was ${a}`);
+  assert.ok(Math.abs(a - 121) <= 5, `half-coverage edge alpha was ${a}`);
   assert.equal(alphaAt(s, 12, 10), 255); // inside the logo stays solid
+}
+
+// 4a. Two-tone logo: the lighter tone stays solid, and a dark speck doesn't dim the rest.
+{
+  const img = canvas(80, 60, [255, 255, 255, 255]);
+  paint(img, 10, 10, 40, 50, [0, 0, 0, 255]); // black half
+  paint(img, 40, 10, 70, 50, [212, 175, 55, 255]); // gold half
+  paint(img, 75, 5, 76, 6, [0, 0, 0, 255]); // a stray speck
+  const s = logoShape(img)!;
+  assert.ok(s);
+  // Interior of the gold half (original x=55, y=30) -> trimmed origin is (8, 3).
+  assert.equal(alphaAt(s, 55 - 8, 30 - 3), 255);
+  assert.equal(alphaAt(s, 25 - 8, 30 - 3), 255);
+  // Gold's own outer edge is solid too: nothing stronger is beside it but the black half, 30px away.
+  assert.equal(alphaAt(s, 69 - 8, 30 - 3), 255);
 }
 
 // 4b. An opaque logo with one stray see-through pixel is still treated as opaque (background removed, not a solid block).

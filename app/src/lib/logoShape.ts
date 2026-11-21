@@ -33,15 +33,17 @@ const TRANSPARENT_SHARE = 0.01;
 /** Colour distance (0-441) within which a corner patch is one flat colour, and patches match each other. */
 const FLAT = 24;
 /**
- * Background-to-logo ramp. At or under RAMP_LOW the pixel is background. Full
- * logo is reached at the logo's own contrast (its strongest distance from the
- * background, slightly eased so compression noise inside the logo stays
- * solid), never less than RAMP_MIN_FULL. Alpha then tracks how much of an
- * edge pixel the logo covers, so curves keep their anti-aliasing.
+ * Background-to-logo ramp. A pixel at or under RAMP_LOW from the background
+ * is background. A logo pixel with no background pixel beside it is solid,
+ * whatever its colour, so every tone of a two-tone logo stays full strength.
+ * A pixel on the logo's edge (a background pixel beside it) gets alpha by
+ * how far it is from the background compared with the strongest logo pixel
+ * near it, which keeps the source's anti-aliasing.
  */
 const RAMP_LOW = 24;
-const RAMP_MIN_FULL = 72;
-const RAMP_FULL_SHARE = 0.92;
+/** How far (in pixels) an edge pixel looks for the logo pixel it fades into. */
+const EDGE_REACH = 2;
+
 /** Alpha above this counts when trimming. */
 const VISIBLE = 8;
 const MARGIN = 2;
@@ -96,16 +98,29 @@ export function logoShape(img: RawImage): RawImage | null {
     const bg = backgroundColour(img);
     if (!bg) return null;
     const dists = new Float32Array(w * h);
-    let maxD = 0;
-    for (let i = 0; i < w * h; i++) {
-      dists[i] = dist(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], ...bg);
-      if (dists[i] > maxD) maxD = dists[i];
-    }
-    const full = Math.max(RAMP_MIN_FULL, maxD * RAMP_FULL_SHARE);
-    for (let i = 0; i < w * h; i++) {
-      const t = Math.min(1, Math.max(0, (dists[i] - RAMP_LOW) / (full - RAMP_LOW)));
-      alpha[i] = Math.round(t * 255);
-    }
+    for (let i = 0; i < w * h; i++) dists[i] = dist(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], ...bg);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const d = dists[y * w + x];
+        if (d <= RAMP_LOW) continue; // background: alpha stays 0
+        let touchesBackground = false;
+        for (let dy = -1; dy <= 1 && !touchesBackground; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && ny >= 0 && nx < w && ny < h && dists[ny * w + nx] <= RAMP_LOW) { touchesBackground = true; break; }
+          }
+        if (!touchesBackground) {
+          alpha[y * w + x] = 255;
+          continue;
+        }
+        let ref = d;
+        for (let dy = -EDGE_REACH; dy <= EDGE_REACH; dy++)
+          for (let dx = -EDGE_REACH; dx <= EDGE_REACH; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && ny >= 0 && nx < w && ny < h && dists[ny * w + nx] > ref) ref = dists[ny * w + nx];
+          }
+        alpha[y * w + x] = Math.round(Math.min(1, (d - RAMP_LOW) / (ref - RAMP_LOW)) * 255);
+      }
   }
 
   let left = w, top = h, right = -1, bottom = -1;
