@@ -566,8 +566,7 @@ export interface AlertsResponse {
 export interface JobRun { id: number; key: string; label: string; startedAt: number; finishedAt: number | null; ok: boolean | null; error: string | null; durationMs: number | null; detail: unknown }
 export interface JobsResponse { latest: JobRun[]; history: JobRun[] }
 
-export type Stage = "trial" | "onboarding" | "active" | "at_risk" | "churned";
-export const STAGE_LABEL: Record<Stage, string> = { trial: "Trial", onboarding: "Onboarding", active: "Active", at_risk: "At risk", churned: "Churned" };
+export type Stage = "trial" | "onboarding" | "active" | "at_risk" | "churned" | "not_launched" | "internal";
 export interface TenantMeta { tenantId: number; stage: Stage | null; stageAuto: Stage; ownerUserId: number | null; tags: string[]; updatedAt: number | null }
 export interface SetupView { requiredDone: number; requiredTotal: number; resolved: number; total: number; nextTitle: string | null; steps: { id: string; title: string; done: boolean; skipped: boolean; optional: boolean }[] }
 export interface Risk { score: number; level: "low" | "medium" | "high"; reasons: string[] }

@@ -1,9 +1,8 @@
-export function StatusChip({ status, exempt }: { status: string | null; exempt?: boolean }) {
-  if (!status) return <span className="chip exempt">no billing</span>;
-  if (exempt) return <span className="chip exempt">agency</span>;
-  const label: Record<string, string> = {
-    pending_payment: "awaiting payment", active: "active", past_due: "past due",
-    suspended: "suspended", cancelled: "cancelled",
-  };
-  return <span className={`chip ${status}`}>{label[status] ?? status}</span>;
+import { billingLabel } from "@/lib/labels";
+
+/** Billing in plain words: Paying, Past due, Free · agency client, Internal. */
+export function StatusChip({ status, exempt, stage }: { status: string | null; exempt?: boolean; stage?: string | null }) {
+  const label = billingLabel({ exempt: Boolean(exempt), status, stage });
+  const neutral = stage === "internal" || exempt || !status;
+  return <span className={`chip ${neutral ? "exempt" : status}`}>{label}</span>;
 }

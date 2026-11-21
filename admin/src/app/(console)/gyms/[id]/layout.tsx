@@ -9,7 +9,8 @@ import { StatusChip } from "@/components/StatusChip";
 import { OpenBusinessButton } from "@/components/OpenBusinessButton";
 import { TenantTabs } from "@/components/TenantTabs";
 import { Properties } from "@/components/business/Properties";
-import { STAGE_LABEL, type StaffResponse, type TenantDetail } from "@/lib/types";
+import { stageLabel } from "@/lib/labels";
+import type { StaffResponse, TenantDetail } from "@/lib/types";
 import { openTenant } from "./actions";
 
 /**
@@ -66,8 +67,8 @@ export default async function TenantLayout(
           <div style={{ flex: "1 1 320px", minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <h1 className="page-title">{tenant.name}</h1>
-              <StatusChip status={billing?.status ?? null} exempt={billing?.billingExempt} />
-              {meta && <span className="chip">{STAGE_LABEL[meta.stage ?? meta.stageAuto]}</span>}
+              <StatusChip status={billing?.status ?? null} exempt={billing?.billingExempt} stage={meta ? (meta.stage ?? meta.stageAuto) : null} />
+              {meta && <span className="chip">{stageLabel(meta.stage ?? meta.stageAuto)}</span>}
               {!tenant.isActive && (
                 <span className="chip suspended">inactive</span>
               )}

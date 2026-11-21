@@ -10,9 +10,14 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { StatusChip } from "@/components/StatusChip";
 import { OpenBusinessButton } from "@/components/OpenBusinessButton";
 import { bulkTenantAction, type BulkAction } from "@/app/(console)/gyms/bulk-actions";
-import { fmtDate, fmtDay } from "@/lib/format";
+import { fmtDate } from "@/lib/format";
+import { billingLabel, relTime, riskShown, stageLabel } from "@/lib/labels";
 import { notify } from "@/lib/toast";
-import { STAGE_LABEL, type FleetTenantRow, type Stage } from "@/lib/types";
+import type { FleetTenantRow } from "@/lib/types";
+
+function Dot({ colour }: { colour: string }) {
+  return <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: colour, flex: "0 0 auto" }} />;
+}
 
 export function BusinessesTable({
   tenants,
@@ -76,29 +81,75 @@ export function BusinessesTable({
     }
   }
 
+  const mono = { fontFamily: "var(--font-mono), ui-monospace, monospace" } as const;
   const columns: Column<FleetTenantRow>[] = [
     {
-      key: "name", label: "Name", sortable: true, hideable: false,
+      key: "name", label: "Business", sortable: true, hideable: false,
       render: (t) => (
-        <>
-          <Link href={`/gyms/${t.id}`}>{t.name}</Link>
-          <div style={{ marginTop: 3, fontSize: 12, color: "var(--text-tertiary)", fontFamily: "var(--font-mono), ui-monospace, monospace" }}>{t.slug}</div>
-        </>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+          <span className="biz-mark" aria-hidden style={{ width: 28, height: 28, borderRadius: 8, fontSize: 13 }}>
+            {t.name.trim().slice(0, 2).toUpperCase() || "?"}
+          </span>
+          <span>
+            <Link href={`/gyms/${t.id}`} style={{ fontWeight: 600 }}>{t.name}</Link>
+            {t.venueType && <span style={{ color: "var(--text-tertiary)" }}> · {t.venueType}</span>}
+          </span>
+        </span>
       ),
     },
-    { key: "venueType", label: "Venue", sortable: true, value: (t) => t.venueType ?? "", render: (t) => <span style={{ textTransform: "capitalize", color: "var(--text-secondary)" }}>{t.venueType ?? <span style={{ color: "var(--text-tertiary)", textTransform: "none" }}>Not set</span>}</span> },
     {
-      key: "status", label: "Status", sortable: true,
-      value: (t) => (t.archivedAt ? "archived" : t.billingExempt ? "agency" : t.billingStatus ?? "none"),
-      render: (t) => (t.archivedAt ? <span className="chip past_due">archived</span> : <StatusChip status={t.billingStatus} exempt={t.billingExempt} />),
+      key: "status", label: "Billing", sortable: true,
+      value: (t) => (t.archivedAt ? "Archived" : billingLabel({ exempt: t.billingExempt, status: t.billingStatus, stage: t.stage })),
+      render: (t) => (t.archivedAt ? <span className="chip past_due">archived</span> : <StatusChip status={t.billingStatus} exempt={t.billingExempt} stage={t.stage} />),
     },
-    { key: "stage", label: "Stage", sortable: true, value: (t) => t.stage ?? "", render: (t) => (t.stage ? STAGE_LABEL[t.stage as Stage] ?? t.stage : "—") },
-    { key: "risk", label: "Risk", sortable: true, align: "right", value: (t) => t.risk.score, render: (t) => <span style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", color: t.risk.level === "high" ? "var(--red)" : t.risk.level === "medium" ? "var(--amber)" : "var(--text-secondary)" }}>{t.risk.score}</span> },
-    { key: "setup", label: "Setup", sortable: true, align: "right", value: (t) => (t.setup.requiredTotal ? t.setup.requiredDone / t.setup.requiredTotal : 0), render: (t) => <span style={{ fontVariantNumeric: "tabular-nums", color: "var(--text-secondary)" }}>{t.setup.requiredDone}/{t.setup.requiredTotal}</span> },
-    { key: "users", label: "People", sortable: true, align: "right" },
-    { key: "nextRenewalAt", label: "Next renewal", sortable: true, value: (t) => t.nextRenewalAt ?? "", render: (t) => (t.nextRenewalAt ? fmtDay(t.nextRenewalAt) : "—") },
+    { key: "stage", label: "Stage", sortable: true, value: (t) => stageLabel(t.stage), render: (t) => stageLabel(t.stage) },
+    {
+      key: "risk", label: "Risk", sortable: true,
+      value: (t) => (riskShown(t.stage) ? t.risk.score : -1),
+      csv: (t) => (riskShown(t.stage) ? t.risk.level : "not tracked"),
+      render: (t) => {
+        if (!riskShown(t.stage)) {
+          return (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "var(--text-tertiary)" }}>
+              <Dot colour="var(--text-tertiary)" />Not tracked
+            </span>
+          );
+        }
+        const colour = t.risk.level === "high" ? "var(--red)" : t.risk.level === "medium" ? "var(--amber)" : "var(--green)";
+        const word = t.risk.level === "high" ? "High" : t.risk.level === "medium" ? "Medium" : "Low";
+        return (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <Dot colour={colour} />
+            {word}
+            {t.riskReason && <span style={{ color: "var(--text-tertiary)" }}>· {t.riskReason}</span>}
+          </span>
+        );
+      },
+    },
+    {
+      key: "setup", label: "Setup", sortable: true,
+      value: (t) => (t.setup.requiredTotal ? t.setup.requiredDone / t.setup.requiredTotal : 0),
+      csv: (t) => `${t.setup.requiredDone}/${t.setup.requiredTotal}`,
+      render: (t) => {
+        const pct = t.setup.requiredTotal ? Math.round((t.setup.requiredDone / t.setup.requiredTotal) * 100) : 0;
+        return (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span className="bar" style={{ width: 70 }}><i style={{ width: `${pct}%` }} /></span>
+            <span style={{ ...mono, fontSize: 12, color: "var(--text-tertiary)" }}>{t.setup.requiredDone}/{t.setup.requiredTotal}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: "lastLoginAt", label: "Last login", sortable: true, align: "right",
+      value: (t) => t.lastLoginAt ?? 0,
+      csv: (t) => (t.lastLoginAt ? new Date(t.lastLoginAt).toISOString() : ""),
+      render: (t) => <span style={{ ...mono, fontSize: 12.5, color: "var(--text-secondary)" }}>{relTime(t.lastLoginAt)}</span>,
+    },
+    { key: "users", label: "Staff", sortable: true, align: "right" },
+    { key: "members", label: "Members", sortable: true, align: "right", value: (t) => t.members ?? -1, render: (t) => (t.members === undefined ? "-" : t.members) },
     { key: "createdAt", label: "Joined", sortable: true, render: (t) => fmtDate(t.createdAt) },
-    { key: "actions", label: "Actions", hideable: false, width: 1, align: "right", value: () => "", render: (t) => (!t.archivedAt ? <OpenBusinessButton action={(reason) => open(t.id, reason)} /> : null) },
+    { key: "actions", label: "", hideable: false, width: 1, align: "right", value: () => "", render: (t) => (!t.archivedAt ? <OpenBusinessButton action={(reason) => open(t.id, reason)} /> : null) },
   ];
   return (
     <>

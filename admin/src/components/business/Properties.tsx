@@ -6,9 +6,10 @@ import { X } from "lucide-react";
 
 import { notify } from "@/lib/toast";
 import { setMetaAction } from "@/app/(console)/gyms/[id]/business-actions";
-import { STAGE_LABEL, type PlatformStaffRow, type Stage, type TenantMeta } from "@/lib/types";
+import { stageLabel } from "@/lib/labels";
+import type { PlatformStaffRow, Stage, TenantMeta } from "@/lib/types";
 
-const STAGES: Stage[] = ["trial", "onboarding", "active", "at_risk", "churned"];
+const STAGES: Stage[] = ["trial", "onboarding", "active", "at_risk", "churned", "not_launched", "internal"];
 
 /** Stage, owner, tags: the strip under the business header. Each control saves on change. */
 export function Properties({ tenantId, meta, staff }: { tenantId: number; meta: TenantMeta; staff: PlatformStaffRow[] }) {
@@ -35,8 +36,8 @@ export function Properties({ tenantId, meta, staff }: { tenantId: number; meta: 
       <label className="prop">
         <span className="prop-label">Stage</span>
         <select className="input" value={meta.stage ?? ""} onChange={(e) => save({ stage: (e.target.value || null) as Stage | null }, "Stage saved")}>
-          <option value="">Auto: {STAGE_LABEL[meta.stageAuto]}</option>
-          {STAGES.map((s) => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}
+          <option value="">Auto: {stageLabel(meta.stageAuto)}</option>
+          {STAGES.map((s) => <option key={s} value={s}>{stageLabel(s)}</option>)}
         </select>
       </label>
       <label className="prop">
