@@ -2,7 +2,7 @@ import { TYPE_DEFS } from "./schema";
 import type { TypeName } from "./types";
 
 export const STAGE_RULE =
-  "Stage rule: lead = only lead records. member = an active membership, an active package with sessions left, or a visit in the last 30 days. lapsed = a past visit, none in the last 30 days, and nothing booked ahead. client = any other client. A visit is an attended class or a completed appointment.";
+  "Stage rule: lead = only lead records. member = an active membership, an active, started package with sessions left, or a visit in the last 30 days. lapsed = a past visit, none in the last 30 days, and nothing booked ahead. client = any other client. A visit is an attended class or a completed appointment.";
 
 export const MAP_ROUTING =
   "For questions about people, bookings, classes, memberships, packages, online orders or messages, use the map tools (map_find, map_get, map_follow, map_count). For ads, posts, the website, campaigns and anything that changes something, use your other tools.";

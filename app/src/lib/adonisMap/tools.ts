@@ -3,7 +3,7 @@ import "server-only";
 
 import type Anthropic from "@anthropic-ai/sdk";
 
-import type { ToolContext, ToolResult } from "@/lib/agents/toolKit";
+import { fenceUntrusted, type ToolContext, type ToolResult } from "@/lib/agents/toolKit";
 import { mapEnabled } from "./access";
 import { mapCount, mapFind, mapFollow, mapGet } from "./query";
 import { MapError } from "./types";
@@ -95,10 +95,11 @@ export async function executeMapTool(name: string, input: Record<string, unknown
   const env = { tenantId: ctx.tenantId };
   try {
     switch (name) {
-      case "map_find": return { text: JSON.stringify(mapFind(env, input)) };
-      case "map_get": return { text: JSON.stringify(mapGet(env, input)) };
-      case "map_follow": return { text: JSON.stringify(mapFollow(env, input)) };
-      case "map_count": return { text: JSON.stringify(mapCount(env, input)) };
+      // Lead names, sources, campaigns, order names and messages come from the public, so every successful result is fenced.
+      case "map_find": return { text: fenceUntrusted(JSON.stringify(mapFind(env, input))) };
+      case "map_get": return { text: fenceUntrusted(JSON.stringify(mapGet(env, input))) };
+      case "map_follow": return { text: fenceUntrusted(JSON.stringify(mapFollow(env, input))) };
+      case "map_count": return { text: fenceUntrusted(JSON.stringify(mapCount(env, input))) };
       default: return { text: JSON.stringify({ error: `Unknown map tool ${name}.` }) };
     }
   } catch (err) {

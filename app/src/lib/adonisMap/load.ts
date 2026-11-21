@@ -7,7 +7,6 @@ import "server-only";
  * Hidden fields (medical notes, addresses, Stripe ids, raw payloads ...) are
  * never selected.
  */
-import { fenceUntrusted } from "@/lib/agents/toolKit";
 import { addDays, dublinDate, dublinDateTime } from "./engine";
 import { leadDisplayName, loadPeopleData, sqliteFor, type LeadFull, type PeopleData, type Sqlite } from "./peopleData";
 import { emailKey, personStage, phoneKey } from "./person";
@@ -47,13 +46,22 @@ export function loadRows(lc: LoadCtx, type: TypeName, args: LoadArgs = {}): Row[
   const hit = lc.cache.get(key);
   if (hit) return hit;
   const rows = LOADERS[type](lc, args);
-  const max = TYPE_DEFS[type].maxRows;
-  if (rows.length > max) {
-    const d = TYPE_DEFS[type].dateField;
-    throw new MapError(`There are ${rows.length} ${type} records to check, more than ${max}. ${d ? `Add a date range on ${d}.` : "Add a narrower filter."}`);
-  }
+  guardRows(type, rows.length);
   lc.cache.set(key, rows);
   return rows;
+}
+
+/** Throws when a type would have more records than its cap. Run on COUNT(*) before loading, and again on the loaded rows. */
+function guardRows(type: TypeName, n: number): void {
+  const max = TYPE_DEFS[type].maxRows;
+  if (n > max) {
+    const d = TYPE_DEFS[type].dateField;
+    throw new MapError(`There are ${n} ${type} records to check, more than ${max}. ${d ? `Add a date range on ${d}.` : "Add a narrower filter."}`);
+  }
+}
+
+function countOf(lc: LoadCtx, fromWhere: string, params: Params): number {
+  return (lc.sq.prepare(`SELECT COUNT(*) AS n ${fromWhere}`).get(...params) as { n: number }).n;
 }
 
 // ── SQL helpers ──
@@ -103,14 +111,18 @@ function therapyNames(json: string, names: Map<number, string>): string {
 
 function loadBookings(lc: LoadCtx, a: LoadArgs): Row[] {
   const out: Row[] = [];
+  let counted = 0; // both halves count towards the one Booking cap, checked before any row is loaded
   // Id filters say which half they are for: class booking ids and session ids only concern classes.
   const classPart = lc.modules.timetable && (a.appointmentIds === undefined || a.bookingIds !== undefined);
   const apptPart = lc.modules.calendar && a.sessionIds === undefined && (a.bookingIds === undefined || a.appointmentIds !== undefined);
   if (classPart) {
     const params: Params = [];
-    const sql =
-      "SELECT b.id, b.client_id, b.status, s.id AS session_id, s.date, s.start_time, s.name, s.instructor FROM session_bookings b JOIN class_sessions s ON s.id = b.session_id" +
+    const fromWhere =
+      "FROM session_bookings b JOIN class_sessions s ON s.id = b.session_id" +
       whereSql([rangeSql("s.date", a.range, params), inSql("b.client_id", a.clientIds, params), inSql("s.id", a.sessionIds, params), inSql("b.id", a.bookingIds, params)]);
+    counted += countOf(lc, fromWhere, params);
+    guardRows("Booking", counted);
+    const sql = `SELECT b.id, b.client_id, b.status, s.id AS session_id, s.date, s.start_time, s.name, s.instructor ${fromWhere}`;
     for (const r of lc.sq.prepare(sql).all(...params) as { id: number; client_id: number; status: string; session_id: number; date: string; start_time: string; name: string; instructor: string | null }[]) {
       const personId = `c:${r.client_id}`;
       out.push({
@@ -122,9 +134,12 @@ function loadBookings(lc: LoadCtx, a: LoadArgs): Row[] {
   if (apptPart) {
     const therapy = new Map((lc.sq.prepare("SELECT id, name FROM therapies").all() as { id: number; name: string }[]).map((t) => [t.id, t.name]));
     const params: Params = [];
-    const sql =
-      "SELECT id, client_id, date, start_time, status, therapy_ids, total_price_eur FROM appointments" +
+    const fromWhere =
+      "FROM appointments" +
       whereSql([rangeSql("date", a.range, params), inSql("client_id", a.clientIds, params), inSql("id", a.appointmentIds, params)]);
+    counted += countOf(lc, fromWhere, params);
+    guardRows("Booking", counted);
+    const sql = `SELECT id, client_id, date, start_time, status, therapy_ids, total_price_eur ${fromWhere}`;
     for (const r of lc.sq.prepare(sql).all(...params) as { id: number; client_id: number; date: string; start_time: string; status: string; therapy_ids: string; total_price_eur: number }[]) {
       const personId = `c:${r.client_id}`;
       out.push({
@@ -141,12 +156,14 @@ function loadBookings(lc: LoadCtx, a: LoadArgs): Row[] {
 function loadClasses(lc: LoadCtx, a: LoadArgs): Row[] {
   if (!lc.modules.timetable) return [];
   const params: Params = [];
+  const where = whereSql([rangeSql("s.date", a.range, params), inSql("s.id", a.sessionIds, params)]);
+  guardRows("Class", countOf(lc, `FROM class_sessions s${where}`, params));
   const sql =
     `SELECT s.id, s.name, s.date, s.start_time, s.end_time, s.category, s.capacity, s.instructor, s.status,
         COALESCE(SUM(CASE WHEN b.status IN ('booked', 'attended', 'no_show') THEN 1 ELSE 0 END), 0) AS booked,
         COALESCE(SUM(CASE WHEN b.status IN ('booked', 'attended') THEN 1 ELSE 0 END), 0) AS taking
        FROM class_sessions s LEFT JOIN session_bookings b ON b.session_id = s.id` +
-    whereSql([rangeSql("s.date", a.range, params), inSql("s.id", a.sessionIds, params)]) +
+    where +
     " GROUP BY s.id";
   return (lc.sq.prepare(sql).all(...params) as { id: number; name: string; date: string; start_time: string; end_time: string; category: string | null; capacity: number; instructor: string | null; status: string; booked: number; taking: number }[]).map((r) => ({
     id: `k:${r.id}`, name: r.name, date: r.date, startsAt: `${r.date} ${r.start_time}`, endTime: r.end_time, category: r.category,
@@ -180,12 +197,14 @@ function loadMemberships(lc: LoadCtx): Row[] {
 
 function loadPackages(lc: LoadCtx): Row[] {
   const out: Row[] = [];
-  for (const r of lc.sq.prepare("SELECT id, client_id, package_name, price_cents, sessions_total, unlimited_sessions, sessions_used, status, start_date, end_date FROM client_packages").all() as { id: number; client_id: number; package_name: string; price_cents: number; sessions_total: number; unlimited_sessions: number; sessions_used: number; status: string; start_date: string; end_date: string | null }[]) {
+  for (const r of lc.sq.prepare("SELECT id, client_id, package_name, price_cents, sessions_total, unlimited_sessions, sessions_used, status, activated, start_date, end_date FROM client_packages").all() as { id: number; client_id: number; package_name: string; price_cents: number; sessions_total: number; unlimited_sessions: number; sessions_used: number; status: string; activated: number; start_date: string; end_date: string | null }[]) {
     const personId = `c:${r.client_id}`;
     const unlimited = r.unlimited_sessions === 1;
     out.push({
       id: `p:${r.id}`, name: r.package_name, kind: "package", sessionsTotal: r.sessions_total, sessionsUsed: r.sessions_used,
-      sessionsLeft: unlimited ? null : Math.max(0, r.sessions_total - r.sessions_used), unlimited, status: r.status,
+      sessionsLeft: unlimited ? null : Math.max(0, r.sessions_total - r.sessions_used), unlimited, started: r.activated === 1,
+      // Same expiry rule the Person stage uses: a stored "active" past its end date is expired.
+      status: r.status === "cancelled" ? "cancelled" : r.end_date !== null && r.end_date < lc.today ? "expired" : r.status,
       startDate: r.start_date, endDate: r.end_date, priceEur: r.price_cents / 100, personId, personName: nameOf(lc, personId),
     });
   }
@@ -193,7 +212,7 @@ function loadPackages(lc: LoadCtx): Row[] {
     const personId = `c:${r.client_id}`;
     out.push({
       id: `b:${r.id}`, name: r.package_name, kind: "bundle", sessionsTotal: r.total_sessions, sessionsUsed: r.sessions_used,
-      sessionsLeft: Math.max(0, r.total_sessions - r.sessions_used), unlimited: false,
+      sessionsLeft: Math.max(0, r.total_sessions - r.sessions_used), unlimited: false, started: true,
       status: r.is_active === 1 && r.expiry_date >= lc.today ? "active" : "expired",
       startDate: r.purchase_date, endDate: r.expiry_date, priceEur: r.price_paid_eur, personId, personName: nameOf(lc, personId),
     });
@@ -263,8 +282,8 @@ function loadConversations(lc: LoadCtx): Row[] {
   });
 }
 
-/** The last 10 messages of one conversation, oldest first, each trimmed to 500 characters, fenced as untrusted. */
-export function conversationMessages(lc: LoadCtx, conversationId: string): string {
+/** The last 10 messages of one conversation, oldest first, each trimmed to 500 characters. The text is untrusted; the map tool fences the whole result. */
+export function conversationMessages(lc: LoadCtx, conversationId: string): { at: string; direction: "in" | "out"; text: string }[] {
   const bar = conversationId.lastIndexOf("|");
   const personId = conversationId.slice(0, bar);
   const channel = conversationId.slice(bar + 1);
@@ -288,9 +307,8 @@ export function conversationMessages(lc: LoadCtx, conversationId: string): strin
       msgs.push({ at: m.at, direction: dir(m.direction), text: m.content });
     }
   }
-  const last = msgs.sort((x, y) => y.at - x.at).slice(0, 10).reverse()
+  return msgs.sort((x, y) => y.at - x.at).slice(0, 10).reverse()
     .map((m) => ({ at: dublinDateTime(m.at), direction: m.direction, text: m.text.slice(0, 500) }));
-  return fenceUntrusted(JSON.stringify(last));
 }
 
 // ── Person ──

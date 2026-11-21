@@ -71,6 +71,7 @@ process.chdir(work);
   const { seedClinic, seedGym } = requireLocal("./fixture") as typeof import("./fixture");
   const { computeTruth } = requireLocal("./truth") as typeof import("./truth");
   const { QUESTIONS } = requireLocal("./questions") as typeof import("./questions");
+  const { setGraderTenant } = requireLocal("./rubric") as typeof import("./rubric");
 
   const today = dublinDate(Date.now());
   const mk = (slug: string, name: string) =>
@@ -81,6 +82,7 @@ process.chdir(work);
   runWithTenant(clinicId, () => setSchedulingMode("appointments"));
   const gym = seedGym(gymId, today);
   const clinic = seedClinic(clinicId, today);
+  setGraderTenant(gymId);
   ensureAgents(gymId);
   ensureAgents(clinicId);
   setPlatformFlag({ key: "adonis_map", mode: map === "on" ? "allow" : "none", percent: 100, allow: map === "on" ? [gymId, clinicId] : [] });
@@ -150,7 +152,7 @@ process.chdir(work);
   const md = [
     `# Adonis test set: map ${map}, ${today}`,
     "",
-    `Score: ${passed} of ${results.length}. Model: ${model}. Agent cost about EUR ${costEur.toFixed(2)} (grader extra).`,
+    `Score: ${passed} of ${results.length}. Model: ${model}. Cost about EUR ${costEur.toFixed(2)}, grading included.`,
     "",
     "| Category | Passed |",
     "|---|---|",

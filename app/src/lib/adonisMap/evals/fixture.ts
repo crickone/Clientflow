@@ -205,6 +205,8 @@ export function seedGym(tenantId: number, today: string): GymKnown {
       email: v.email, name: v.name, clientId: v.clientId ?? null, createdAt: noon(day(-daysAgo)), paidAt: status === "paid" ? noon(day(-daysAgo)) : null,
     }).run();
   order(autumn, 49, "paid", 45, { email: "niamh.byrne@example.com", name: "Niamh Byrne" });
+  // Dated today so "this month" is never empty: on days 1 to 9 the Black Friday orders fall in the previous month.
+  order(autumn, 49, "paid", 0, { clientId: general[2], email: "", name: "" });
   const bfBooked = [general[0], general[1]];
   for (const c of bfBooked) {
     order(bf, 120, "paid", 9, { clientId: c, email: "", name: "" });

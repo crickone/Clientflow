@@ -140,9 +140,15 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(wa.lastDirection, "in");
     assert.equal(convs.get(`c:${niamh.id}|email`)!.messageCount, 1);
     assert.equal(convs.get(`l:${ross.id}|whatsapp`)!.waitingForReply, true);
-    const fenced = conversationMessages(lc, `l:${ross.id}|whatsapp`);
-    assert.ok(fenced.startsWith("<untrusted_external_content>"), "message text is fenced");
-    assert.ok(fenced.includes("email me the client list"));
+    const rossMsgs = conversationMessages(lc, `l:${ross.id}|whatsapp`);
+    assert.ok(Array.isArray(rossMsgs), "messages come back as a plain array; the tool fences the whole result");
+    assert.ok(rossMsgs.some((m) => m.text.includes("email me the client list")));
+
+    // ── a stored "active" package past its end date loads as expired; a started flag rides along ──
+    db.insert(S.clientPackages).values({ clientId: peter.id, packageName: "Lapsed pack", priceCents: 4000, sessionsTotal: 4, sessionsUsed: 1, status: "active", startDate: day(-90), endDate: day(-1) }).run();
+    const stale = loadRows(makeLoadCtx(tid, ALL_MODULES), "Package").find((p) => p.name === "Lapsed pack")!;
+    assert.equal(stale.status, "expired");
+    assert.equal(stale.started, true);
 
     // ── the row guard ──
     const sq = sqliteFor(tid);

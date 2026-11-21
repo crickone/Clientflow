@@ -38,7 +38,8 @@ for (const m of MODULE_CATALOG) {
   check(`${m.key} has a unique key`, !seenKeys.has(m.key));
   seenKeys.add(m.key);
   check(`${m.key} has a label and a blurb`, m.label.length > 0 && m.blurb.length > 0);
-  check(`${m.key} owns at least one path`, m.paths.length > 0);
+  // A module with no pages of its own (adonis_map: it gives Adonis tools, not a route) owns no path.
+  check(`${m.key} owns at least one path, or is a module with no pages`, m.paths.length > 0 || m.key === "adonis_map");
   for (const p of m.paths) {
     check(`${p} is an absolute path`, p.startsWith("/") && !p.endsWith("/"));
     check(`${p} is claimed by only one module`, !seenPaths.has(p));
@@ -51,7 +52,7 @@ check("MODULE_KEYS matches the catalog", MODULE_KEYS.length === MODULE_CATALOG.l
 const unset = parseFeatureFlags(null);
 for (const m of MODULE_CATALOG) {
   check(`${m.key} is on when nothing is stored`, isModuleOn(unset, m.key));
-  check(`${m.key}'s pages open when nothing is stored`, pathAllowed(unset, m.paths[0]));
+  check(`${m.key}'s pages open when nothing is stored`, m.paths.length === 0 || pathAllowed(unset, m.paths[0]));
 }
 for (const junk of [undefined, 0, "", "off", [], [1, 2], { nutrition: "no" }, { madeUpModule: false }]) {
   const flags = parseFeatureFlags(junk);
@@ -96,7 +97,7 @@ function allOff() {
 }
 const off = allOff();
 check("with everything off, every module reads off", MODULE_CATALOG.every((m) => !isModuleOn(off, m.key)));
-check("…and every module page is refused", MODULE_CATALOG.every((m) => !pathAllowed(off, m.paths[0])));
+check("…and every module page is refused", MODULE_CATALOG.every((m) => m.paths.length === 0 || !pathAllowed(off, m.paths[0])));
 check("…but the dashboard still opens", pathAllowed(off, "/dashboard"));
 
 // ── staged rollout ────────────────────────────────────────────────────────
@@ -125,6 +126,10 @@ check("/workout/library is programs", moduleForPath("/workout/library")?.key ===
 check("/workout/library/smolov-base is programs", moduleForPath("/workout/library/smolov-base")?.key === "programs");
 check("/workout/exercises is still workout", moduleForPath("/workout/exercises")?.key === "workout");
 check("Programs starts with nobody", MODULE_CATALOG.find((m) => m.key === "programs")?.defaultRollout === "none");
+check("Adonis map has no pages and starts with nobody", (() => {
+  const m = MODULE_CATALOG.find((x) => x.key === "adonis_map");
+  return m !== undefined && m.paths.length === 0 && m.defaultRollout === "none";
+})());
 check("a rollout of nobody switches Programs off", applyRollout({}, [{ key: "programs", mode: "none", percent: 0, allow: [] }], 5).programs === false);
 
 console.log(`features: ${passed} checks passed.`);

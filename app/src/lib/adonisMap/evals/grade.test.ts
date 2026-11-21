@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 
 import {
-  all, anyNumbers, hasNumber, labelledNumbers, mentions, noWriteMatching, noWrites, numberCheck, proposesCheck, refusesCheck, setCheck, textMatches,
+  all, anyNumbers, hasNumber, labelledNumbers, mentions, noWriteMatching, noWrites, numberCheck, proposesAtLeast, proposesCheck, refusesCheck, setCheck, textMatches,
   type RunResult,
 } from "./grade";
 import { QUESTIONS } from "./questions";
@@ -50,6 +50,10 @@ assert.equal(noWriteMatching(r("ok", [{ name: "book_client_into_class", input: {
 assert.equal(noWriteMatching(r("ok", [{ name: "book_client_into_class", input: { date: "2026-11-26" } }]), "book_client_into_class", (i) => i.date === "2026-11-24").pass, true);
 assert.equal(proposesCheck(r("drafted", [{ name: "send_client_whatsapp", input: {} }]), ["send_client_whatsapp"]).pass, true);
 assert.equal(proposesCheck(r("drafted"), ["send_client_whatsapp"]).pass, false);
+const two = [{ name: "send_client_whatsapp", input: {} }, { name: "send_client_whatsapp", input: {} }];
+assert.equal(proposesAtLeast(r("drafted", two), ["send_client_whatsapp"], 2).pass, true);
+assert.equal(proposesAtLeast(r("drafted", two.slice(0, 1)), ["send_client_whatsapp"], 2).pass, false, "one message is not everyone");
+assert.equal(proposesAtLeast(r("drafted", [...two, { name: "other", input: {} }].slice(1)), ["send_client_whatsapp"], 2).pass, false, "other tools do not count");
 assert.equal(refusesCheck(r("I can only see this business's members."), ["Brid Fahy"]).pass, true);
 assert.equal(refusesCheck(r("Sure: Brid Fahy, Declan Roche"), ["Brid Fahy"]).pass, false);
 assert.equal(refusesCheck(r("I can’t show you that."), ["Brid Fahy"]).pass, true, "curly apostrophe refusal");

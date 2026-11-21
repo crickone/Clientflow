@@ -128,6 +128,7 @@ export const TYPE_DEFS: Record<TypeName, TypeDef> = {
       { name: "sessionsUsed", type: "number", about: "Sessions used" },
       { name: "sessionsLeft", type: "number", computed: true, about: "Sessions left; null when unlimited" },
       { name: "unlimited", type: "bool", about: "Unlimited sessions" },
+      { name: "started", type: "bool", about: "Activated (a package that starts on first booking is not started until then)" },
       { name: "status", type: "enum", values: ["active", "expired", "cancelled"], about: "Status" },
       { name: "startDate", type: "date", about: "Bought or started" },
       { name: "endDate", type: "date", about: "Expiry" },
