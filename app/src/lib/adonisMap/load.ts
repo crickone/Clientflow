@@ -323,16 +323,26 @@ function loadPersons(lc: LoadCtx): Row[] {
     `SELECT client_id AS id, SUM(eur) AS eur FROM (
        SELECT client_id, total_price_eur AS eur FROM appointments WHERE status = 'completed'
        UNION ALL SELECT client_id, price_cents / 100.0 FROM client_packages
-       UNION ALL SELECT client_id, price_paid_eur FROM packages
      ) GROUP BY client_id`,
   ).all() as { id: number; eur: number }[]) addSpend(`c:${r.id}`, r.eur);
-  for (const o of loadRows(lc, "Order")) {
+  // Paid online orders are counted once, through the order. fulfil.ts also writes a legacy
+  // `packages` row per offer item, listed in offer_orders.package_ids_json, so those rows are skipped here.
+  const orderPackageIds = new Set<number>();
+  for (const r of sq.prepare("SELECT package_ids_json AS j FROM offer_orders WHERE package_ids_json IS NOT NULL").all() as { j: string }[]) {
+    let ids: unknown;
+    try { ids = JSON.parse(r.j); } catch (e) { if (e instanceof SyntaxError) continue; throw e; }
+    if (Array.isArray(ids)) for (const id of ids) if (typeof id === "number") orderPackageIds.add(id);
+  }
+  for (const r of sq.prepare("SELECT id, client_id, price_paid_eur FROM packages").all() as { id: number; client_id: number; price_paid_eur: number }[]) {
+    if (!orderPackageIds.has(r.id)) addSpend(`c:${r.client_id}`, r.price_paid_eur);
+  }
+  for (const o of loadOrders(lc)) {
     if (o.status === "paid" && typeof o.personId === "string") addSpend(o.personId, o.amountEur as number);
   }
 
   const lastOut = new Map<string, string>();
   const lastAny = new Map<string, string>();
-  for (const c of loadRows(lc, "Conversation")) {
+  for (const c of loadConversations(lc)) {
     const pid = c.personId as string;
     if (typeof c.lastOutboundAt === "string" && (lastOut.get(pid) ?? "") < c.lastOutboundAt) lastOut.set(pid, c.lastOutboundAt);
     if ((lastAny.get(pid) ?? "") < (c.lastMessageAt as string)) lastAny.set(pid, c.lastMessageAt as string);
