@@ -22,9 +22,20 @@ export function PersonLinksCard({ linked, reviews }: { linked: LinkLine[]; revie
     // Ask before the transition starts: a confirm awaited inside it never renders.
     if (unlink && !(await confirm({ title: `Unlink ${line.name}?`, body: "They show as two people again, and Adonis stops treating them as one.", confirmLabel: "Unlink", destructive: true }))) return;
     start(async () => {
-      const r = await decidePersonLink(line.leadId, line.clientId, decision);
-      if (!r.ok) toast.error(r.error);
-      else toast.success(unlink ? "Unlinked." : decision === "join" ? "Joined into one person." : "Kept separate.");
+      let r: Awaited<ReturnType<typeof decidePersonLink>>;
+      try {
+        r = await decidePersonLink(line.leadId, line.clientId, decision);
+      } catch (err) {
+        // A thrown error (signed out, network) would otherwise reach the page's error boundary.
+        console.error("[PersonLinksCard] decision failed:", err);
+        toast.error("Couldn't save that. Try again.");
+        return;
+      }
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success(unlink ? "Unlinked." : decision === "join" ? "Joined into one person." : "Kept separate.");
       router.refresh();
     });
   }
