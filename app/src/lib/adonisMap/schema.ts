@@ -141,7 +141,8 @@ export const TYPE_DEFS: Record<TypeName, TypeDef> = {
     about: "Something bought online through Stripe.",
     idHint: "o:3",
     dateField: null,
-    maxRows: EVENT_ROWS,
+    // No date field to narrow a load by, so the people-sized cap: a busy business never loses Person lookups to it.
+    maxRows: PEOPLE_ROWS,
     fields: [
       { name: "offer", type: "text", about: "Offer name" },
       { name: "amountEur", type: "number", about: "Amount" },
