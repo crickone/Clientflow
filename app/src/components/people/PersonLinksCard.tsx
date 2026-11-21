@@ -45,7 +45,7 @@ export function PersonLinksCard({ linked, reviews }: { linked: LinkLine[]; revie
       {reviews.length > 0 && (
         <>
           <CardLabel>Possible same person</CardLabel>
-          <div style={{ display: "grid", gap: 14, margin: "4px 0 8px" }}>
+          <div style={{ display: "grid", gap: 14, margin: "4px 0 22px" }}>
             {reviews.map((line) => (
               <div key={`r-${line.leadId}-${line.clientId}`} style={{ display: "grid", gap: 8 }}>
                 <div style={{ minWidth: 0 }}>
