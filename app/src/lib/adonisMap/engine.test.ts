@@ -27,6 +27,10 @@ throwsMap(() => validateWhere(P, [{ field: "name", op: "in", value: [] }], ALL),
 throwsMap(() => validateWhere(P, [{ link: "bookings" }], ALL), /needs exists: true or false/);
 throwsMap(() => validateWhere(P, "stage = lapsed", ALL), /where must be a list/);
 assert.deepEqual(validateWhere(P, undefined, ALL), []);
+throwsMap(() => validateWhere(B, [{ field: "date", op: "eq", value: "2026-11-09 10:00" }], ALL), /a date like 2026-11-21/);
+assert.doesNotThrow(() => validateWhere(B, [{ field: "startsAt", op: "eq", value: "2026-11-09 10:00" }], ALL));
+throwsMap(() => validateWhere(P, Array.from({ length: 13 }, () => ({ field: "name", op: "isNull", value: false })), ALL), /at most 12 conditions/);
+throwsMap(() => validateWhere(P, [{ field: "name", op: "in", value: Array.from({ length: 101 }, (_, i) => `n${i}`) }], ALL), /a list of 1 to 100 values/);
 
 // ── matching ──
 const people: Row[] = [
@@ -51,6 +55,8 @@ assert.deepEqual(ids(sortRows(P, people, { field: "leadScore", dir: "desc" })), 
 assert.deepEqual(ids(sortRows(P, people, { field: "leadScore", dir: "asc" })), ["c:1", "c:2", "l:3"]);
 assert.deepEqual(ids(sortRows(P, people, undefined)), ["c:1", "c:2", "l:3"]);
 throwsMap(() => sortRows(P, people, { field: "nope" }), /Unknown field "nope"/);
+throwsMap(() => sortRows(P, people, { field: "leadScore", dir: "descending" }), /sort dir takes asc or desc/);
+assert.deepEqual(ids(sortRows(P, people, { field: "leadScore" })), ["c:1", "c:2", "l:3"], "no dir sorts ascending");
 
 // ── pick and limits ──
 assert.deepEqual(pick(P, people[0], ["name"]), { id: "c:1", name: "Niamh Byrne" });
@@ -105,5 +111,12 @@ assert.deepEqual(groupRows(B, bookings, undefined, undefined), { total: 3, group
 throwsMap(() => groupRows(B, bookings, { field: "date", by: "hour" }, undefined), /hour needs a datetime field/);
 throwsMap(() => groupRows(B, bookings, "name", "name"), /sum takes a number field/);
 throwsMap(() => groupRows(B, bookings, { field: "name", by: "week" }, undefined), /needs a date field/);
+const weekdayRows: Row[] = [
+  { id: "w:1", date: "2026-11-21", startsAt: "2026-11-21 10:00", status: "booked", priceEur: null, name: "HBOT" },
+  { id: "w:2", date: "2026-11-16", startsAt: "2026-11-16 10:00", status: "booked", priceEur: null, name: "HBOT" },
+  { id: "w:3", date: "2026-11-23", startsAt: "2026-11-23 10:00", status: "booked", priceEur: null, name: "HBOT" },
+];
+assert.deepEqual(groupRows(B, weekdayRows, { field: "date", by: "weekday" }, undefined).groups.map((g) => g.key), ["Mon", "Sat"], "weekday groups run Monday to Sunday");
+throwsMap(() => groupRows(P, Array.from({ length: 101 }, (_, i) => ({ id: `c:${i}`, name: `Name ${i}` })), "name", undefined), /the most is 100/);
 
 console.log("engine.test.ts: all assertions passed");

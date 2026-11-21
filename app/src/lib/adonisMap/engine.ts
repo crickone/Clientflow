@@ -21,7 +21,9 @@ const OPS_BY_TYPE: Record<FieldDef["type"], readonly Op[]> = {
 const MAX_IN = 100;
 const MAX_CONDITIONS = 12;
 export const MAX_GROUPS = 100;
-const DATE_RE = /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/;
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DATETIME_RE = /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/;
+const WEEK_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "none"];
 
 // ── lookups ──
 
@@ -53,8 +55,10 @@ function checkScalar(where: string, f: FieldDef, v: unknown): void {
       if (typeof v !== "number" || !Number.isFinite(v)) throw new MapError(`${where} takes a number.`);
       return;
     case "date":
+      if (typeof v !== "string" || !DATE_ONLY_RE.test(v)) throw new MapError(`${where} takes a date like 2026-11-21.`);
+      return;
     case "datetime":
-      if (typeof v !== "string" || !DATE_RE.test(v)) throw new MapError(`${where} takes a date like 2026-11-21.`);
+      if (typeof v !== "string" || !DATETIME_RE.test(v)) throw new MapError(`${where} takes a date like 2026-11-21.`);
       return;
     case "bool":
       if (typeof v !== "boolean") throw new MapError(`${where} takes true or false.`);
@@ -136,7 +140,10 @@ function cmp(a: unknown, b: unknown): number {
 }
 
 export function matchField(def: TypeDef, row: Row, c: FieldCondition): boolean {
-  const f = fieldDef(def, c.field);
+  return matchResolved(fieldDef(def, c.field), row, c);
+}
+
+function matchResolved(f: FieldDef, row: Row, c: FieldCondition): boolean {
   const raw = row[f.name];
   if (c.op === "isNull") return (raw === null || raw === undefined) === (c.value !== false);
   if (raw === null || raw === undefined) return c.op === "ne";
@@ -158,14 +165,19 @@ export function matchField(def: TypeDef, row: Row, c: FieldCondition): boolean {
 }
 
 export function filterRows(def: TypeDef, rows: Row[], where: FieldCondition[]): Row[] {
-  return where.length ? rows.filter((r) => where.every((c) => matchField(def, r, c))) : rows;
+  if (!where.length) return rows;
+  const resolved = where.map((c) => ({ f: fieldDef(def, c.field), c }));
+  return rows.filter((r) => resolved.every(({ f, c }) => matchResolved(f, r, c)));
 }
 
-/** Sorts by one field; nulls go last in both directions. */
+/** Sorts by one field, ascending unless dir is "desc"; nulls go last in both directions. */
 export function sortRows(def: TypeDef, rows: Row[], sort: unknown): Row[] {
   if (sort === undefined || sort === null) return rows;
   const s = sort as { field?: unknown; dir?: unknown };
   const f = fieldDef(def, s.field);
+  if (s.dir !== undefined && s.dir !== null && s.dir !== "asc" && s.dir !== "desc") {
+    throw new MapError('sort dir takes asc or desc.');
+  }
   const dir = s.dir === "desc" ? -1 : 1;
   return [...rows].sort((a, b) => {
     const x = a[f.name];
@@ -269,6 +281,7 @@ export function groupRows(def: TypeDef, rows: Row[], groupBy: unknown, sum: unkn
 
   let keyOf: (r: Row) => string;
   let byKey = false;
+  let byWeek = false;
   if (typeof groupBy === "string") {
     const f = fieldDef(def, groupBy);
     keyOf = (r) => (r[f.name] === null || r[f.name] === undefined ? "none" : String(r[f.name]));
@@ -282,6 +295,7 @@ export function groupRows(def: TypeDef, rows: Row[], groupBy: unknown, sum: unkn
     if (by === "hour" && f.type !== "datetime") throw new MapError(`Grouping by hour needs a datetime field; ${def.name}.${f.name} is a date.`);
     keyOf = (r) => (typeof r[f.name] === "string" ? bucketKey(r[f.name] as string, by) : "none");
     byKey = by !== "weekday";
+    byWeek = by === "weekday";
   }
 
   const m = new Map<string, Group>();
@@ -293,9 +307,11 @@ export function groupRows(def: TypeDef, rows: Row[], groupBy: unknown, sum: unkn
     m.set(k, g);
   }
   const groups = [...m.values()].sort(
-    byKey
-      ? (a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
-      : (a, b) => b.count - a.count || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
+    byWeek
+      ? (a, b) => WEEK_ORDER.indexOf(a.key) - WEEK_ORDER.indexOf(b.key)
+      : byKey
+        ? (a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
+        : (a, b) => b.count - a.count || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
   );
   if (groups.length > MAX_GROUPS) {
     throw new MapError(`That makes ${groups.length} groups; the most is ${MAX_GROUPS}. Group by something coarser or add a filter.`);
