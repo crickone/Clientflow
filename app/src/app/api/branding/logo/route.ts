@@ -61,7 +61,8 @@ export async function GET(req: Request) {
       { status: 404 },
     );
   }
-  if (new URL(req.url).searchParams.get("shape") === "1") {
+  const wantShape = new URL(req.url).searchParams.get("shape") === "1";
+  if (wantShape) {
     const shape = await ensureLogoShape(filePath);
     if (!shape) {
       return NextResponse.json({ ok: false, error: "No one-colour logo." }, { status: 404 });
@@ -76,7 +77,10 @@ export async function GET(req: Request) {
     headers: {
       "Content-Type": contentType,
       "Content-Length": String(stat.size),
-      "Cache-Control": "no-store",
+      // The shape's URL carries the logo's mtime (?v=), so a day of private
+      // caching is safe and saves the mask + sizing <img> refetching it on
+      // every page. The logo itself stays uncached as before.
+      "Cache-Control": wantShape ? "private, max-age=86400" : "no-store",
       ...mediaSecurityHeaders(),
     },
   });

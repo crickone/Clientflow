@@ -9,7 +9,10 @@ const requireLocal = createRequire(import.meta.url);
 
 (async () => {
   const sharp = (await import("sharp")).default;
-  const { ensureLogoShape, removeLogoShape } = requireLocal("./logoShapeFile") as typeof import("./logoShapeFile");
+  const { ensureLogoShape, removeLogoShape, svgDensity } = requireLocal("./logoShapeFile") as typeof import("./logoShapeFile");
+  assert.equal(svgDensity(120, 40), 300); // small mark: crisp
+  assert.equal(Math.round(svgDensity(4000, 4000)), 37); // big export: scaled down
+  assert.equal(svgDensity(undefined, undefined), 72);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "logo-shape-"));
   try {
     // A dark block on white, saved as JPG.
@@ -52,6 +55,23 @@ const requireLocal = createRequire(import.meta.url);
     removeLogoShape(photo);
     assert.ok(!fs.existsSync(path.join(dir, "logo.shape.none")));
     assert.ok(!fs.existsSync(path.join(dir, "logo.shape.png")));
+
+    // A large design-tool SVG (4000 x 4000 user units) still gets a shape.
+    const big = path.join(dir, "logo.svg");
+    removeLogoShape(big);
+    fs.writeFileSync(big, '<svg xmlns="http://www.w3.org/2000/svg" width="4000" height="4000"><rect x="400" y="1500" width="3200" height="1000" fill="#111"/></svg>');
+    const bigShape = await ensureLogoShape(big);
+    assert.ok(bigShape, "large SVG should get a shape");
+    const bigMeta = await sharp(bigShape!).metadata();
+    assert.ok(bigMeta.width! <= 1024 + 4, `width ${bigMeta.width}`);
+
+    // An undecodable logo is remembered (marker), so it isn't re-decoded on every request.
+    const junk = path.join(dir, "logo.webp");
+    removeLogoShape(junk);
+    fs.writeFileSync(junk, "not an image");
+    assert.equal(await ensureLogoShape(junk), null);
+    assert.ok(fs.existsSync(path.join(dir, "logo.shape.none")));
+    removeLogoShape(junk);
 
     // A missing file is null, never a throw.
     assert.equal(await ensureLogoShape(path.join(dir, "nope.png")), null);

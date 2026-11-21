@@ -25,18 +25,40 @@ function fresh(file: string, logoMtime: number): boolean {
   }
 }
 
+/** Rasterise an SVG so its long side lands near this many pixels (then fit to MAX_PX). */
+const SVG_TARGET_PX = 2048;
+
+/**
+ * The density to rasterise an SVG at. A fixed high density makes a large
+ * design-tool export (thousands of user units) blow past sharp's pixel limit,
+ * so it scales with the SVG's own size: small marks render crisp, large ones
+ * stay within bounds.
+ */
+export function svgDensity(width: number | undefined, height: number | undefined): number {
+  const long = Math.max(width ?? 0, height ?? 0);
+  if (!long) return 72;
+  return Math.min(300, Math.max(1, (72 * SVG_TARGET_PX) / long));
+}
+
 export async function ensureLogoShape(logoPath: string): Promise<string | null> {
+  let none: string | null = null;
   try {
     const dir = path.dirname(logoPath);
     const out = path.join(dir, SHAPE);
-    const none = path.join(dir, NONE);
     const logoMtime = fs.statSync(logoPath).mtimeMs;
+    none = path.join(dir, NONE);
     if (fresh(out, logoMtime)) return out;
     if (fresh(none, logoMtime)) return null;
 
     const sharp = (await import("sharp")).default;
     const isSvg = path.extname(logoPath).toLowerCase() === ".svg";
-    const { data, info } = await sharp(fs.readFileSync(logoPath), isSvg ? { density: 300 } : {})
+    const buf = fs.readFileSync(logoPath);
+    let density: number | undefined;
+    if (isSvg) {
+      const meta = await sharp(buf).metadata();
+      density = svgDensity(meta.width, meta.height);
+    }
+    const { data, info } = await sharp(buf, density ? { density } : {})
       .resize(MAX_PX, MAX_PX, { fit: "inside", withoutEnlargement: !isSvg })
       .ensureAlpha()
       .raw()
@@ -59,6 +81,15 @@ export async function ensureLogoShape(logoPath: string): Promise<string | null> 
     fs.rmSync(none, { force: true });
     return out;
   } catch {
+    // The logo exists but can't be made one-colour (undecodable, too large):
+    // remember that, so the public route doesn't retry it on every request.
+    if (none) {
+      try {
+        fs.writeFileSync(none, "");
+      } catch {
+        // best effort
+      }
+    }
     return null;
   }
 }
