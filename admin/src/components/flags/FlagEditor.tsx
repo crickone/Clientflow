@@ -4,7 +4,8 @@ import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { notify } from "@/lib/toast";
-import { segmentOf, whoHasIt } from "@/lib/flagWho";
+import { lostCount, segmentOf, whoHasIt } from "@/lib/flagWho";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { setFlagAction } from "@/app/(console)/flags/actions";
 import type { PlatformFlag } from "@/lib/types";
 
@@ -54,7 +55,9 @@ function FlagRow({ row, total, isOwner }: { row: FlagRowData; total: number; isO
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
   // The panel edits either a named list or a percentage; start from what is saved.
-  const [draft, setDraft] = useState<PlatformFlag>(flag.mode === "percent" ? flag : { ...flag, mode: "allow" });
+  const ask = useConfirm();
+  const savedDraft = (): PlatformFlag => (flag.mode === "percent" ? flag : { ...flag, mode: "allow" });
+  const [draft, setDraft] = useState<PlatformFlag>(savedDraft);
   const usePercent = draft.mode === "percent";
   const emptyAllow = !usePercent && draft.allow.length === 0;
   const active: Segment = open ? "some" : segmentOf(flag);
@@ -72,13 +75,36 @@ function FlagRow({ row, total, isOwner }: { row: FlagRowData; total: number; isO
     });
   }
 
-  function pick(seg: Segment) {
-    if (!isOwner || pending) return;
-    if (seg === "some") { setOpen((o) => !o); return; }
+  function closePanel() {
     setOpen(false);
+    setDraft(savedDraft());
+  }
+
+  async function pick(seg: Segment) {
+    if (!isOwner || pending) return;
+    if (seg === "some") {
+      if (open) closePanel();
+      else setOpen(true);
+      return;
+    }
+    closePanel();
     if (segmentOf(flag) === seg) return;
-    // Everyone and Nobody save at once; the saved list and percentage are kept so switching back is lossless.
+    // Everyone and Nobody are platform-wide, so they ask first. The saved list and percentage are kept so switching back is lossless.
+    const r = seg === "nobody"
+      ? await ask({ title: `Turn off ${label} for every business?`, body: "No business gets it. Their pages are refused and the module leaves their sidebar until you turn it back on.", confirmLabel: "Turn off", danger: true })
+      : await ask({ title: `Turn on ${label} for every business?`, body: `All ${total} businesses get it. A business that switched it off on its own Features tab stays off.`, confirmLabel: "Turn on" });
+    if (!r.ok) return;
     save({ ...flag, mode: seg === "everyone" ? "all" : "none" });
+  }
+
+  async function saveDraft() {
+    const lost = lostCount(flag, draft, tenants.map((t) => t.id));
+    if (lost !== 0) {
+      const body = lost === null ? `Fewer businesses will have ${label}.` : `${lost} ${lost === 1 ? "business loses" : "businesses lose"} ${label}.`;
+      const r = await ask({ title: `Change who has ${label}?`, body, confirmLabel: "Save", danger: true });
+      if (!r.ok) return;
+    }
+    save(draft, () => setOpen(false));
   }
 
   return (
@@ -138,8 +164,8 @@ function FlagRow({ row, total, isOwner }: { row: FlagRowData; total: number; isO
                   <input type="checkbox" checked={usePercent} onChange={(e) => setDraft(e.target.checked ? { ...draft, mode: "percent" } : { ...draft, mode: "allow" })} /> Percentage instead
                 </label>
                 <span style={{ flex: 1 }} />
-                <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setOpen(false); setDraft(flag.mode === "percent" ? flag : { ...flag, mode: "allow" }); }} disabled={pending}>Cancel</button>
-                <button type="button" className="btn btn--primary btn--sm" onClick={() => save(draft, () => setOpen(false))} disabled={pending || emptyAllow}>Save</button>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={closePanel} disabled={pending}>Cancel</button>
+                <button type="button" className="btn btn--primary btn--sm" onClick={saveDraft} disabled={pending || emptyAllow}>Save</button>
               </div>
             </div>
           </td>

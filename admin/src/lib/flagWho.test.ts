@@ -1,7 +1,7 @@
 // Run: npm test -- src/lib/flagWho.test.ts
 import assert from "node:assert/strict";
 
-import { segmentOf, whoHasIt } from "./flagWho";
+import { lostCount, segmentOf, whoHasIt } from "./flagWho";
 import type { PlatformFlag } from "./types";
 
 const name = (id: number) => `B${id}`;
@@ -21,4 +21,27 @@ assert.equal(segmentOf(f("all")), "everyone");
 assert.equal(segmentOf(f("none")), "nobody");
 assert.equal(segmentOf(f("allow", 0, [1])), "some");
 assert.equal(segmentOf(f("percent", 10)), "some");
+assert.equal(segmentOf(f("allow", 0, [])), "nobody");
+
+const ids = [1, 2, 3, 4, 5];
+// From Everyone.
+assert.equal(lostCount(f("all", 100), f("allow", 0, [1, 2]), ids), 3);
+assert.equal(lostCount(f("all", 100), f("allow", 0, ids), ids), 0);
+assert.equal(lostCount(f("all", 100), f("percent", 50), ids), null);
+assert.equal(lostCount(f("all", 100), f("percent", 100), ids), 0);
+assert.equal(lostCount(f("all", 100), f("none"), ids), 5);
+// From a named list.
+assert.equal(lostCount(f("allow", 0, [1, 2, 3]), f("allow", 0, [1, 2, 3, 4]), ids), 0);
+assert.equal(lostCount(f("allow", 0, [1, 2, 3]), f("allow", 0, [1]), ids), 2);
+assert.equal(lostCount(f("allow", 0, [1, 2, 3]), f("percent", 40), ids), null);
+assert.equal(lostCount(f("allow", 0, [1, 2, 3]), f("all", 100), ids), 0);
+// From a percentage.
+assert.equal(lostCount(f("percent", 50), f("percent", 60), ids), 0);
+assert.equal(lostCount(f("percent", 50), f("percent", 50), ids), 0);
+assert.equal(lostCount(f("percent", 50), f("percent", 20), ids), null);
+assert.equal(lostCount(f("percent", 50), f("allow", 0, [1]), ids), null);
+assert.equal(lostCount(f("percent", 0), f("allow", 0, [1]), ids), 0);
+// From nothing: nobody can lose it.
+assert.equal(lostCount(f("none"), f("allow", 0, [1]), ids), 0);
+assert.equal(lostCount(f("allow", 0, []), f("percent", 10), ids), 0);
 console.log("flagWho: ok");
