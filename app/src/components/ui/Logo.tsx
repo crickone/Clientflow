@@ -96,19 +96,24 @@ export function Logo({
         style={{
           display: "inline-block",
           flex: "none",
+          maxWidth: "100%",
           lineHeight: 0,
           color: colour,
           backgroundColor: "currentColor",
           WebkitMaskImage: mask,
           maskImage: mask,
-          WebkitMaskSize: "100% 100%",
-          maskSize: "100% 100%",
+          // contain, not stretch: a wide logo squeezed by a narrow parent
+          // shrinks in proportion instead of distorting or overflowing.
+          WebkitMaskSize: "contain",
+          maskSize: "contain",
+          WebkitMaskPosition: "left center",
+          maskPosition: "left center",
           WebkitMaskRepeat: "no-repeat",
           maskRepeat: "no-repeat",
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- sizes the box; the mask above paints it */}
-        <img ref={shapeRef} src={shapeSrc} alt="" aria-hidden onError={missShape} style={{ height, width: "auto", display: "block", opacity: 0 }} />
+        <img ref={shapeRef} src={shapeSrc} alt="" aria-hidden onError={missShape} style={{ height, width: "auto", maxWidth: "100%", objectFit: "contain", display: "block", opacity: 0 }} />
       </span>
     );
   }

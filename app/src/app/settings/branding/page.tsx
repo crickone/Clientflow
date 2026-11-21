@@ -25,7 +25,7 @@ export default async function BrandingSettingsPage() {
       <PageHeader
         eyebrow="Settings"
         title="Branding"
-        subtitle="Your business logo, content fonts, and the AI image style used for AI-generated post imagery. (The app chrome shows the AdonisAgent wordmark for now.)"
+        subtitle="Your business logo, content fonts, and the AI image style used for AI-generated post imagery."
       />
       <BrandingForm
         hasLogo={hasLogo}
