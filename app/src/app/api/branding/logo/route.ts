@@ -19,6 +19,7 @@ import {
   getBrandingLogoFilename,
   setKey,
 } from "@/lib/settings";
+import { ensureLogoShape, removeLogoShape } from "@/lib/logoShapeFile";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -31,8 +32,13 @@ const MIME_BY_EXT: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
-/** Streams the current logo for preview in the settings page + img tags. */
-export async function GET() {
+/**
+ * Streams the current logo for preview in the settings page + img tags.
+ * `?shape=1` streams its one-colour shape instead (see lib/logoShapeFile),
+ * or 404 when the logo can't be made one-colour, so the caller shows the
+ * original.
+ */
+export async function GET(req: Request) {
   // Public route (allow-listed in middleware): with no resolvable tenant
   // (logged out, forged cookie) there is no logo to serve — 404, never a
   // default tenant's file. resolveLogoPath throws TenantResolutionError in
@@ -54,6 +60,13 @@ export async function GET() {
       { ok: false, error: "No logo uploaded." },
       { status: 404 },
     );
+  }
+  if (new URL(req.url).searchParams.get("shape") === "1") {
+    const shape = await ensureLogoShape(filePath);
+    if (!shape) {
+      return NextResponse.json({ ok: false, error: "No one-colour logo." }, { status: 404 });
+    }
+    filePath = shape;
   }
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_BY_EXT[ext] ?? "application/octet-stream";
@@ -161,6 +174,7 @@ export async function DELETE() {
     } catch {
       // best effort
     }
+    if (full) removeLogoShape(full);
     deleteKey("branding_logo_filename");
   }
   invalidateCachedCards();
