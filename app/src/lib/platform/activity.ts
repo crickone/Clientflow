@@ -48,7 +48,8 @@ function countBookings(tdb: ReturnType<typeof getTenantDbById>, afterDay: string
       .innerJoin(classSessions, eq(classSessions.id, sessionBookings.sessionId))
       .where(
         and(
-          inArray(sessionBookings.status, ["booked", "attended"]),
+          // A no-show still held the place, so it counts as a booking (appointments count theirs too).
+          inArray(sessionBookings.status, ["booked", "attended", "no_show"]),
           ne(classSessions.status, "cancelled"),
           gt(classSessions.date, afterDay),
           lte(classSessions.date, uptoDay),
