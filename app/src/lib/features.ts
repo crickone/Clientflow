@@ -45,6 +45,7 @@ export const MODULE_CATALOG: ModuleDef[] = [
   { key: "content_studio", label: "Content Studio", blurb: "Designed posts, blogs and video.", paths: ["/content-studio"] },
   { key: "email_campaigns", label: "Email campaigns", blurb: "Bulk email, contacts and sending domains.", paths: ["/campaigns"] },
   { key: "client_app", label: "Client app", blurb: "The members' own app and its branding.", paths: ["/my-app"] },
+  { key: "adonis_map", label: "Adonis business map", blurb: "Adonis reads people, bookings, memberships, packages, orders and messages as one connected map.", paths: [], defaultRollout: "none" },
 ];
 
 export const MODULE_KEYS: readonly string[] = MODULE_CATALOG.map((m) => m.key);
