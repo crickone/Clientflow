@@ -63,6 +63,31 @@ assert.match(jobAlerts(runs)[0].title, /disk/);
     assert.ok(!plan.tenantIds.includes(badId), "unreadable tenant is excluded from scope");
     assert.ok(plan.tenantIds.includes(goneId), "inactive tenant with an open alert is in scope so it resolves");
     assert.ok(!plan.candidates.some((c) => c.tenantId === goneId), "inactive tenant raises nothing");
+    // Churn risk: a business at high risk raises churn:high, unless its stage says it is not launched or internal.
+    const churnSlugs = ["alert-src-churn", "alert-src-notlaunched", "alert-src-internal"];
+    for (const sl of churnSlugs) controlSqlite.prepare("DELETE FROM tenants WHERE slug = ?").run(sl);
+    const [churnId, notLaunchedId, internalId] = churnSlugs.map((sl) => mk(sl, 1));
+    try {
+      for (const id of [churnId, notLaunchedId, internalId]) {
+        // Suspended (40) plus a business older than a week that nobody has signed into (40) is high.
+        controlSqlite.prepare("INSERT INTO tenant_billing (tenant_id, status, billing_exempt, anchor_day) VALUES (?, 'suspended', 0, 1)").run(id);
+      }
+      controlSqlite.prepare("INSERT INTO tenant_meta (tenant_id, stage, updated_at) VALUES (?, 'not_launched', 1)").run(notLaunchedId);
+      controlSqlite.prepare("INSERT INTO tenant_meta (tenant_id, stage, updated_at) VALUES (?, 'internal', 1)").run(internalId);
+      const churnFleet = {
+        tenants: [churnId, notLaunchedId, internalId].map((id) => row(id, true, [])),
+        schedulers: [],
+        duplicateSiteSlugs: [],
+      } as unknown as Parameters<typeof collectAlertCandidates>[0];
+      const later = Date.now() + 30 * 86400000;
+      const churn = collectAlertCandidates(churnFleet, later).candidates.filter((c) => c.key === "churn:high");
+      assert.ok(churn.some((c) => c.tenantId === churnId), "an ordinary business at high risk raises churn:high");
+      assert.ok(!churn.some((c) => c.tenantId === notLaunchedId), "a not_launched business raises no churn alert");
+      assert.ok(!churn.some((c) => c.tenantId === internalId), "an internal business raises no churn alert");
+    } finally {
+      for (const sl of churnSlugs) controlSqlite.prepare("DELETE FROM tenants WHERE slug = ?").run(sl);
+      controlSqlite.prepare("DELETE FROM tenant_meta WHERE tenant_id IN (?, ?)").run(notLaunchedId, internalId);
+    }
     const hasBackupAlert = plan.candidates.some((c) => c.key === "backup:not_configured");
     const hasBackupSched = plan.candidates.some((c) => c.key === "scheduler:backup_last_run");
     assert.ok(!(hasBackupAlert && hasBackupSched), "never both a not-configured and a stale-backup alert");

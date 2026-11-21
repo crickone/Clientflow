@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, inArray, lte } from "drizzle-orm";
+import { and, asc, eq, inArray, lte, ne } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import { getTenantDbById } from "@/lib/db/tenant";
@@ -17,6 +17,7 @@ import {
 import { getBusinessProfile, getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { getThemeForTenant } from "@/lib/settings";
 import { renderEmailShell, sendEmailForTenant, textToParagraphs } from "@/lib/email";
+import { isStopped } from "@/lib/platform/killSwitch";
 
 /**
  * The campaign nurture sequence: one follow-up series, every campaign.
@@ -190,10 +191,23 @@ const BATCH = 25;
  */
 export async function dispatchDueAutomationQueue(tenantId: number, now: number = Date.now()): Promise<number> {
   const tdb = getTenantDbById(tenantId);
+  // The platform "Email sending" switch holds the nurture sequence too. A
+  // held email row is left exactly as it is (still queued, no attempt, no
+  // error) so it goes on the first tick after sending is started again. The
+  // email rows are kept out of the batch query rather than skipped in the
+  // loop: otherwise 25 held emails at the front of the queue would crowd the
+  // WhatsApp messages (which the switch does not cover) out of every batch.
+  const emailHeld = isStopped("email");
   const due = tdb
     .select()
     .from(schema.automationQueue)
-    .where(and(eq(schema.automationQueue.status, "queued"), lte(schema.automationQueue.dueAt, new Date(now))))
+    .where(
+      and(
+        eq(schema.automationQueue.status, "queued"),
+        lte(schema.automationQueue.dueAt, new Date(now)),
+        ...(emailHeld ? [ne(schema.automationQueue.channel, "email")] : []),
+      ),
+    )
     .orderBy(asc(schema.automationQueue.dueAt))
     .limit(BATCH)
     .all();
@@ -254,6 +268,9 @@ export async function dispatchDueAutomationQueue(tenantId: number, now: number =
       else sent++;
       continue;
     }
+
+    // Stopped between the batch query and this row: hold it, untouched.
+    if (item.channel === "email" && isStopped("email")) continue;
 
     if (item.channel !== "email" || !item.sendTo) {
       tdb.update(schema.automationQueue)

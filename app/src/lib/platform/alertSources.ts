@@ -173,8 +173,12 @@ export function collectAlertCandidates(
   }
 
   // Churn risk for every active business (exempt ones can still drift away). One bad business never drops the sync.
+  // A business that has not launched yet, or is the agency's own, is not "drifting away": no churn alert for it.
+  const noChurnAlert = new Set(
+    (controlSqlite.prepare("SELECT tenant_id AS id FROM tenant_meta WHERE stage IN ('not_launched', 'internal')").all() as Array<{ id: number }>).map((r) => r.id),
+  );
   for (const b of billing) {
-    if (!inFleet.has(b.id)) continue;
+    if (!inFleet.has(b.id) || noChurnAlert.has(b.id)) continue;
     try {
       const setup = getSetupSummaryForTenant(b.id);
       const r = churnRisk(riskFacts(b.id, { requiredDone: setup.requiredDone, requiredTotal: setup.requiredTotal }, now));
