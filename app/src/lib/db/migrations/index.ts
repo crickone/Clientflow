@@ -398,7 +398,11 @@ export const CONTROL_MIGRATIONS: Migration[] = [
           updated_at INTEGER
         );
         INSERT INTO tenant_meta_new (tenant_id, stage, owner_user_id, tags, updated_at)
-          SELECT tenant_id, stage, owner_user_id, tags, updated_at FROM tenant_meta;
+          SELECT tenant_id, stage,
+                 CASE WHEN owner_user_id IN (SELECT id FROM users) THEN owner_user_id ELSE NULL END,
+                 tags, updated_at
+            FROM tenant_meta
+           WHERE tenant_id IN (SELECT id FROM tenants);
         DROP TABLE tenant_meta;
         ALTER TABLE tenant_meta_new RENAME TO tenant_meta;
       `);
