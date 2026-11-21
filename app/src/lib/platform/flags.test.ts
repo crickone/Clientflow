@@ -6,7 +6,7 @@ const requireLocal = createRequire(import.meta.url);
 
 (async () => {
   const { controlSqlite } = requireLocal("../db/control") as typeof import("../db/control");
-  const { listPlatformFlags, setPlatformFlag, rolloutCount } = requireLocal("./flags") as typeof import("./flags");
+  const { listPlatformFlags, setPlatformFlag, rolloutCount, flagModules } = requireLocal("./flags") as typeof import("./flags");
   const { MODULE_CATALOG } = requireLocal("../features") as typeof import("../features");
 
   const key = "leads";
@@ -29,6 +29,13 @@ const requireLocal = createRequire(import.meta.url);
     const f = listPlatformFlags().find((x) => x.key === key)!;
     assert.deepEqual(f, { key, mode: "allow", percent: 100, allow: [3, 9] });
     assert.equal(rolloutCount(f, [1, 3, 9, 12]), 2);
+
+    const all = listPlatformFlags();
+    const mods = flagModules(all);
+    assert.equal(mods.length, all.length, "one module entry per flag");
+    assert.deepEqual(mods.map((m) => m.key), all.map((x) => x.key));
+    assert.ok(mods.every((m) => m.label.length > 0 && m.blurb.length > 0), "each module has a label and blurb");
+    assert.deepEqual(flagModules([all[0]]).map((m) => m.key), [all[0].key], "only keys in flags");
 
     setPlatformFlag({ key, mode: "none", percent: 0, allow: [] });
     assert.equal(listPlatformFlags().find((x) => x.key === key)!.mode, "none");

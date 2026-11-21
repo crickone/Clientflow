@@ -4,7 +4,7 @@ import { z } from "zod";
 import { controlSqlite } from "@/lib/db/control";
 import { guardPlatform } from "@/lib/platform/auth";
 import { recordAudit, requestIp } from "@/lib/platform/audit";
-import { listPlatformFlags, rolloutCount, setPlatformFlag } from "@/lib/platform/flags";
+import { flagModules, listPlatformFlags, rolloutCount, setPlatformFlag } from "@/lib/platform/flags";
 import { MODULE_KEYS } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   if (g instanceof Response) return g;
   const flags = listPlatformFlags();
   const ids = activeTenantIds();
-  return NextResponse.json({ flags, tenantIds: ids, counts: Object.fromEntries(flags.map((f) => [f.key, rolloutCount(f, ids)])) });
+  return NextResponse.json({ flags, modules: flagModules(flags), tenantIds: ids, counts: Object.fromEntries(flags.map((f) => [f.key, rolloutCount(f, ids)])) });
 }
 
 const schema = z.object({

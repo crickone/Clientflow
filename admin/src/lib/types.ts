@@ -574,4 +574,5 @@ export interface Risk { score: number; level: "low" | "medium" | "high"; reasons
 export interface Note { id: number; tenantId: number; authorUserId: number; authorEmail: string; body: string; pinned: boolean; createdAt: number }
 export interface Task { id: number; tenantId: number | null; tenantName: string | null; title: string; dueAt: number | null; assignedTo: number | null; doneAt: number | null; createdBy: number; createdAt: number }
 export interface ModuleUsage { key: string; label: string; hits: number; lastAt: number | null; prevHits: number }
+export interface FlagModule { key: string; label: string; blurb: string }
 export interface PlatformFlag { key: string; mode: "all" | "none" | "percent" | "allow"; percent: number; allow: number[] }

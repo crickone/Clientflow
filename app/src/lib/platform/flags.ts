@@ -38,6 +38,12 @@ export function listPlatformFlags(): PlatformFlag[] {
   });
 }
 
+/** Label and plain-words description for each listed flag, from the catalog. */
+export function flagModules(flags: PlatformFlag[]): Array<{ key: string; label: string; blurb: string }> {
+  const keys = new Set(flags.map((f) => f.key));
+  return MODULE_CATALOG.filter((m) => keys.has(m.key)).map((m) => ({ key: m.key, label: m.label, blurb: m.blurb }));
+}
+
 export function setPlatformFlag(flag: PlatformFlag): void {
   controlSqlite
     .prepare(
