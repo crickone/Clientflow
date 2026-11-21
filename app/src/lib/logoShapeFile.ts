@@ -47,7 +47,15 @@ export async function ensureLogoShape(logoPath: string): Promise<string | null> 
       fs.rmSync(out, { force: true });
       return null;
     }
-    await sharp(Buffer.from(shape.data), { raw: { width: shape.width, height: shape.height, channels: 4 } }).png().toFile(out);
+    // Write beside it, then rename: a reader never sees a half-written file,
+    // and a failed write leaves nothing that would later pass as fresh.
+    const tmp = `${out}.${process.pid}.${Date.now()}.tmp`;
+    try {
+      await sharp(Buffer.from(shape.data), { raw: { width: shape.width, height: shape.height, channels: 4 } }).png().toFile(tmp);
+      fs.renameSync(tmp, out);
+    } finally {
+      fs.rmSync(tmp, { force: true });
+    }
     fs.rmSync(none, { force: true });
     return out;
   } catch {
