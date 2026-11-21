@@ -113,11 +113,11 @@ function ActivityTableInner({ views, now }: { views: ActivityView[]; now: number
                   className="activity-num"
                   style={{
                     textAlign: "right",
-                    fontWeight: problems > 0 ? 600 : 400,
-                    color: problems === 0 ? "var(--text-tertiary)" : worst === "bad" ? "var(--red)" : "var(--amber)",
+                    fontWeight: problems !== null && problems > 0 ? 600 : 400,
+                    color: !problems ? "var(--text-tertiary)" : worst === "bad" ? "var(--red)" : "var(--amber)",
                   }}
                 >
-                  {problems}
+                  {num(problems)}
                 </td>
               </tr>
             );

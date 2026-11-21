@@ -5,7 +5,8 @@ export type ActivitySortKey = "problems" | "name" | "lastLogin" | "membersActive
 
 export interface ActivityView {
   row: ActivityRow;
-  problems: number;
+  /** Open problems; null when the alerts feed was unavailable, so it is unknown rather than zero. */
+  problems: number | null;
   worst: "bad" | "warn" | null;
 }
 
@@ -14,9 +15,10 @@ export const ACTIVITY_SORT_KEYS: ActivitySortKey[] = ["problems", "name", "lastL
 /** Attach each business's open-problem count and its worst level. Snoozed-until-future alerts do not count. */
 export function joinProblems(
   rows: ActivityRow[],
-  alerts: { tenantId: number | null; level: string; snoozedUntil?: number | null }[],
+  alerts: { tenantId: number | null; level: string; snoozedUntil?: number | null }[] | null,
   now: number,
 ): ActivityView[] {
+  if (alerts === null) return rows.map((row) => ({ row, problems: null, worst: null }));
   const byTenant = new Map<number, { problems: number; worst: "bad" | "warn" | null }>();
   for (const a of alerts) {
     if (a.tenantId === null || a.tenantId === undefined) continue;

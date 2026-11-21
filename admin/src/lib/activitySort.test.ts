@@ -53,6 +53,12 @@ assert.deepEqual(joined.map((v) => [v.row.tenantId, v.problems, v.worst]), [
   [3, 1, "bad"],
 ]);
 assert.deepEqual(joinProblems([row(4, "Delta")], [], NOW).map((v) => [v.problems, v.worst]), [[0, null]]);
+// No alerts feed: unknown, not zero, and unknown sorts last in both directions.
+const unknown = joinProblems([row(5, "Echo"), row(6, "Foxtrot")], null, NOW);
+assert.deepEqual(unknown.map((v) => v.problems), [null, null]);
+const mixed: ActivityView[] = [unknown[0]!, { row: row(7, "Alpha"), problems: 2, worst: "bad" }];
+assert.equal(sortActivity(mixed, "problems", "desc")[0]!.row.name, "Alpha");
+assert.equal(sortActivity(mixed, "problems", "asc")[0]!.row.name, "Alpha");
 
 // --- sortActivity ---
 const v = (r: ActivityRow, problems = 0, worst: ActivityView["worst"] = null): ActivityView => ({ row: r, problems, worst });

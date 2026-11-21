@@ -16,7 +16,8 @@ import type { ActivityResponse, AlertsResponse, PlatformAlert, PlatformAnalytics
  * and the money.
  *
  * Each of the three fetches is fail-soft on its own. A section whose data did
- * not arrive is left out; the others still render.
+ * not arrive says so in a quiet line (never an empty "all fine"); the others
+ * still render.
  */
 
 const NEEDS_SHOWN = 8;
@@ -59,14 +60,25 @@ export default async function DashboardPage() {
   const open = openAlerts(alertList, now);
   const eyebrow = `Fleet · ${new Intl.DateTimeFormat("en-IE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Dublin" }).format(now)}`;
 
-  const views = activity ? joinProblems(activity.rows, alertList, now) : null;
-  const salesWeek = activity ? activity.rows.reduce((sum, r) => sum + (r.salesCents7d ?? 0), 0) : null;
+  // With no alerts feed the problem counts are unknown (null), not zero.
+  const views = activity ? joinProblems(activity.rows, alertsRes ? alertList : null, now) : null;
+  const known = activity ? activity.rows.filter((r) => r.salesCents7d !== null) : [];
+  const salesWeek = known.length > 0 ? known.reduce((sum, r) => sum + (r.salesCents7d ?? 0), 0) : null;
 
   return (
     <div className="board">
       <PageHeader eyebrow={eyebrow} title="Dashboard" />
 
-      {alertsRes ? (
+      {!alertsRes ? (
+        <Card>
+          <div className="need-head">
+            <h2 className="card-title">Needs you</h2>
+          </div>
+          <p className="inbox-empty" style={{ margin: "8px 0 0" }}>
+            Couldn&apos;t load alerts. <Link href="/inbox">Open the inbox.</Link>
+          </p>
+        </Card>
+      ) : (
         <Card>
           <div className="need-head">
             <h2 className="card-title">Needs you · {open.length}</h2>
@@ -100,16 +112,18 @@ export default async function DashboardPage() {
             </p>
           ) : null}
         </Card>
-      ) : null}
+      )}
 
-      {views ? (
-        <section>
-          <h2 className="board-section-title">This week</h2>
+      <section>
+        <h2 className="board-section-title">This week</h2>
+        {views ? (
           <Card style={{ padding: "18px 22px" }}>
             <ActivityTable views={views} now={now} />
           </Card>
-        </section>
-      ) : null}
+        ) : (
+          <p className="inbox-empty" style={{ margin: "8px 0 0" }}>Couldn&apos;t load this week&apos;s activity.</p>
+        )}
+      </section>
 
       {analytics ? <Money analytics={analytics} salesWeekCents={salesWeek} /> : null}
     </div>
@@ -120,12 +134,15 @@ function Money({ analytics, salesWeekCents }: { analytics: PlatformAnalytics; sa
   const { platform, gyms } = analytics;
 
   if (platform.gyms.paying === 0) {
+    const allExempt = platform.gyms.exempt === platform.gyms.total;
     return (
       <section>
         <h2 className="board-section-title">Money</h2>
         <Card>
           <p className="money-line">
-            All {platform.gyms.total} {platform.gyms.total === 1 ? "business is" : "businesses are"} exempt. Platform MRR starts when the first business pays.
+            {allExempt
+              ? `All ${platform.gyms.total} ${platform.gyms.total === 1 ? "business is" : "businesses are"} exempt. Platform MRR starts when the first business pays.`
+              : "No business is paying yet. Platform MRR starts when the first business pays."}
           </p>
           {salesWeekCents !== null ? (
             <p className="money-line">

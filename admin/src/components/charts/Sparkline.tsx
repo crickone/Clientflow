@@ -50,16 +50,3 @@ export function Sparkline({
     </svg>
   );
 }
-
-/**
- * A hairline bar showing one row's share of a total. Used in the fleet strip,
- * where the comparison that matters is between businesses, not against a scale.
- */
-export function ShareBar({ fraction }: { fraction: number }) {
-  const pct = Math.max(0, Math.min(1, fraction)) * 100;
-  return (
-    <span className="sharebar" aria-hidden>
-      <span className="sharebar-fill" style={{ width: `${pct}%` }} />
-    </span>
-  );
-}

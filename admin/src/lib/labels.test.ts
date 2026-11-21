@@ -44,10 +44,9 @@ assert.equal(relTime(ago(26 * H), now), "1d");
 assert.equal(relTime(ago(9 * D), now), "9d");
 assert.equal(relTime(ago(21 * D), now), "3w");
 assert.equal(relTime(now + 5 * M, now), "just now");
-console.log("labels.test.ts: ok");
-
 assert.equal(isReconnectAlert("integration:facebook"), true);
 assert.equal(isReconnectAlert("integration:meta"), true);
 assert.equal(isReconnectAlert("billing:card_expiring"), false);
 assert.equal(isReconnectAlert("health:queue_failed:posts"), false);
 assert.equal(isReconnectAlert("churn:high"), false);
+console.log("labels.test.ts: ok");
