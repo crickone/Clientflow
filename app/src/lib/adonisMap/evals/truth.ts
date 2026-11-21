@@ -114,10 +114,16 @@ export function computeTruth(a: { gymId: number; clinicId: number; today: string
     expiringPackages: names(sq.prepare(
       "SELECT c.first_name || ' ' || c.last_name AS name FROM client_packages p JOIN clients c ON c.id = p.client_id WHERE p.status = 'active' AND p.end_date BETWEEN ? AND ? AND p.sessions_total - p.sessions_used > 2",
     ).all(today, addDays(today, 30))),
-    topVisitors: names(sq.prepare(
-      `SELECT c.first_name || ' ' || c.last_name AS name, COUNT(*) AS n FROM session_bookings b JOIN class_sessions s ON s.id = b.session_id JOIN clients c ON c.id = b.client_id
-        WHERE b.status = 'attended' AND s.date BETWEEN ? AND ? GROUP BY c.id ORDER BY n DESC, name ASC LIMIT 10`,
-    ).all(monthStart, today)),
+    // Everyone tied with the 10th-placed visitor counts as a top-10 answer: regulars attend in
+    // groups with identical counts, so a hard LIMIT 10 would cut a tie at an alphabetical line.
+    topVisitors: (() => {
+      const ranked = sq.prepare(
+        `SELECT c.first_name || ' ' || c.last_name AS name, COUNT(*) AS n FROM session_bookings b JOIN class_sessions s ON s.id = b.session_id JOIN clients c ON c.id = b.client_id
+          WHERE b.status = 'attended' AND s.date BETWEEN ? AND ? GROUP BY c.id ORDER BY n DESC, name ASC`,
+      ).all(monthStart, today) as { name: string; n: number }[];
+      const cutoff = ranked[Math.min(9, ranked.length - 1)]?.n ?? 0;
+      return ranked.filter((r) => r.n >= cutoff).map((r) => r.name);
+    })(),
     bookingsLastWeek: { kept: last.kept ?? 0, all: last.allc },
     bookingsWeekBefore: { kept: prev.kept ?? 0, all: prev.allc },
     halfEmptyLastWeek: halfEmpty.map((r) => `${sessionLine(r)} (${r.n} of ${r.capacity})`).join("; ") || "none",
