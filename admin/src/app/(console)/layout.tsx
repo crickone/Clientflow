@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { api } from "@/lib/api";
 import { requireAdminSession } from "@/lib/session";
@@ -23,7 +23,12 @@ export default async function ConsoleLayout({ children }: { children: ReactNode 
   }
   return (
     <ConfirmProvider>
-      <Shell user={user} views={views} inboxCount={inboxCount} banner={<SwitchesBanner />}>{children}</Shell>
+      <Shell user={user} views={views} inboxCount={inboxCount} banner={
+        // Streams in on its own: a slow /fleet never holds up the page.
+        <Suspense fallback={null}>
+          <SwitchesBanner />
+        </Suspense>
+      }>{children}</Shell>
     </ConfirmProvider>
   );
 }

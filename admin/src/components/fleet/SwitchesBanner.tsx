@@ -17,7 +17,8 @@ export async function SwitchesBanner() {
   }
   if (stopped.length === 0) return null;
 
-  const things = stopped.map((l, i) => (i === 0 ? l : l.toLowerCase())).join(" and ");
+  // Later labels lose their capital only when it is a plain word ("Email" -> "email", "AI generation" stays).
+  const things = stopped.map((l, i) => (i === 0 || /^[A-Z]{2}/.test(l) ? l : l.charAt(0).toLowerCase() + l.slice(1))).join(" and ");
   return (
     <div className="switch-banner" role="status">
       <span>
