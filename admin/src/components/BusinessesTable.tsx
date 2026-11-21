@@ -147,7 +147,7 @@ export function BusinessesTable({
       render: (t) => <span style={{ ...mono, fontSize: 12.5, color: "var(--text-secondary)" }}>{relTime(t.lastLoginAt)}</span>,
     },
     { key: "users", label: "Staff", sortable: true, align: "right" },
-    { key: "members", label: "Members", sortable: true, align: "right", value: (t) => t.members ?? -1, render: (t) => (t.members === undefined ? "-" : t.members) },
+    { key: "members", label: "Members", sortable: true, align: "right", value: (t) => t.members ?? -1, csv: (t) => (t.members === undefined ? "" : String(t.members)), render: (t) => (t.members === undefined ? "-" : t.members) },
     { key: "createdAt", label: "Joined", sortable: true, render: (t) => fmtDate(t.createdAt) },
     { key: "actions", label: "", hideable: false, width: 1, align: "right", value: () => "", render: (t) => (!t.archivedAt ? <OpenBusinessButton action={(reason) => open(t.id, reason)} /> : null) },
   ];
