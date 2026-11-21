@@ -21,7 +21,7 @@ export default async function SelectAccountPage() {
   const memberships = await listActiveMemberships(user.id);
   const logos = Object.fromEntries(
     await Promise.all(memberships.map(async (m) => [m.tenantId, await tenantLogoThumb(m.tenantId)] as const)),
-  ) as Record<number, string | null>;
+  ) as Record<number, { src: string; oneColour: boolean } | null>;
 
   return (
     <div

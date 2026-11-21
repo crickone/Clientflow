@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { Upload, Trash2, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Input";
+import { Logo } from "@/components/ui/Logo";
 import { FONT_OPTIONS } from "@/lib/image/fonts";
+import { THEME_MODES } from "@/lib/theme";
 import { saveBrandFontsAction, saveBrandImageStyleAction } from "@/app/settings/branding/actions";
 import { SaveStatus } from "./SaveStatus";
 import { useAutosave } from "./useAutosave";
@@ -32,6 +34,8 @@ export function BrandingForm({
   const [heading, setHeading] = useState(headingFontId);
   const [body, setBody] = useState(bodyFontId);
   const [style, setStyle] = useState(imageStyle);
+  // True once the one-colour shape of the logo turns out not to exist.
+  const [noShape, setNoShape] = useState(false);
 
   // Fonts and the image-style prompt save independently — they are separate
   // settings with separate failure modes, so they get their own status.
@@ -58,6 +62,7 @@ export function BrandingForm({
 
   useEffect(() => {
     setCacheKey(String(Date.now()));
+    setNoShape(false);
   }, [filename]);
 
   async function uploadFile(file: File) {
@@ -107,45 +112,63 @@ export function BrandingForm({
     <div style={{ display: "grid", gap: 20 }}>
       <Section title="Business logo">
         <div style={{ display: "grid", gap: 16 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 24,
-              borderRadius: "var(--radius)",
-              border: "1px dashed var(--hairline-strong)",
-              background: "#0a0a0a",
-              minHeight: 180,
-            }}
-          >
-            {hasLogo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={`/api/branding/logo?v=${cacheKey}`}
-                alt="Business logo"
-                style={{
-                  maxHeight: 160,
-                  maxWidth: "100%",
-                  objectFit: "contain",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  color: "var(--text-tertiary)",
-                  fontSize: 13,
-                  textAlign: "center",
-                }}
-              >
-                <ImagePlus
-                  size={28}
-                  style={{ marginBottom: 8, opacity: 0.6 }}
-                />
+          {hasLogo ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                {(["light", "dark"] as const).map((mode) => (
+                  <div
+                    key={mode}
+                    style={{
+                      display: "grid",
+                      placeItems: "center",
+                      gap: 10,
+                      padding: 24,
+                      minHeight: 150,
+                      borderRadius: "var(--radius)",
+                      border: "1px solid var(--hairline)",
+                      // The two app themes, shown side by side whatever mode the viewer is in.
+                      background: THEME_MODES[mode].bg,
+                    }}
+                  >
+                    <Logo
+                      src={`/api/branding/logo?v=${cacheKey}`}
+                      alt="Business logo"
+                      height={56}
+                      oneColour
+                      colour={THEME_MODES[mode].accent}
+                      onShapeMissing={() => setNoShape(true)}
+                    />
+                    <span style={{ fontSize: 12, color: THEME_MODES[mode].accent, opacity: 0.6 }}>{mode === "light" ? "Light mode" : "Dark mode"}</span>
+                  </div>
+                ))}
+              </div>
+              <p style={{ fontSize: 12.5, color: "var(--text-tertiary)", margin: 0, lineHeight: 1.5 }}>
+                {noShape
+                  ? "Shown as uploaded. Use a transparent PNG for a logo that suits light and dark."
+                  : "The app shows your logo in one colour, so it reads in light and dark mode."}
+              </p>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 24,
+                borderRadius: "var(--radius)",
+                border: "1px dashed var(--hairline-strong)",
+                minHeight: 180,
+                color: "var(--text-tertiary)",
+                fontSize: 13,
+                textAlign: "center",
+              }}
+            >
+              <div>
+                <ImagePlus size={28} style={{ marginBottom: 8, opacity: 0.6 }} />
                 <div>No logo uploaded yet.</div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           <input
             ref={fileRef}

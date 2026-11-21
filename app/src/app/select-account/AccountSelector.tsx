@@ -15,7 +15,7 @@ export function AccountSelector({
 }: {
   memberships: MembershipOption[];
   /** Small inline logo per business; missing ones show the initial. */
-  logos?: Record<number, string | null>;
+  logos?: Record<number, { src: string; oneColour: boolean } | null>;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -86,8 +86,27 @@ export function AccountSelector({
               }}
             >
               {logos[m.tenantId] ? (
-                // eslint-disable-next-line @next/next/no-img-element -- inline data URI, already sized
-                <img src={logos[m.tenantId]!} alt="" width={28} height={28} style={{ width: 28, height: 28, objectFit: "contain" }} />
+                logos[m.tenantId]!.oneColour ? (
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 28,
+                      height: 28,
+                      backgroundColor: "currentColor",
+                      WebkitMaskImage: `url("${logos[m.tenantId]!.src}")`,
+                      maskImage: `url("${logos[m.tenantId]!.src}")`,
+                      WebkitMaskSize: "contain",
+                      maskSize: "contain",
+                      WebkitMaskRepeat: "no-repeat",
+                      maskRepeat: "no-repeat",
+                      WebkitMaskPosition: "center",
+                      maskPosition: "center",
+                    }}
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element -- inline data URI, already sized
+                  <img src={logos[m.tenantId]!.src} alt="" width={28} height={28} style={{ width: 28, height: 28, objectFit: "contain" }} />
+                )
               ) : (
                 m.name[0]?.toUpperCase() ?? "?"
               )}
