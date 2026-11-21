@@ -51,15 +51,32 @@ const rgbAt = (img: RawImage, x: number, y: number) => Array.from(img.data.slice
   assert.equal(alphaAt(s, 10, 10), 255);
 }
 
-// 4. Soft edge: a pixel half-way between background and logo gets a middling alpha.
+// 4. Soft edge: alpha tracks edge coverage against the logo's own contrast.
+{
+  const img = canvas(60, 60, [255, 255, 255, 255]);
+  paint(img, 20, 20, 40, 40, [0, 0, 0, 255]); // full contrast: distance ~441.7
+  paint(img, 19, 20, 20, 40, [128, 128, 128, 255]); // half coverage: distance ~220
+  const s = logoShape(img)!;
+  // full = 441.7 * 0.92 = 406.4; (220 - 24) / (406.4 - 24) = 0.51 -> ~131
+  const a = alphaAt(s, 2, 10); // column 19 sits at x=2 after trimming with a 2px margin
+  assert.ok(Math.abs(a - 131) <= 5, `half-coverage edge alpha was ${a}`);
+  assert.equal(alphaAt(s, 12, 10), 255); // inside the logo stays solid
+}
+
+// 4b. An opaque logo with one stray see-through pixel is still treated as opaque (background removed, not a solid block).
 {
   const img = canvas(60, 60, [255, 255, 255, 255]);
   paint(img, 20, 20, 40, 40, [0, 0, 0, 255]);
-  paint(img, 19, 20, 20, 40, [215, 215, 215, 255]); // ~69 from white: inside the ramp
+  paint(img, 59, 30, 60, 31, [255, 255, 255, 0]);
   const s = logoShape(img)!;
-  const a = alphaAt(s, 2, 10); // column 19 sits at x=2 after trimming with a 2px margin
-  assert.ok(a > 0 && a < 255, `soft edge alpha was ${a}`);
+  assert.ok(s);
+  assert.equal(s.width, 24); // the 20px logo + 2*2 margin, not the 60px tile
+  assert.equal(alphaAt(s, 0, 0), 0);
 }
+
+// 4c. Tiny images don't throw.
+assert.equal(logoShape(canvas(1, 1, [0, 0, 0, 255])), null);
+assert.ok(logoShape((() => { const i = canvas(3, 3, [255, 255, 255, 255]); paint(i, 1, 1, 2, 2, [0, 0, 0, 255]); return i; })()));
 
 // 5. Corners that disagree (a photo): no shape.
 {

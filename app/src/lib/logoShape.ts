@@ -23,11 +23,25 @@ export interface RawImage {
 
 /** Below this alpha a pixel counts as see-through when deciding "has transparency". */
 const TRANSPARENT_BELOW = 250;
+/**
+ * A logo "has transparency" only when at least this share of its pixels is
+ * see-through. One stray clear pixel (an anti-aliased corner) on an
+ * otherwise opaque logo must not send its whole background down the alpha
+ * path, where it would come out as a solid block.
+ */
+const TRANSPARENT_SHARE = 0.01;
 /** Colour distance (0-441) within which a corner patch is one flat colour, and patches match each other. */
 const FLAT = 24;
-/** Background-to-logo ramp: at or under LOW the pixel is background, at or over HIGH it is fully logo. */
+/**
+ * Background-to-logo ramp. At or under RAMP_LOW the pixel is background. Full
+ * logo is reached at the logo's own contrast (its strongest distance from the
+ * background, slightly eased so compression noise inside the logo stays
+ * solid), never less than RAMP_MIN_FULL. Alpha then tracks how much of an
+ * edge pixel the logo covers, so curves keep their anti-aliasing.
+ */
 const RAMP_LOW = 24;
-const RAMP_HIGH = 72;
+const RAMP_MIN_FULL = 72;
+const RAMP_FULL_SHARE = 0.92;
 /** Alpha above this counts when trimming. */
 const VISIBLE = 8;
 const MARGIN = 2;
@@ -72,17 +86,24 @@ export function logoShape(img: RawImage): RawImage | null {
   if (w < 1 || h < 1 || data.length < w * h * 4) return null;
   const alpha = new Uint8Array(w * h);
 
-  let transparent = false;
-  for (let i = 0; i < w * h; i++) if (data[i * 4 + 3] < TRANSPARENT_BELOW) { transparent = true; break; }
+  let clear = 0;
+  for (let i = 0; i < w * h; i++) if (data[i * 4 + 3] < TRANSPARENT_BELOW) clear++;
+  const transparent = clear >= Math.max(1, w * h * TRANSPARENT_SHARE);
 
   if (transparent) {
     for (let i = 0; i < w * h; i++) alpha[i] = data[i * 4 + 3];
   } else {
     const bg = backgroundColour(img);
     if (!bg) return null;
+    const dists = new Float32Array(w * h);
+    let maxD = 0;
     for (let i = 0; i < w * h; i++) {
-      const d = dist(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], ...bg);
-      const t = Math.min(1, Math.max(0, (d - RAMP_LOW) / (RAMP_HIGH - RAMP_LOW)));
+      dists[i] = dist(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], ...bg);
+      if (dists[i] > maxD) maxD = dists[i];
+    }
+    const full = Math.max(RAMP_MIN_FULL, maxD * RAMP_FULL_SHARE);
+    for (let i = 0; i < w * h; i++) {
+      const t = Math.min(1, Math.max(0, (dists[i] - RAMP_LOW) / (full - RAMP_LOW)));
       alpha[i] = Math.round(t * 255);
     }
   }
