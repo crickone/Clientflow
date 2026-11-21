@@ -94,7 +94,7 @@ export default async function GymsPage(
       </form>
 
       <Card style={{ padding: "20px 26px 18px" }}>
-        <BusinessesTable tenants={tenants} open={openTenant} />
+        <BusinessesTable tenants={tenants} now={Date.now()} open={openTenant} />
       </Card>
     </div>
   );

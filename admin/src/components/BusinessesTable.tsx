@@ -21,9 +21,12 @@ function Dot({ colour }: { colour: string }) {
 
 export function BusinessesTable({
   tenants,
+  now,
   open,
 }: {
   tenants: FleetTenantRow[];
+  /** Server clock (ms), so relative times read the same on the server render and in the browser. */
+  now: number;
   /** `openTenant` server action; bound per row here. */
   open: (id: number, reason: string) => Promise<{ ok: true; url: string } | { ok: false; error: string }>;
 }) {
@@ -144,7 +147,7 @@ export function BusinessesTable({
       key: "lastLoginAt", label: "Last login", sortable: true, align: "right",
       value: (t) => t.lastLoginAt ?? 0,
       csv: (t) => (t.lastLoginAt ? new Date(t.lastLoginAt).toISOString() : ""),
-      render: (t) => <span style={{ ...mono, fontSize: 12.5, color: "var(--text-secondary)" }}>{relTime(t.lastLoginAt)}</span>,
+      render: (t) => <span style={{ ...mono, fontSize: 12.5, color: "var(--text-secondary)" }}>{relTime(t.lastLoginAt, now)}</span>,
     },
     { key: "users", label: "Staff", sortable: true, align: "right" },
     { key: "members", label: "Members", sortable: true, align: "right", value: (t) => t.members ?? -1, csv: (t) => (t.members === undefined ? "" : String(t.members)), render: (t) => (t.members === undefined ? "-" : t.members) },

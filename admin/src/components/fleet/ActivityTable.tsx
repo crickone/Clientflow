@@ -10,11 +10,16 @@ import { fmtCents } from "@/lib/format";
 import { relTime } from "@/lib/labels";
 import { readTableState, writeTableState } from "@/lib/table";
 
-const COLUMNS: { key: ActivitySortKey; label: string; right?: boolean }[] = [
+const COLUMNS: { key: ActivitySortKey; label: string; right?: boolean; hint?: string }[] = [
   { key: "name", label: "Business" },
   { key: "setup", label: "Setup" },
   { key: "lastLogin", label: "Last login" },
-  { key: "membersActive", label: "Members active", right: true },
+  {
+    key: "membersActive",
+    label: "App sign-ins",
+    right: true,
+    hint: "Members who signed in to the app this week. Members stay signed in for 60 days, so this undercounts daily use.",
+  },
   { key: "bookings", label: "Bookings", right: true },
   { key: "leads", label: "Leads", right: true },
   { key: "sales", label: "Sales", right: true },
@@ -68,7 +73,7 @@ function ActivityTableInner({ views, now }: { views: ActivityView[]; now: number
         <thead>
           <tr>
             {COLUMNS.map((c) => (
-              <th key={c.key} style={c.right ? { textAlign: "right" } : undefined}>
+              <th key={c.key} style={c.right ? { textAlign: "right" } : undefined} title={c.hint}>
                 <button
                   type="button"
                   className="dt-sort"

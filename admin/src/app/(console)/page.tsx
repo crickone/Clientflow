@@ -125,7 +125,14 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      {analytics ? <Money analytics={analytics} salesWeekCents={salesWeek} /> : null}
+      {analytics ? (
+        <Money analytics={analytics} salesWeekCents={salesWeek} />
+      ) : (
+        <section>
+          <h2 className="board-section-title">Money</h2>
+          <p className="inbox-empty" style={{ margin: "8px 0 0" }}>Couldn&apos;t load money.</p>
+        </section>
+      )}
     </div>
   );
 }
