@@ -108,6 +108,7 @@ export function buildFleetCandidates(fleet: ReturnType<typeof getFleetHealth>): 
         key: `health:${a.key}`,
         level: a.level,
         title: a.message,
+        detail: a.detail ?? null,
         href: `/gyms/${row.tenantId}/health`,
       });
     }

@@ -7,6 +7,7 @@ import { findDuplicateSiteSlugs } from "@/lib/cms/siteSlugs";
 import { controlSqlite, getCronState } from "@/lib/db/control";
 import { getTenantDbById, runWithTenant } from "@/lib/db/tenant";
 import { TENANT_MIGRATIONS } from "@/lib/db/migrations";
+import { queueReason } from "./queueReason";
 
 /**
  * Is anything broken for this business?
@@ -29,6 +30,8 @@ export interface HealthAlert {
   key: string;
   level: Exclude<AlertLevel, "ok">;
   message: string;
+  /** Why, where the system records it: the latest failure's error for a failed-queue alert. */
+  detail?: string | null;
 }
 
 export interface QueueDepth {
@@ -39,6 +42,8 @@ export interface QueueDepth {
   failed: number;
   /** What a non-zero `failed` means here, in the operator's terms. */
   note: string | null;
+  /** The latest failed row's error, tidied; null when none is recorded or the queue keeps no error. */
+  failedReason: string | null;
 }
 
 export interface TenantHealth {
@@ -123,6 +128,17 @@ export function getTenantHealth(tenantId: number, opts: { deep?: boolean } = {})
           }
         };
 
+        // The most recent failed row's error text, or null (no rows, no
+        // error recorded, or a table not migrated yet).
+        const lastError = (sql: string): string | null => {
+          try {
+            const r = raw.prepare(sql) as unknown as { get: () => { e: string | null } | undefined };
+            return queueReason(r.get()?.e);
+          } catch {
+            return null;
+          }
+        };
+
         queues.push({
           key: "nurture",
           label: "Nurture messages",
@@ -130,6 +146,7 @@ export function getTenantHealth(tenantId: number, opts: { deep?: boolean } = {})
           waiting: count("SELECT count(*) AS n FROM automation_queue WHERE status = 'queued' AND due_at > ?", now),
           failed: count("SELECT count(*) AS n FROM automation_queue WHERE status = 'failed'"),
           note: "Failed messages are usually a missing email provider.",
+          failedReason: lastError("SELECT error AS e FROM automation_queue WHERE status = 'failed' AND error IS NOT NULL AND error <> '' ORDER BY id DESC LIMIT 1"),
         });
         queues.push({
           key: "posts",
@@ -138,6 +155,9 @@ export function getTenantHealth(tenantId: number, opts: { deep?: boolean } = {})
           waiting: count("SELECT count(*) AS n FROM scheduled_posts WHERE status = 'scheduled' AND scheduled_for > ?", now),
           failed: count("SELECT count(*) AS n FROM scheduled_posts WHERE status = 'failed'"),
           note: "A post due but not sent is normally waiting on the Facebook connection.",
+          failedReason: lastError(
+            "SELECT error AS e FROM scheduled_posts WHERE status = 'failed' AND error IS NOT NULL AND error <> '' ORDER BY COALESCE(last_attempt_at, 0) DESC, id DESC LIMIT 1",
+          ),
         });
         queues.push({
           key: "calls",
@@ -146,6 +166,9 @@ export function getTenantHealth(tenantId: number, opts: { deep?: boolean } = {})
           waiting: 0,
           failed: count("SELECT count(*) AS n FROM voice_call_queue WHERE status = 'failed'"),
           note: null,
+          failedReason: lastError(
+            "SELECT last_error AS e FROM voice_call_queue WHERE status = 'failed' AND last_error IS NOT NULL AND last_error <> '' ORDER BY updated_at DESC, id DESC LIMIT 1",
+          ),
         });
 
         stuckGenerations = count(
@@ -177,7 +200,7 @@ export function getTenantHealth(tenantId: number, opts: { deep?: boolean } = {})
     alerts.push({ key: "wal", level: "warn", message: "The write-ahead log is larger than the database; checkpoints may not be landing." });
   }
   for (const q of queues) {
-    if (q.failed > 0) alerts.push({ key: `queue_failed:${q.key}`, level: "warn", message: `${q.failed} failed in ${q.label.toLowerCase()}.` });
+    if (q.failed > 0) alerts.push({ key: `queue_failed:${q.key}`, level: "warn", message: `${q.failed} failed in ${q.label.toLowerCase()}.`, detail: q.failedReason });
   }
   if (stuckGenerations > 0) {
     alerts.push({ key: "stuck_generations", level: "warn", message: `${stuckGenerations} design(s) stuck mid-generation.` });

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const requireLocal = createRequire(import.meta.url);
-const { billingAlerts, aiCapAlert, schedulerAlerts, jobAlerts } = requireLocal("./alertSources") as typeof import("./alertSources");
+const { billingAlerts, aiCapAlert, schedulerAlerts, jobAlerts, buildFleetCandidates } = requireLocal("./alertSources") as typeof import("./alertSources");
 
 const base = { tenantId: 7, name: "Gym", status: "active", exempt: false, nextRenewalAt: "2026-12-01", failedAttempts: 0, cardExpiry: null };
 const keys = (xs: { key: string }[]) => xs.map((x) => x.key);
@@ -74,3 +74,19 @@ assert.match(jobAlerts(runs)[0].title, /disk/);
   console.error(e);
   process.exit(1);
 });
+
+// A failed-queue alert's reason reaches the candidate; an alert without one carries null.
+{
+  const fleet = {
+    tenants: [{ tenantId: 7, name: "Gym", slug: "gym", dbBytes: 0, walBytes: 0, queueDue: 0, queueFailed: 2, stuck: 0, readable: true,
+      alerts: [
+        { key: "queue_failed:nurture", level: "warn" as const, message: "2 failed in nurture messages.", detail: "no provider" },
+        { key: "wal", level: "warn" as const, message: "wal" },
+      ] }],
+    schedulers: [],
+    duplicateSiteSlugs: [],
+  };
+  const c = buildFleetCandidates(fleet);
+  assert.equal(c.find((x) => x.key === "health:queue_failed:nurture")!.detail, "no provider");
+  assert.equal(c.find((x) => x.key === "health:wal")!.detail, null);
+}

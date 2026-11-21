@@ -104,6 +104,15 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(nurture.due, 1, "a queued message past its time is due");
     assert.equal(nurture.waiting, 1, "one queued for tomorrow is waiting, not due");
     assert.equal(h.alerts.filter((a) => a.message.includes("nurture")).length, 1, "one alert for the failed message");
+    assert.equal(h.alerts.find((a) => a.key === "queue_failed:nurture")!.detail, "no provider", "the alert says why the message failed");
+    raw
+      .prepare(
+        "INSERT INTO automation_queue (trigger_key, lead_id, channel, subject, body, send_to, due_at, status, error) VALUES ('campaign_signup', 1, 'email', 's', 'b', 'x@test.local', ?, 'failed', 'WhatsApp  not\nconnected')",
+      )
+      .run(Date.now() - 1000);
+    h = health.getTenantHealth(tid);
+    assert.equal(h.alerts.find((a) => a.key === "queue_failed:nurture")!.detail, "WhatsApp not connected", "the latest failure's error wins, tidied");
+    raw.prepare("DELETE FROM automation_queue WHERE error = 'WhatsApp  not\nconnected'").run();
 
     // ── a stuck generation ───────────────────────────────────────────────
     raw
