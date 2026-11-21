@@ -62,4 +62,25 @@ assert.equal(personStage({ ...base, lastVisit: "2026-10-21" }), "lapsed");
 assert.equal(personStage({ ...base, lastVisit: "2026-10-21", futureBookings: 1 }), "client", "booked ahead is not lapsed");
 assert.equal(personStage(base), "client", "a client who never visited");
 
+// A lead matching two clients is never auto-joined, even after staff keep one pair separate.
+const kept = matchPeople(
+  [
+    { id: 101, firstName: "Kate", lastName: "X", email: "kate@x.ie", phone: "0871234000" },
+    { id: 102, firstName: "Kate", lastName: "Y", email: "other@x.ie", phone: "0871234001" },
+  ],
+  [{ id: 201, firstName: "Kate", lastName: null, email: "kate@x.ie", phone: "0871234001", clientId: null }],
+  [{ leadId: 201, clientId: 101, decision: "separate" }],
+);
+assert.equal(kept.leadPerson.get(201), "l:201", "one pair kept separate must not auto-join the other");
+assert.deepEqual(kept.reviews.map((r) => `${r.leadId}-${r.clientId}: ${r.reason}`), ["201-102: Matches more than one client"]);
+
+// A converted lead joins its client whatever the decisions say.
+const converted = matchPeople(
+  [{ id: 101, firstName: "Zoe", lastName: "X", email: "zoe@x.ie", phone: "0871234000" }],
+  [{ id: 202, firstName: "Zoe", lastName: null, email: "zoe@x.ie", phone: "0871234000", clientId: 101 }],
+  [{ leadId: 202, clientId: 101, decision: "separate" }],
+);
+assert.equal(converted.leadPerson.get(202), "c:101");
+assert.equal(converted.joinReason.get(202), "converted");
+
 console.log("person.test.ts: all assertions passed");

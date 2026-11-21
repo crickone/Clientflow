@@ -82,15 +82,19 @@ export function matchPeople(clients: ClientRec[], leads: LeadRec[], decisions: D
     const p = phoneKey(lead.phone);
     const viaEmail = new Set(e ? byEmail.get(e) ?? [] : []);
     const viaPhone = new Set(p ? byPhone.get(p) ?? [] : []);
-    const candidates = [...new Set([...viaEmail, ...viaPhone])].filter((cid) => decided.get(`${lead.id}:${cid}`) !== "separate");
+    // Ambiguity is judged on every raw match, before "separate" pairs are removed:
+    // a lead that matched two clients stays for staff even if one pair was kept apart.
+    const raw = [...new Set([...viaEmail, ...viaPhone])];
+    const ambiguous = raw.length > 1;
+    const candidates = raw.filter((cid) => decided.get(`${lead.id}:${cid}`) !== "separate");
     const first = firstKey(lead.firstName);
     const sameFirst = (cid: number) => first !== "" && first === firstKey(byId.get(cid)?.firstName);
-    if (candidates.length === 1 && sameFirst(candidates[0])) {
+    if (!ambiguous && candidates.length === 1 && sameFirst(candidates[0])) {
       join(lead.id, candidates[0], "rules");
       continue;
     }
     for (const cid of candidates) {
-      const reason = candidates.length > 1
+      const reason = ambiguous
         ? "Matches more than one client"
         : viaEmail.has(cid)
           ? "Same email, different first name"
