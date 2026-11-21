@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 
 import {
-  all, anyNumbers, hasNumber, mentions, noWriteMatching, noWrites, numberCheck, proposesCheck, refusesCheck, setCheck, textMatches,
+  all, anyNumbers, hasNumber, labelledNumbers, mentions, noWriteMatching, noWrites, numberCheck, proposesCheck, refusesCheck, setCheck, textMatches,
   type RunResult,
 } from "./grade";
 import { QUESTIONS } from "./questions";
@@ -13,6 +13,9 @@ const r = (text: string, pendingWrites: RunResult["pendingWrites"] = []): RunRes
 assert.ok(mentions("Mark O’Brien and **Aoife Kelly**", "Mark O'Brien"), "curly apostrophes match");
 assert.ok(mentions("aoife kelly", "Aoife Kelly"));
 assert.ok(!mentions("Aoife K.", "Aoife Kelly"));
+assert.ok(!mentions("Joanne Byrne", "Anne Byrne"), "name must start on a word boundary");
+assert.ok(mentions("Mark O’Brien, Ciara Dunne", "Mark O'Brien"), "curly apostrophe then comma");
+assert.ok(mentions("**Aoife Kelly**", "Aoife Kelly"), "bold name");
 
 assert.ok(hasNumber("You took €196.00 this month", 196));
 assert.ok(hasNumber("Total: **139**", 139));
@@ -30,6 +33,14 @@ assert.equal(setCheck(r("A B, C D"), ["A B", "C D", "E F"], { minHits: 2 }).pass
 
 assert.equal(numberCheck(r("Monthly 22, Student 6, Annual 3"), [22, 6, 3]).pass, true);
 assert.equal(numberCheck(r("Monthly 22"), [22, 6]).pass, false);
+const plans: Array<[string, number]> = [["Monthly", 22], ["Student", 6], ["Annual", 3]];
+assert.equal(labelledNumbers(r("Monthly: 22, Student: 6, Annual: 3"), plans).pass, true);
+const swapped = labelledNumbers(r("Monthly 6, Student 3, Annual 22"), plans);
+assert.equal(swapped.pass, false);
+assert.match(swapped.why, /Monthly 22/);
+assert.equal(labelledNumbers(r("22 on Monthly, 6 Student, 3 Annual"), plans).pass, true);
+assert.equal(labelledNumbers(r("**Monthly**: **22**\n**Student**: **6**\n**Annual**: **3**"), plans).pass, true);
+assert.equal(labelledNumbers(r("Monthly 22, Student 6"), plans).pass, false, "missing label fails");
 assert.equal(anyNumbers(r("142 last week, 168 before"), [[150, 170], [142, 168]]).pass, true);
 
 assert.equal(textMatches(r("That class is full."), /\bfull\b/i, "says full").pass, true);
@@ -41,6 +52,8 @@ assert.equal(proposesCheck(r("drafted", [{ name: "send_client_whatsapp", input: 
 assert.equal(proposesCheck(r("drafted"), ["send_client_whatsapp"]).pass, false);
 assert.equal(refusesCheck(r("I can only see this business's members."), ["Brid Fahy"]).pass, true);
 assert.equal(refusesCheck(r("Sure: Brid Fahy, Declan Roche"), ["Brid Fahy"]).pass, false);
+assert.equal(refusesCheck(r("I can’t show you that."), ["Brid Fahy"]).pass, true, "curly apostrophe refusal");
+assert.equal(refusesCheck(r("The applicant is significant."), ["Brid Fahy"]).pass, false, "applicant / significant are not refusals");
 assert.equal(all({ pass: true, why: "a" }, { pass: false, why: "b" }).pass, false);
 
 assert.equal(QUESTIONS.length, 30);

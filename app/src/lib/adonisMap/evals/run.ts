@@ -32,8 +32,8 @@ const arg = (k: string) => { const i = argv.indexOf(k); return i >= 0 ? argv[i +
 const map = arg("--map");
 const only = arg("--only");
 const maxEur = Number(arg("--max-eur") ?? 10);
-if (map !== "on" && map !== "off") {
-  console.error("Usage: npm run eval:adonis -- --map on|off [--only q15] [--max-eur 10]");
+if ((map !== "on" && map !== "off") || !Number.isFinite(maxEur) || maxEur <= 0) {
+  console.error("Usage: npm run eval:adonis -- --map on|off [--only q15] [--max-eur 10]  (--max-eur must be a positive number)");
   process.exit(2);
 }
 
@@ -90,6 +90,13 @@ process.chdir(work);
   console.log(`Adonis test set: map ${map}, ${questions.length} questions, ${today}. Calls paid models; stops at about EUR ${maxEur}.`);
   const results: Record<string, unknown>[] = [];
   let model = "";
+  const outDir = path.join(APP, "evals", "adonis", "results");
+  fs.mkdirSync(outDir, { recursive: true });
+  const stamp = `${today}-map-${map}${only ? `-${only}` : ""}`;
+  const costNow = () => (getMonthlyUsageCents(gymId) + getMonthlyUsageCents(clinicId)) / 100;
+  // Overwritten after every question, so a later crash keeps the earlier answers.
+  const saveJson = () =>
+    fs.writeFileSync(path.join(outDir, `${stamp}.json`), JSON.stringify({ map, today, model, costEur: costNow(), passed: results.filter((x) => x.pass).length, total: results.length, results }, null, 2));
   for (const q of questions) {
     const tid = q.variant === "gym" ? gymId : clinicId;
     const agent = resolveChatAgent(tid, "orchestrator");
@@ -117,8 +124,17 @@ process.chdir(work);
       error = err instanceof Error ? err.message : String(err);
     }
     const r = { text: out?.text ?? "", pendingWrites: (out?.pendingWrites ?? []).map((w) => ({ name: w.name, input: w.input })), toolCalls };
-    const verdict = error ? { pass: false, why: `run failed: ${error}` } : await q.check(r, truth);
+    let verdict: { pass: boolean; why: string };
+    if (error) verdict = { pass: false, why: `run failed: ${error}` };
+    else {
+      try {
+        verdict = await q.check(r, truth);
+      } catch (err) {
+        verdict = { pass: false, why: `grader failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    }
     results.push({ id: q.id, category: q.category, question: q.text, pass: verdict.pass, why: verdict.why, ms: Date.now() - started, answer: r.text, toolCalls, pendingWrites: r.pendingWrites });
+    saveJson();
     console.log(`${verdict.pass ? "PASS" : "FAIL"} ${q.id} ${q.text}${verdict.pass ? "" : ` (${verdict.why})`}`);
     const spentCents = getMonthlyUsageCents(gymId) + getMonthlyUsageCents(clinicId);
     if (spentCents > maxEur * 100) {
@@ -127,12 +143,9 @@ process.chdir(work);
     }
   }
 
-  const costEur = (getMonthlyUsageCents(gymId) + getMonthlyUsageCents(clinicId)) / 100;
+  const costEur = costNow();
   const passed = results.filter((x) => x.pass).length;
-  const outDir = path.join(APP, "evals", "adonis", "results");
-  fs.mkdirSync(outDir, { recursive: true });
-  const stamp = `${today}-map-${map}${only ? `-${only}` : ""}`;
-  fs.writeFileSync(path.join(outDir, `${stamp}.json`), JSON.stringify({ map, today, model, costEur, passed, total: results.length, results }, null, 2));
+  saveJson();
   const cats = [...new Set(results.map((x) => String(x.category)))];
   const md = [
     `# Adonis test set: map ${map}, ${today}`,
