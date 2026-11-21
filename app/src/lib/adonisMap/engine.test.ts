@@ -112,11 +112,17 @@ throwsMap(() => groupRows(B, bookings, { field: "date", by: "hour" }, undefined)
 throwsMap(() => groupRows(B, bookings, "name", "name"), /sum takes a number field/);
 throwsMap(() => groupRows(B, bookings, { field: "name", by: "week" }, undefined), /needs a date field/);
 const weekdayRows: Row[] = [
-  { id: "w:1", date: "2026-11-21", startsAt: "2026-11-21 10:00", status: "booked", priceEur: null, name: "HBOT" },
-  { id: "w:2", date: "2026-11-16", startsAt: "2026-11-16 10:00", status: "booked", priceEur: null, name: "HBOT" },
-  { id: "w:3", date: "2026-11-23", startsAt: "2026-11-23 10:00", status: "booked", priceEur: null, name: "HBOT" },
+  // Two Sundays and one Monday: by count Sunday would come first, so this proves week order.
+  { id: "w:1", date: "2026-11-22", startsAt: "2026-11-22 10:00", status: "booked", priceEur: null, name: "HBOT" },
+  { id: "w:2", date: "2026-11-29", startsAt: "2026-11-29 10:00", status: "booked", priceEur: null, name: "HBOT" },
+  { id: "w:3", date: "2026-11-16", startsAt: "2026-11-16 10:00", status: "booked", priceEur: null, name: "HBOT" },
+  { id: "w:4", date: null, startsAt: null, status: "booked", priceEur: null, name: "HBOT" },
 ];
-assert.deepEqual(groupRows(B, weekdayRows, { field: "date", by: "weekday" }, undefined).groups.map((g) => g.key), ["Mon", "Sat"], "weekday groups run Monday to Sunday");
+assert.deepEqual(groupRows(B, weekdayRows, { field: "date", by: "weekday" }, undefined).groups.map((g) => g.key), ["Mon", "Sun", "none"], "weekday groups run Monday to Sunday, then none");
+// The caps' upper bounds still pass.
+assert.equal(validateWhere(P, Array.from({ length: 12 }, () => ({ field: "leadScore", op: "isNull", value: true })), ALL).length, 12);
+assert.equal(validateWhere(P, [{ field: "name", op: "in", value: Array.from({ length: 100 }, (_, i) => `n${i}`) }], ALL).length, 1);
+assert.equal(groupRows(P, Array.from({ length: 100 }, (_, i) => ({ id: `c:${i}`, name: `Name ${i}` })), "name", undefined).groups.length, 100);
 throwsMap(() => groupRows(P, Array.from({ length: 101 }, (_, i) => ({ id: `c:${i}`, name: `Name ${i}` })), "name", undefined), /the most is 100/);
 
 console.log("engine.test.ts: all assertions passed");
