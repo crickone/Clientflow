@@ -46,3 +46,13 @@ export function relTime(ms: number | null | undefined, now: number = Date.now())
   if (days < 14) return `${days}d`;
   return `${Math.floor(days / 7)}w`;
 }
+
+/**
+ * Alerts about a lapsed connection, where the fix is to reconnect. In
+ * app/src/lib/platform/alertSources.ts these are `integration:facebook` and
+ * `integration:meta`; the word matches cover any added later. Card expiry
+ * (`billing:card_expiring`) is deliberately not one: it is a billing fix.
+ */
+export function isReconnectAlert(key: string): boolean {
+  return key.startsWith("integration:") || /reconnect|token|expired/.test(key);
+}

@@ -1,46 +1,39 @@
 import Link from "next/link";
 
 import { api } from "@/lib/api";
+import { joinProblems } from "@/lib/activitySort";
 import { fmtCents, fmtMonthShort } from "@/lib/format";
-import { ShareBar } from "@/components/charts/Sparkline";
+import { isReconnectAlert } from "@/lib/labels";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { ActivityTable } from "@/components/fleet/ActivityTable";
 import { LineChart } from "@/components/charts/LineChart";
 import { BarChart } from "@/components/charts/BarChart";
-import type { AlertsResponse, PlatformAnalytics } from "@/lib/types";
+import type { ActivityResponse, AlertsResponse, PlatformAlert, PlatformAnalytics } from "@/lib/types";
 
 /**
- * The fleet board.
+ * The fleet board: what needs the operator, what each business did this week,
+ * and the money.
  *
- * This page used to be four equal stat tiles, two full line charts and a
- * donut. The trouble was what the numbers actually are: MRR and ARR are the
- * same fact twice (ARR is MRR×12), every business is exempt so both read
- * €0.00, the revenue chart was a flat line along zero, and the donut was a
- * single segment at 100%. A dashboard whose largest elements are a number
- * shown twice and two pictures of nothing.
- *
- * The question an operator opens this page with is "which of my businesses
- * needs me today, and is the platform healthy". So the fleet is the page: one
- * row per business, and the money — which is currently zero, and says so —
- * sits in a readout rather than a chart. Charts return when there is a trend
- * to draw; `Sparkline` refuses to draw a flat line for exactly that reason.
+ * Each of the three fetches is fail-soft on its own. A section whose data did
+ * not arrive is left out; the others still render.
  */
 
-/** Status colours, validated for dark surfaces and CVD separation. They never travel without their label. */
-const STATUS: Record<string, { dot: string; label: string }> = {
-  active: { dot: "#2ea36c", label: "Active" },
-  past_due: { dot: "#b8862b", label: "Past due" },
-  suspended: { dot: "#c44863", label: "Suspended" },
-  pending_payment: { dot: "#b8862b", label: "Pending" },
-  none: { dot: "rgba(244,245,247,0.32)", label: "No billing" },
-};
+const NEEDS_SHOWN = 8;
 
-function Status({ status, exempt }: { status: string; exempt: boolean }) {
-  const s = STATUS[status] ?? STATUS.none!;
-  return (
-    <span className="fleet-status">
-      <i style={{ background: exempt ? "rgba(244,245,247,0.32)" : s.dot }} aria-hidden />
-      {exempt ? "Exempt" : s.label}
-    </span>
-  );
+async function soft<T>(label: string, p: Promise<T>): Promise<T | null> {
+  try {
+    return await p;
+  } catch (err) {
+    console.error(`[dashboard] ${label} unavailable:`, err);
+    return null;
+  }
+}
+
+function openAlerts(all: PlatformAlert[], now: number): PlatformAlert[] {
+  return all
+    .filter((a) => a.resolvedAt === null && !(a.snoozedUntil != null && a.snoozedUntil > now))
+    .sort((a, b) => (a.level === b.level ? b.openedAt - a.openedAt : a.level === "bad" ? -1 : 1));
 }
 
 /** A number in the instrument face: mono, tabular, with its unit kept small. */
@@ -55,136 +48,116 @@ function Readout({ label, value, note }: { label: string; value: string; note?: 
 }
 
 export default async function DashboardPage() {
-  const [data, alertsRes] = await Promise.all([
-    api<PlatformAnalytics>("/analytics", { revalidate: 30, tags: ["fleet"] }),
-    api<AlertsResponse>("/alerts", { revalidate: 60, tags: ["fleet"] }).catch((err) => {
-      console.error("[dashboard] alerts unavailable:", err);
-      return null;
-    }),
+  const [analytics, alertsRes, activity] = await Promise.all([
+    soft("analytics", api<PlatformAnalytics>("/analytics", { revalidate: 30, tags: ["fleet"] })),
+    soft("alerts", api<AlertsResponse>("/alerts", { revalidate: 60, tags: ["fleet"] })),
+    soft("activity", api<ActivityResponse>("/activity", { revalidate: 60, tags: ["fleet"] })),
   ]);
-  const { platform, gyms } = data;
-  const alerts = alertsRes?.alerts ?? [];
-  const counts = alertsRes?.counts ?? null;
+
+  const now = Date.now();
+  const alertList = alertsRes?.alerts ?? [];
+  const open = openAlerts(alertList, now);
+  const eyebrow = `Fleet · ${new Intl.DateTimeFormat("en-IE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Dublin" }).format(now)}`;
+
+  const views = activity ? joinProblems(activity.rows, alertList, now) : null;
+  const salesWeek = activity ? activity.rows.reduce((sum, r) => sum + (r.salesCents7d ?? 0), 0) : null;
+
+  return (
+    <div className="board">
+      <PageHeader eyebrow={eyebrow} title="Dashboard" />
+
+      {alertsRes ? (
+        <Card>
+          <div className="need-head">
+            <h2 className="card-title">Needs you · {open.length}</h2>
+            <Link href="/inbox" className="fleet-count">Open the inbox</Link>
+          </div>
+          {open.length === 0 ? (
+            <p className="inbox-empty" style={{ margin: "8px 0 0" }}>Nothing needs you.</p>
+          ) : (
+            <ul className="need-list">
+              {open.slice(0, NEEDS_SHOWN).map((a) => (
+                <li key={a.id} className={`need-row is-${a.level}`}>
+                  <span className="need-dot" aria-hidden />
+                  <span className="need-biz">{a.tenantName ?? "Platform"}</span>
+                  <span className="need-what">
+                    {a.title}
+                    {a.detail ? <span className="need-detail"> · {a.detail}</span> : null}
+                  </span>
+                  <Link
+                    href={a.href ?? (a.tenantId !== null ? `/gyms/${a.tenantId}` : "/inbox")}
+                    className="btn btn--secondary btn--md"
+                  >
+                    {isReconnectAlert(a.key) ? "Reconnect" : "Open"}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          {open.length > NEEDS_SHOWN ? (
+            <p className="need-more">
+              <Link href="/inbox" className="fleet-count">and {open.length - NEEDS_SHOWN} more</Link>
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {views ? (
+        <section>
+          <h2 className="board-section-title">This week</h2>
+          <Card style={{ padding: "18px 22px" }}>
+            <ActivityTable views={views} now={now} />
+          </Card>
+        </section>
+      ) : null}
+
+      {analytics ? <Money analytics={analytics} salesWeekCents={salesWeek} /> : null}
+    </div>
+  );
+}
+
+function Money({ analytics, salesWeekCents }: { analytics: PlatformAnalytics; salesWeekCents: number | null }) {
+  const { platform, gyms } = analytics;
+
+  if (platform.gyms.paying === 0) {
+    return (
+      <section>
+        <h2 className="board-section-title">Money</h2>
+        <Card>
+          <p className="money-line">
+            All {platform.gyms.total} {platform.gyms.total === 1 ? "business is" : "businesses are"} exempt. Platform MRR starts when the first business pays.
+          </p>
+          {salesWeekCents !== null ? (
+            <p className="money-line">
+              Client sales through Stripe this week: <strong>{fmtCents(salesWeekCents)}</strong>
+            </p>
+          ) : null}
+        </Card>
+      </section>
+    );
+  }
+
   // An older main-app deploy may not send the newer series yet.
   const mrrMovements = platform.mrrMovements ?? [];
   const aiSpend = (gyms.aiSpendByMonth ?? []).map((p) => p.cents / 100);
   const emailSent = (gyms.emailByMonth ?? []).map((p) => p.sent);
-
   const growth = platform.gymsByMonth.map((p) => p.total);
   const growthLabels = platform.gymsByMonth.map((p) => fmtMonthShort(p.month));
   const collected = platform.collectedByMonth.map((p) => p.cents);
 
-  // Ordered by what they contribute, so the row that matters is the first one.
-  const fleet = [...gyms.perGym].sort((a, b) => b.gmvCentsMonthly - a.gmvCentsMonthly);
-  const maxGmv = Math.max(1, ...fleet.map((g) => g.gmvCentsMonthly));
-
-  const needsAttention = counts
-    ? counts.bad + counts.warn
-    : fleet.filter((g) => !g.exempt && g.status !== "active").length;
-
   return (
-    <div className="board">
-      {/* The one sentence worth reading first. Everything else is detail. */}
-      <header className="board-hero">
-        <p className="board-eyebrow">Fleet</p>
-        <h1>
-          <span className="board-figure">{platform.gyms.total}</span>
-          <span className="board-sentence">
-            {platform.gyms.total === 1 ? "business" : "businesses"} on the platform,{" "}
-            {needsAttention === 0 ? (
-              <>nothing needs you.</>
-            ) : (
-              <>
-                <strong>{needsAttention}</strong> open {needsAttention === 1 ? "alert" : "alerts"}.
-              </>
-            )}
-          </span>
-        </h1>
+    <>
+      <section className="cluster">
+        <h2>Money</h2>
         <div className="board-meters">
           <Readout label="MRR" value={fmtCents(platform.mrrCents)} note={`ARR ${fmtCents(platform.arrCents)}`} />
-          <Readout
-            label="Paying"
-            value={`${platform.gyms.paying} of ${platform.gyms.total}`}
-            note={`${platform.gyms.exempt} exempt`}
-          />
+          <Readout label="Paying" value={`${platform.gyms.paying} of ${platform.gyms.total}`} note={`${platform.gyms.exempt} exempt`} />
           <Readout
             label="Client GMV"
             value={`${fmtCents(gyms.gmvCentsMonthly)}/mo`}
             note={`est. residual ${fmtCents(gyms.estResidualCentsMonthly)}/mo`}
           />
         </div>
-      </header>
-
-      {alertsRes ? (
-        <section className="cluster">
-          <h2>
-            Needs you
-            <Link href="/inbox" className="fleet-count">Open the inbox</Link>
-          </h2>
-          {alerts.length === 0 ? (
-            <p style={{ margin: "6px 0 0", color: "var(--text-secondary)", fontSize: 13.5 }}>Nothing open.</p>
-          ) : (
-            <ul className="inbox">
-              {alerts.slice(0, 5).map((a) => (
-                <li key={a.id} className={`inbox-row is-${a.level}`} style={{ padding: "12px 0" }}>
-                  <span className="inbox-icon" aria-hidden style={{ width: 8, height: 8, borderRadius: 4, background: a.level === "bad" ? "var(--red)" : "var(--amber)", marginTop: 7 }} />
-                  <div className="inbox-main">
-                    <Link href={a.href ?? "/inbox"} className="inbox-title">{a.title}</Link>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          {alerts.length > 5 ? (
-            <p style={{ margin: "8px 0 0", fontSize: 13 }}>
-              <Link href="/inbox" className="fleet-count">and {alerts.length - 5} more</Link>
-            </p>
-          ) : null}
-        </section>
-      ) : null}
-
-      {/* The signature: the fleet as a row of channels. */}
-      <section className="fleet">
-        <div className="fleet-head">
-          <h2>Businesses</h2>
-          <span className="fleet-count">{gyms.tenantsCounted} counted</span>
-        </div>
-
-        <div className="fleet-legend">
-          <span>Business</span>
-          <span>Status</span>
-          <span>Share of client GMV</span>
-          <span>Members</span>
-          <span>GMV / mo</span>
-        </div>
-
-        {fleet.length === 0 ? (
-          <p className="board-empty">
-            No businesses yet. <Link href="/provision">Provision the first one</Link>.
-          </p>
-        ) : (
-          <ul className="fleet-list">
-            {fleet.map((g) => (
-              <li key={g.tenantId}>
-                <Link href={`/gyms/${g.tenantId}`} className="fleet-row">
-                  <span className="fleet-name">
-                    {g.name}
-                    <span className="fleet-type">{g.venueType ?? "type not set"}</span>
-                  </span>
-                  <Status status={g.status} exempt={g.exempt} />
-                  <span className="fleet-share">
-                    <ShareBar fraction={g.gmvCentsMonthly / maxGmv} />
-                  </span>
-                  <span className="fleet-num">{g.members}</span>
-                  <span className="fleet-num fleet-gmv">{fmtCents(g.gmvCentsMonthly)}</span>
-                  <span className="fleet-go" aria-hidden>
-                    →
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
 
       <section className="board-twelve">
@@ -202,7 +175,6 @@ export default async function DashboardPage() {
         />
       </section>
 
-      {/* The client-side totals, as a gauge cluster rather than five more cards. */}
       <section className="cluster">
         <h2>Across all businesses</h2>
         <div className="cluster-row">
@@ -213,6 +185,6 @@ export default async function DashboardPage() {
           <Readout label="Revenue this month" value={fmtCents(gyms.revenueCentsThisMonth)} />
         </div>
       </section>
-    </div>
+    </>
   );
 }

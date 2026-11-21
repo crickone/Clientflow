@@ -1,7 +1,7 @@
 // Run: npm test -- src/lib/labels.test.ts
 import assert from "node:assert/strict";
 
-import { billingLabel, relTime, riskShown, stageLabel } from "./labels";
+import { billingLabel, isReconnectAlert, relTime, riskShown, stageLabel } from "./labels";
 
 assert.equal(stageLabel("active"), "Live");
 assert.equal(stageLabel("onboarding"), "Setting up");
@@ -45,3 +45,9 @@ assert.equal(relTime(ago(9 * D), now), "9d");
 assert.equal(relTime(ago(21 * D), now), "3w");
 assert.equal(relTime(now + 5 * M, now), "just now");
 console.log("labels.test.ts: ok");
+
+assert.equal(isReconnectAlert("integration:facebook"), true);
+assert.equal(isReconnectAlert("integration:meta"), true);
+assert.equal(isReconnectAlert("billing:card_expiring"), false);
+assert.equal(isReconnectAlert("health:queue_failed:posts"), false);
+assert.equal(isReconnectAlert("churn:high"), false);
