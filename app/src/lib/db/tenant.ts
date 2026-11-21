@@ -3235,6 +3235,15 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       updated_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_member_programs_client ON member_programs(client_id, updated_at);
+    CREATE TABLE IF NOT EXISTS person_link_decisions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lead_id INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+      client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      decision TEXT NOT NULL CHECK (decision IN ('join', 'separate')),
+      decided_by_user_id INTEGER,
+      decided_at INTEGER NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_person_link_decisions_pair ON person_link_decisions(lead_id, client_id);
   `);
   {
     const addColumn = (table: string, column: string, ddl: string) => {

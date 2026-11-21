@@ -3756,3 +3756,17 @@ export const programEnrolmentEvents = sqliteTable("program_enrolment_events", {
   afterJson: text("after_json"),
   sessionId: integer("session_id"),
 });
+
+/** Staff decisions on whether a lead and a client are the same person (Adonis business map, lib/adonisMap). */
+export const personLinkDecisions = sqliteTable(
+  "person_link_decisions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    leadId: integer("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    decision: text("decision", { enum: ["join", "separate"] }).notNull(),
+    decidedByUserId: integer("decided_by_user_id"),
+    decidedAt: integer("decided_at").notNull(),
+  },
+  (t) => ({ pair: uniqueIndex("idx_person_link_decisions_pair").on(t.leadId, t.clientId) }),
+);
