@@ -102,7 +102,7 @@ export function BusinessesTable({
       value: (t) => (t.archivedAt ? "Archived" : billingLabel({ exempt: t.billingExempt, status: t.billingStatus, stage: t.stage })),
       render: (t) => (t.archivedAt ? <span className="chip past_due">archived</span> : <StatusChip status={t.billingStatus} exempt={t.billingExempt} stage={t.stage} />),
     },
-    { key: "stage", label: "Stage", sortable: true, value: (t) => stageLabel(t.stage), render: (t) => stageLabel(t.stage) },
+    { key: "stage", label: "Stage", sortable: true, value: (t) => stageLabel(t.stage), render: (t) => <span style={{ whiteSpace: "nowrap" }}>{stageLabel(t.stage)}</span> },
     {
       key: "risk", label: "Risk", sortable: true,
       value: (t) => (riskShown(t.stage) ? t.risk.score : -1),
