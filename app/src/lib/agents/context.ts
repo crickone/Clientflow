@@ -1,5 +1,7 @@
 import "server-only";
 import { skillBodiesFor, skillMenuFor } from "@/lib/agents/skills";
+import { availableTypesFor, mapEnabled } from "@/lib/adonisMap/access";
+import { describeMap } from "@/lib/adonisMap/describe";
 import { getAgent } from "@/lib/agents/registry";
 import { getBusinessContext } from "@/lib/ai/businessContext";
 import { OUTPUT_STYLE } from "@/lib/ai/responseStyle";
@@ -54,9 +56,13 @@ export function composeAgentSystem(tenantId: number, key: string): string {
       menu.map((s) => `- ${s.name}: ${s.description || "(no description)"}`).join("\n")
     : "";
 
+  // The business map, where it is switched on: the types this business has and how to read them.
+  const mapText = mapEnabled(tenantId) ? "\n\n=== BUSINESS MAP ===\n" + describeMap(availableTypesFor(tenantId)) : "";
+
   return [
     base,
     "\n\n=== BUSINESS CONTEXT ===\n" + getBusinessContext(),
+    mapText,
     skillText,
     menuText,
     custom ? "\n\n=== OPERATOR INSTRUCTIONS (from the Agents tab) ===\n" + custom : "",

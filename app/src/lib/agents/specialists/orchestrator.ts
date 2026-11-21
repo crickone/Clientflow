@@ -1,4 +1,5 @@
 import { conciergeToolSlice } from "@/lib/assistant/tools";
+import { MAP_TOOL_NAMES } from "@/lib/adonisMap/names";
 import { CUSTOMER_MESSAGE_RULES } from "@/lib/ai/messageStyle";
 
 /**
@@ -107,6 +108,7 @@ function buildOrchestratorToolNames(): string[] {
       ...LEAD_TOOLS,
       ...MARKETING_TOOLS,
       ...OPS_TOOLS,
+      ...MAP_TOOL_NAMES,
     ]),
   ].filter((n) => !n.startsWith("delegate_to_"));
   // ^ The delegate_to_* filter is belt-and-suspenders only now: the whole

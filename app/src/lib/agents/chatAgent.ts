@@ -3,6 +3,8 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 
 import { TOOLS } from "@/lib/assistant/tools";
+import { mapEnabled } from "@/lib/adonisMap/access";
+import { MAP_TOOL_SET } from "@/lib/adonisMap/names";
 import { getAgent, parseDisabledTools } from "@/lib/agents/registry";
 import { SPECIALISTS } from "@/lib/agents/specialists";
 
@@ -27,8 +29,10 @@ export function resolveChatAgent(
   if (!agent || agent.status !== "active" || !spec) return null;
   const allowed = new Set<string>(spec.toolNames);
   const disabled = new Set<string>(parseDisabledTools(agent.disabledTools));
+  // The map tools are offered only where the business map is switched on.
+  const mapOn = mapEnabled(tenantId);
   return {
     model: agent.model, // registry model: Sonnet default, Opus if upgraded — never hardcoded
-    tools: TOOLS.filter((t) => allowed.has(t.name) && !disabled.has(t.name)),
+    tools: TOOLS.filter((t) => allowed.has(t.name) && !disabled.has(t.name) && (mapOn || !MAP_TOOL_SET.has(t.name))),
   };
 }

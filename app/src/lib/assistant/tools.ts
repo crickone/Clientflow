@@ -75,6 +75,7 @@ import {
   saveBlogPostTool,
 } from "@/lib/agents/tools.marketing";
 import { SKILL_TOOLS, loadSkillTool } from "@/lib/agents/tools.skills";
+import { MAP_TOOLS, executeMapTool } from "@/lib/adonisMap/tools";
 import {
   POSTS_TOOLS,
   createSocialPostTool,
@@ -864,6 +865,11 @@ export const TOOLS: Anthropic.Tool[] = [
   // ── Skills: read one the operator switched on for this agent. Read-only,
   // so no approval gate; see lib/agents/tools.skills.ts. ──
   ...SKILL_TOOLS,
+
+  // ── Business map: four read tools over people, bookings, classes, memberships,
+  // packages, orders and messages. Offered only where adonis_map is on
+  // (lib/agents/chatAgent.ts); read-only, so never in WRITE_TOOLS. ──
+  ...MAP_TOOLS,
 ];
 
 /**
@@ -1081,6 +1087,11 @@ export async function executeTool(
         return await listLapsedMembersTool(ctx, input);
       case "send_client_whatsapp":
         return await sendClientWhatsappTool(ctx, input);
+      case "map_find":
+      case "map_get":
+      case "map_follow":
+      case "map_count":
+        return await executeMapTool(name, input, ctx);
       default:
         return { text: `Unknown tool: ${name}` };
     }

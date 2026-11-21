@@ -10,6 +10,8 @@
  * Adonis doesn't have — so a tool added to (or removed from) Adonis without a
  * category here is caught by the test, not silently dumped into "Other".
  */
+import { MAP_TOOL_NAMES } from "@/lib/adonisMap/names";
+
 export interface ToolCategory {
   key: string;
   label: string;
@@ -78,6 +80,11 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
       "list_website_pages", "read_website_page", "list_website_images", "edit_website_text", "replace_website_image",
       "create_website_page", "publish_website_page",
     ],
+  },
+  {
+    key: "map",
+    label: "Business map",
+    tools: [...MAP_TOOL_NAMES],
   },
   {
     key: "general",
