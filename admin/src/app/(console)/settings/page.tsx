@@ -1,19 +1,9 @@
 import { api } from "@/lib/api";
-import { saveNotifyPrefs, saveSettings } from "./actions";
+import { saveNotifyPrefs } from "./actions";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SettingsCards } from "@/components/SettingsCards";
+import type { PlatformSettings } from "@/lib/settingsCards";
 import type { StaffResponse } from "@/lib/types";
-
-interface Settings {
-  monthlyPriceCents: number;
-  vatRateBp: number;
-  emailCreditPricePer1000Cents: number;
-  emailIncludedPerMonth: number;
-  aiCreditMarginBp: number;
-  voicePricePerMinuteCents: number;
-  voiceIncludedMinutes: number;
-  voiceTrialMinutes: number;
-  provider: string;
-}
 
 export default async function SettingsPage(
   props: {
@@ -21,178 +11,40 @@ export default async function SettingsPage(
   }
 ) {
   const searchParams = await props.searchParams;
-  const s = await api<Settings>("/settings");
+  const s = await api<PlatformSettings>("/settings");
   const staff = await api<StaffResponse>("/staff");
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 480 }}>
-      <PageHeader eyebrow="Console" title="Settings" sub="Platform prices and allowances. Changes apply to every business." />
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <PageHeader eyebrow="Console" title="Settings" sub="Platform prices and allowances. Changes apply to every business. Each card saves on its own." />
 
-      <form
-        action={saveSettings}
-        className="glass"
-        style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}
-      >
-        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Monthly price (EUR)</span>
-          <input
-            className="input"
-            type="number"
-            step="0.01"
-            min="0"
-            name="monthlyPrice"
-            defaultValue={(s.monthlyPriceCents / 100).toFixed(2)}
-            required
-          />
-        </label>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 20, alignItems: "stretch" }}>
+        <SettingsCards settings={s} />
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>VAT rate (%)</span>
-          <input
-            className="input"
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            name="vatRate"
-            defaultValue={(s.vatRateBp / 100).toFixed(2)}
-            required
-          />
-        </label>
-
-        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Email credit price (EUR / 1000 recipients)</span>
-          <input
-            className="input"
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            name="emailPrice"
-            defaultValue={(s.emailCreditPricePer1000Cents / 100).toFixed(2)}
-            required
-          />
-        </label>
-
-        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Emails included per month</span>
-          <input
-            className="input"
-            type="number"
-            step="1"
-            min="0"
-            name="emailIncluded"
-            defaultValue={String(s.emailIncludedPerMonth)}
-            required
-          />
-          <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
-            Recipients each business can email every month on the base plan before credits are charged.
-          </p>
-        </label>
-
-        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>AI credit margin (%)</span>
-          <input
-            className="input"
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            name="aiMargin"
-            defaultValue={(s.aiCreditMarginBp / 100).toFixed(2)}
-            required
-          />
-          <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
-            Markup over raw model cost, charged on AI usage beyond each business&apos;s free monthly allowance.
-          </p>
-        </label>
-
-        <div style={{ borderTop: "1px solid var(--hairline)", paddingTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>Voice Agent add-on</div>
-
-          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Price per minute (EUR)</span>
-            <input
-              className="input"
-              type="number"
-              step="0.01"
-              min="0"
-              max="20"
-              name="voicePrice"
-              defaultValue={(s.voicePricePerMinuteCents / 100).toFixed(2)}
-              required
-            />
+        <div className="card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <h2 className="card-title" style={{ margin: 0 }}>Other</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Payment provider</span>
+            <div style={{ fontSize: 13.5 }}>{s.provider}</div>
             <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
-              Charged on minutes beyond the included allowance. Calls under 20 seconds are never billed.
+              CreatePay/Cardstream lands here when credentials arrive.
             </p>
-          </label>
-
-          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Minutes included per month</span>
-            <input
-              className="input"
-              type="number"
-              step="1"
-              min="0"
-              name="voiceIncluded"
-              defaultValue={String(s.voiceIncludedMinutes)}
-              required
-            />
-          </label>
-
-          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Free trial minutes</span>
-            <input
-              className="input"
-              type="number"
-              step="1"
-              min="0"
-              name="voiceTrial"
-              defaultValue={String(s.voiceTrialMinutes)}
-              required
-            />
-            <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
-              One-off evaluation minutes while a business&apos;s add-on is on trial. They do not reset monthly.
-            </p>
-          </label>
+          </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Payment provider</span>
-          <div style={{ fontSize: 13.5 }}>{s.provider}</div>
-          <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
-            CreatePay/Cardstream lands here when credentials arrive.
-          </p>
-        </div>
-
-        {searchParams.error && (
-          <p role="alert" style={{ margin: 0, color: "var(--red)", fontSize: 13 }}>
-            {searchParams.error}
-          </p>
-        )}
-        {searchParams.saved === "1" && !searchParams.error && (
-          <p style={{ margin: 0, color: "var(--green)", fontSize: 13 }}>Settings saved.</p>
-        )}
-
-        <div>
-          <button className="btn btn--primary btn--md" type="submit">
-            Save
-          </button>
-        </div>
-      </form>
-
-      <form action={saveNotifyPrefs} className="glass" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14 }}>
-        <h2 className="card-title" style={{ margin: 0 }}>Alert emails to you</h2>
-        <label className="check"><input type="checkbox" name="instant" defaultChecked={staff.you.notify.instant} /> The moment a serious alert opens</label>
-        <label className="check"><input type="checkbox" name="digest" defaultChecked={staff.you.notify.digest} /> A morning digest at 8am of everything still open</label>
-        {searchParams.notifyError && (
-          <p role="alert" style={{ margin: 0, color: "var(--red)", fontSize: 13 }}>{searchParams.notifyError}</p>
-        )}
-        {searchParams.saved === "notify" && !searchParams.notifyError && (
-          <p style={{ margin: 0, color: "var(--green)", fontSize: 13 }}>Alert emails saved.</p>
-        )}
-        <div><button className="btn btn--primary btn--md" type="submit">Save</button></div>
-      </form>
+        <form action={saveNotifyPrefs} className="card" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <h2 className="card-title" style={{ margin: 0 }}>Alert emails to you</h2>
+          <label className="check"><input type="checkbox" name="instant" defaultChecked={staff.you.notify.instant} /> The moment a serious alert opens</label>
+          <label className="check"><input type="checkbox" name="digest" defaultChecked={staff.you.notify.digest} /> A morning digest at 8am of everything still open</label>
+          {searchParams.notifyError && (
+            <p role="alert" style={{ margin: 0, color: "var(--red)", fontSize: 13 }}>{searchParams.notifyError}</p>
+          )}
+          {searchParams.saved === "notify" && !searchParams.notifyError && (
+            <p style={{ margin: 0, color: "var(--green)", fontSize: 13 }}>Alert emails saved.</p>
+          )}
+          <div><button className="btn btn--primary btn--md" type="submit">Save</button></div>
+        </form>
+      </div>
     </div>
   );
 }
