@@ -613,7 +613,7 @@ export function Sidebar({
             />
           ) : (
             <div style={{ padding: "4px 4px 0" }}>
-              <Logo src={logoSrc} alt={businessName} height={24} />
+              <Logo src={logoSrc} alt={businessName} height={24} oneColour />
             </div>
           )}
         </div>
@@ -835,7 +835,7 @@ function AccountSwitcher({
           }}
         >
           <span style={{ flex: 1, minWidth: 0 }}>
-            <Logo src={logoSrc} alt={businessName} height={24} />
+            <Logo src={logoSrc} alt={businessName} height={24} oneColour />
           </span>
           <ChevronsUpDown
             size={15}

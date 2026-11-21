@@ -128,7 +128,7 @@ export function ClientAppFrame({
                 <ChevronLeft size={22} />
               </button>
             )}
-            <Logo src={logoSrc} alt={businessName} height={22} />
+            <Logo src={logoSrc} alt={businessName} height={22} oneColour />
           </header>
         )}
 

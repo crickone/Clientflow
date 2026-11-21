@@ -193,7 +193,7 @@ export function AppShell({
             >
               <Menu size={22} strokeWidth={1.9} />
             </button>
-            <Logo src={logoSrc} alt={businessName} height={22} />
+            <Logo src={logoSrc} alt={businessName} height={22} oneColour />
           </div>
           {children}
         </main>
