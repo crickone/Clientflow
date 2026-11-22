@@ -150,6 +150,7 @@ guarantees, no free consults, no pricing, no fabricated claims.
   ids via `OpenRouterProvider` (e.g. DeepSeek, Kimi, GPT-5) — behind one
   provider-neutral turn loop, so tool dispatch/approval/metering never see a
   provider-specific wire format.
+- **Business map** (`src/lib/adonisMap/`, flag `adonis_map`, off by default): Adonis reads Person (leads linked to clients, never merged; staff decisions in `person_link_decisions`), Booking, Class, Membership, Package, Order and Conversation through four read tools (`map_find`, `map_get`, `map_follow`, `map_count`). Test set: `npm run eval:adonis -- --map on|off` (paid, by hand).
 - **Durable runs:** the agent chat route runs `runAgentTurn` in a
   detached, tenant-bound continuation that keeps going after the response
   has streamed back (Railway runs this app as a persistent `next start`
