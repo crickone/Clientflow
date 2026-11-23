@@ -212,7 +212,7 @@ const GIFT_CSS = `
 .vg__details > div{display:flex;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid rgba(127,127,127,.4)}
 .vg__details dt{font-size:12px;letter-spacing:.18em;text-transform:uppercase;opacity:.7;margin:0}
 .vg__details dd{margin:0;text-align:right;overflow-wrap:anywhere}
-.vg__mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em}
+.vg__mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;white-space:nowrap}
 .vg__actions{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:clamp(26px,4vw,36px)}
 .vg__book,.vg__print{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 24px;border-radius:999px;font:inherit;font-weight:600;font-size:16px;text-decoration:none;cursor:pointer}
 .vg__book{border:0}

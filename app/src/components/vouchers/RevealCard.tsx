@@ -141,7 +141,8 @@ const RC_CSS = `
 .rc__title--long{font-size:clamp(22px,6.5vw,38px)}
 .rc__for{text-align:center;margin-top:10px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;opacity:.85}
 .rc__bottom{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding-top:12px;border-top:1px solid var(--rc-f2)}
-.rc__code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;letter-spacing:.14em}
+.rc__code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;letter-spacing:.14em;white-space:nowrap;flex-shrink:0}
+@media(max-width:420px){.rc__code{font-size:12px;letter-spacing:.08em}}
 .rc__exp{font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.8;text-align:right}
 @media (prefers-reduced-motion:reduce){.rc{transform:none!important;transition:none}.rc__foil{opacity:.45}}
 @media print{.rc{box-shadow:none;transform:none!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
