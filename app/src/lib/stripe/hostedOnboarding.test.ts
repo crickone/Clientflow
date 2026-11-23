@@ -47,4 +47,23 @@ assert.equal(canTakePayments({ livemode: true, chargesEnabled: false }), false);
 assert.equal(canTakePayments({ livemode: true, chargesEnabled: true }), true);
 assert.equal(canTakePayments({ livemode: false, chargesEnabled: false }), true);
 
+
+// Connect an existing account (OAuth): the sign-in link carries the platform's client id, read_write and the signed state.
+{
+  const { oauthAuthorizeUrl, oauthConfigured } = requireLocal("./api") as typeof import("./api");
+  const before = { id: process.env.STRIPE_CONNECT_CLIENT_ID, key: process.env.STRIPE_SECRET_KEY };
+  delete process.env.STRIPE_CONNECT_CLIENT_ID;
+  assert.equal(oauthAuthorizeUrl("s", "https://app.example/api/stripe/callback"), null, "no client id, no link");
+  process.env.STRIPE_CONNECT_CLIENT_ID = " ca_test123\n";
+  process.env.STRIPE_SECRET_KEY = "sk_test_x";
+  assert.equal(oauthConfigured(), true);
+  const u = new URL(oauthAuthorizeUrl("st4te", "https://app.example/api/stripe/callback")!);
+  assert.equal(u.origin + u.pathname, "https://connect.stripe.com/oauth/authorize");
+  assert.equal(u.searchParams.get("client_id"), "ca_test123", "client id trimmed");
+  assert.equal(u.searchParams.get("scope"), "read_write");
+  assert.equal(u.searchParams.get("state"), "st4te");
+  assert.equal(u.searchParams.get("redirect_uri"), "https://app.example/api/stripe/callback");
+  if (before.id === undefined) delete process.env.STRIPE_CONNECT_CLIENT_ID; else process.env.STRIPE_CONNECT_CLIENT_ID = before.id;
+  if (before.key === undefined) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = before.key;
+}
 console.log("stripe/hostedOnboarding: ok");

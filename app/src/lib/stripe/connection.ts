@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { controlDb } from "@/lib/db/control";
 import { stripeConnections } from "@/lib/db/schema";
+import { signTokenPayload, readTokenPayload } from "@/lib/signedToken";
 import { stripeKeyMode, type StripeAccount } from "./api";
 
 /**
@@ -91,4 +92,24 @@ export function updateStripeAccountStatus(tenantId: number, a: StripeAccount): v
 
 export function removeStripeConnection(tenantId: number): void {
   controlDb.delete(stripeConnections).where(eq(stripeConnections.tenantId, tenantId)).run();
+}
+
+// ---- OAuth state (connect an existing account) ------------------------------
+// The `state` round-trips through Stripe; signing it means the callback only
+// ever saves an account for the business and admin who started the connect.
+
+const STATE_TTL_MS = 30 * 60 * 1000;
+
+export function signConnectState(tenantId: number, userId: number): string | null {
+  return signTokenPayload({ k: "stripe-connect", t: tenantId, u: userId, e: Date.now() + STATE_TTL_MS });
+}
+
+export function readConnectState(state: string): { tenantId: number; userId: number } | null {
+  const p = readTokenPayload(state);
+  if (!p || p.k !== "stripe-connect") return null;
+  const t = Number(p.t);
+  const u = Number(p.u);
+  const e = Number(p.e);
+  if (!Number.isInteger(t) || !Number.isInteger(u) || !Number.isFinite(e) || e < Date.now()) return null;
+  return { tenantId: t, userId: u };
 }

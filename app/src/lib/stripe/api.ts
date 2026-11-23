@@ -19,6 +19,8 @@ import { formEncode } from "./encode";
  * Environment (Railway):
  *   STRIPE_SECRET_KEY         the platform account's secret key (sk_live_...)
  *   STRIPE_WEBHOOK_SECRET     signing secret of the Connect webhook endpoint
+ *   STRIPE_CONNECT_CLIENT_ID  Connect > Onboarding options > OAuth client id (ca_...);
+ *                             optional, turns on "Connect your existing Stripe account"
  * See docs/stripe-connect.md.
  */
 
@@ -29,7 +31,7 @@ export type StripeResult<T> = { ok: true; data: T } | { ok: false; error: string
  * Railway with a trailing newline (it happened with the webhook secret)
  * otherwise fails every signature check without a visible difference.
  */
-export function stripeEnv(name: "STRIPE_SECRET_KEY" | "STRIPE_WEBHOOK_SECRET"): string | undefined {
+export function stripeEnv(name: "STRIPE_SECRET_KEY" | "STRIPE_WEBHOOK_SECRET" | "STRIPE_CONNECT_CLIENT_ID"): string | undefined {
   return process.env[name]?.trim() || undefined;
 }
 
@@ -77,6 +79,25 @@ async function call<T>(
 
 // STRIPE_API_BASE exists only to point local tests at a mock; production leaves it unset.
 const API = `${process.env.STRIPE_API_BASE || "https://api.stripe.com"}/v1`;
+const CONNECT = process.env.STRIPE_CONNECT_BASE || "https://connect.stripe.com";
+
+/** Whether a business can attach a Stripe account it already has (OAuth), not only make a new one. */
+export function oauthConfigured(): boolean {
+  return Boolean(stripeEnv("STRIPE_SECRET_KEY") && stripeEnv("STRIPE_CONNECT_CLIENT_ID"));
+}
+
+/** Stripe's sign-in page, where the owner picks the existing account to connect. */
+export function oauthAuthorizeUrl(state: string, redirectUri: string): string | null {
+  const clientId = stripeEnv("STRIPE_CONNECT_CLIENT_ID");
+  if (!clientId) return null;
+  const q = new URLSearchParams({ response_type: "code", client_id: clientId, scope: "read_write", state, redirect_uri: redirectUri, stripe_landing: "login" });
+  return `${CONNECT}/oauth/authorize?${q.toString()}`;
+}
+
+/** Swap the one-time code Stripe sends back for the connected account id. */
+export function exchangeOAuthCode(code: string): Promise<StripeResult<{ stripe_user_id: string; livemode: boolean }>> {
+  return call(`${CONNECT}/oauth/token`, { method: "POST", params: { grant_type: "authorization_code", code } });
+}
 
 /**
  * The controller settings that make a platform-created account behave like a

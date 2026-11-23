@@ -12,6 +12,8 @@ import { formatEur } from "@/lib/offers/model";
 
 export interface StripeSettingsProps {
   configured: boolean;
+  /** The platform can attach an account the business already has (Stripe OAuth). */
+  canLinkExisting: boolean;
   connection: { accountId: string; displayName: string | null; email: string | null; chargesEnabled: boolean; livemode: boolean; connectedAt: number } | null;
   justConnected: boolean;
   /** Back from Stripe's onboarding without finishing it. */
@@ -24,6 +26,8 @@ export interface StripeSettingsProps {
 const STRIPE_SETTINGS = "https://dashboard.stripe.com/settings/account";
 /** Makes a fresh link to Stripe's onboarding. A plain link, never a prefetching one: each visit asks Stripe for a new link. */
 const CONTINUE_IN_STRIPE = "/api/stripe/connect";
+/** Stripe's sign-in, to pick an account the business already has. Plain link: each visit signs a fresh state. */
+const LINK_EXISTING = "/api/stripe/link";
 
 function shortDate(ms: number) {
   return new Date(ms).toLocaleDateString("en-IE", { day: "numeric", month: "short", timeZone: "Europe/Dublin" });
@@ -33,7 +37,7 @@ function shortDate(ms: number) {
  * Stripe for one business: connect it, see whether it can take payments and
  * what to do next, and the latest online sales.
  */
-export function StripeSettings({ configured, connection, justConnected, unfinished, error, offersOnSale, recent }: StripeSettingsProps) {
+export function StripeSettings({ configured, canLinkExisting, connection, justConnected, unfinished, error, offersOnSale, recent }: StripeSettingsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [pending, start] = useTransition();
@@ -69,7 +73,7 @@ export function StripeSettings({ configured, connection, justConnected, unfinish
 
   const steps = connection
     ? [
-        { done: true, title: "Stripe account made", detail: `Since ${shortDate(connection.connectedAt)}`, action: null },
+        { done: true, title: "Stripe account connected", detail: `Since ${shortDate(connection.connectedAt)}`, action: null },
         connection.livemode
           ? {
               done: connection.chargesEnabled,
@@ -129,12 +133,29 @@ export function StripeSettings({ configured, connection, justConnected, unfinish
             <div className="stp-empty-body">
               <h2>Take payments on your campaign pages</h2>
               <p>Buyers pay by card, Apple Pay or Google Pay on Stripe&rsquo;s checkout page. The money goes into your own Stripe account.</p>
-              <div className="stp-connect">
-                <a className="btn btn--primary btn--md" href={CONTINUE_IN_STRIPE}>
-                  Connect with Stripe
-                </a>
-                <span>This makes a Stripe account for your business. You&rsquo;ll add your business and bank details on Stripe&rsquo;s own page, and can sign in to it at stripe.com any time.</span>
-              </div>
+              {canLinkExisting ? (
+                <>
+                  <div className="stp-connect">
+                    <a className="btn btn--primary btn--md" href={LINK_EXISTING}>
+                      Connect your Stripe account
+                    </a>
+                    <span>Already use Stripe? Sign in to Stripe and pick the account to connect.</span>
+                  </div>
+                  <div className="stp-connect">
+                    <a className="btn btn--secondary btn--md" href={CONTINUE_IN_STRIPE}>
+                      Make a new Stripe account
+                    </a>
+                    <span>No Stripe account yet? This makes one. You&rsquo;ll add your business and bank details on Stripe&rsquo;s own page.</span>
+                  </div>
+                </>
+              ) : (
+                <div className="stp-connect">
+                  <a className="btn btn--primary btn--md" href={CONTINUE_IN_STRIPE}>
+                    Connect with Stripe
+                  </a>
+                  <span>This makes a Stripe account for your business. You&rsquo;ll add your business and bank details on Stripe&rsquo;s own page, and can sign in to it at stripe.com any time.</span>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -152,6 +173,12 @@ export function StripeSettings({ configured, connection, justConnected, unfinish
               </div>
               {status && <span className={`stp-pill is-${status.tone}`}>{status.text}</span>}
             </header>
+
+            {canLinkExisting && connection.livemode && !connection.chargesEnabled && (
+              <p className="stp-testnote">
+                Already have a Stripe account you&rsquo;d rather use? <a href={LINK_EXISTING}>Connect it instead</a>. It replaces this one here; this one stays in Stripe, unused.
+              </p>
+            )}
 
             {!connection.livemode && (
               <p className="stp-testnote">Test account: buyers can only pay with Stripe&rsquo;s test cards, and no real money moves.</p>
@@ -195,7 +222,7 @@ export function StripeSettings({ configured, connection, justConnected, unfinish
               <span className="stp-foot-gap" />
               {confirming ? (
                 <span className="stp-confirm">
-                  Buy buttons will stop working. Connecting again makes a new Stripe account.
+                  Buy buttons will stop working.
                   <Button variant="destructive" size="sm" onClick={disconnect} loading={pending}>
                     Disconnect
                   </Button>
