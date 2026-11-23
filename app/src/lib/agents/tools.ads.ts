@@ -15,6 +15,7 @@ import {
   setAdSetBudget,
   updateAdDraft,
 } from "@/lib/ads/service";
+import { listLibraryAssets } from "@/lib/image/library";
 import { OBJECTIVES, PLATFORM_LABEL, PLATFORMS, platformsOf, totalDailyBudget, validateSpec, type AdSpec, type CampaignSpec, type Platforms } from "@/lib/ads/spec";
 import { listAdAccounts } from "@/lib/facebook/grants";
 import { getAdsOverview } from "@/lib/ads/accountInsights";
@@ -43,10 +44,21 @@ const AD_SCHEMA = {
     creative: {
       type: "object",
       properties: {
+        source: {
+          type: "string",
+          enum: ["design", "library"],
+          description:
+            "Where the picture comes from. 'library' = the business's own photos from the Content Studio photo library (list_ad_campaigns 'libraryPhotos'), used exactly as uploaded: one photo makes a single-image ad, 2-10 make a carousel. Use 'library' whenever the operator has uploaded their own ad images. 'design' (default) = a Content Studio ad design (designId).",
+        },
+        imageAssetIds: {
+          type: "array",
+          items: { type: "integer" },
+          description: "For source 'library': the photo ids (list_ad_campaigns 'libraryPhotos'), in order, 1-10.",
+        },
         designId: {
           type: "integer",
           description:
-            "The picture: a version of a Content Studio AD (list_ad_campaigns 'ads', each version's designId, with format 'single' and that version's own texts and cta). Make one with create_ad when none fits. 'socialPosts' designs were written for organic posts (they can say things like 'link in bio') and are NOT ads: use one only if the operator explicitly asks.",
+            "For source 'design': the picture: a version of a Content Studio AD (list_ad_campaigns 'ads', each version's designId, with format 'single' and that version's own texts and cta). Make one with create_ad when none fits. 'socialPosts' designs were written for organic posts (they can say things like 'link in bio') and are NOT ads: use one only if the operator explicitly asks.",
         },
         format: { type: "string", enum: ["single", "carousel"] },
         primaryText: { type: "string" },
@@ -55,7 +67,7 @@ const AD_SCHEMA = {
         cta: { type: "string", enum: ["LEARN_MORE", "BOOK_NOW", "SIGN_UP", "CONTACT_US", "GET_OFFER", "SHOP_NOW", "MESSAGE_PAGE", "APPLY_NOW", "SUBSCRIBE"] },
         linkUrl: { type: "string", description: "https link; required for traffic, awareness and engagement." },
       },
-      required: ["designId", "format", "primaryText", "headline", "cta"],
+      required: ["format", "primaryText", "headline", "cta"],
     },
   },
   required: ["name", "creative"],
@@ -152,7 +164,7 @@ export const ADS_TOOLS: Anthropic.Tool[] = [
   {
     name: "list_ad_campaigns",
     description:
-      "List the business's Facebook/Instagram ad campaigns (status, daily budget, spend and results), the connected ad accounts, and the Content Studio designs that can be used as ad images.",
+      "List the business's Facebook/Instagram ad campaigns (status, daily budget, spend and results), the connected ad accounts, the Content Studio ad designs, the business's own photo library (libraryPhotos, usable directly as ad images with creative.source 'library'), and offerPages: campaign pages a Sales ad can link to. Every offerPage is live now with working Buy buttons (a 'ready' campaign's page is public); the campaign does not need launching first.",
     input_schema: { type: "object", properties: {} },
   },
   {
@@ -300,7 +312,12 @@ export async function listAdCampaignsTool(ctx: ToolContext): Promise<ToolResult>
     .map((c) => ({ designId: c.id, name: c.name, images: c.slideCount }));
   // Campaign pages with an offer: where a Sales ad leads (the ad link, with the ad-only key when set).
   const offerPages = await offerPagesForAds().catch(() => []);
-  return { text: fenceUntrusted(JSON.stringify({ adAccounts, campaigns, ads, socialPosts, offerPages })) };
+  // The business's own photos (e.g. finished ad images they uploaded): usable as-is with creative.source "library".
+  const libraryPhotos = listLibraryAssets()
+    .filter((a: { kind?: string | null }) => a.kind !== "video" && a.kind !== "file")
+    .slice(0, 40)
+    .map((a: { id: number; originalName?: string | null; label?: string | null }) => ({ id: a.id, name: a.label || a.originalName || `Photo ${a.id}` }));
+  return { text: fenceUntrusted(JSON.stringify({ adAccounts, campaigns, ads, socialPosts, libraryPhotos, offerPages })) };
 }
 
 /** READ */
