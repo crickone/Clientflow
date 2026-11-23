@@ -52,6 +52,15 @@ if (!process.env.ANTHROPIC_API_KEY) {
   process.exit(2);
 }
 
+// `railway run` hands this process PRODUCTION settings. Importing the app arms
+// its in-process jobs (nightly backup, ticker, daily jobs), and with production
+// credentials they reach real services: on 2026-11-21..23 the backup job
+// uploaded these throwaway databases to the production backup buckets. Keep
+// only the model keys and the basics; nothing else can be reached from here.
+const KEEP_ENV = new Set(["ANTHROPIC_API_KEY", "OPENROUTER_API_KEY", "PATH", "HOME", "TMPDIR", "TERM", "LANG", "NODE_OPTIONS", "USER", "SHELL"]);
+for (const k of Object.keys(process.env)) if (!KEEP_ENV.has(k)) delete process.env[k];
+(process.env as Record<string, string>).NODE_ENV = "development";
+
 // Everything below reads and writes ./data under this throwaway directory.
 const work = fs.mkdtempSync(path.join(os.tmpdir(), "adonis-eval-"));
 process.chdir(work);
@@ -165,6 +174,8 @@ process.chdir(work);
   fs.writeFileSync(path.join(outDir, `${stamp}.md`), md + "\n");
   console.log(`\n${passed} of ${results.length} passed. Results: evals/adonis/results/${stamp}.md`);
   fs.rmSync(work, { recursive: true, force: true });
+  // The app's timers would keep this process alive for days: end it here.
+  process.exit(0);
 })().catch((err) => {
   console.error(err);
   fs.rmSync(work, { recursive: true, force: true });
