@@ -46,6 +46,7 @@ export const MODULE_CATALOG: ModuleDef[] = [
   { key: "email_campaigns", label: "Email campaigns", blurb: "Bulk email, contacts and sending domains.", paths: ["/campaigns"] },
   { key: "client_app", label: "Client app", blurb: "The members' own app and its branding.", paths: ["/my-app"] },
   { key: "adonis_map", label: "Adonis business map", blurb: "Adonis reads people, bookings, memberships, packages, orders and messages as one connected map.", paths: [], defaultRollout: "none" },
+  { key: "voucher_store", label: "Online voucher store", blurb: "Gift vouchers sold on the business's own website, paid into its own Stripe.", paths: ["/vouchers/store"], defaultRollout: "none" },
 ];
 
 export const MODULE_KEYS: readonly string[] = MODULE_CATALOG.map((m) => m.key);

@@ -291,6 +291,17 @@ export const giftVouchers = sqliteTable("gift_vouchers", {
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
+  /** "staff" = made at the desk; "online" = bought in the voucher store (lib/vouchers). */
+  source: text("source", { enum: ["staff", "online"] }).notNull().default("staff"),
+  /** "amount" = money with a balance; "treatment" = one session of therapy_id, then used up. */
+  kind: text("kind", { enum: ["amount", "treatment"] }).notNull().default("amount"),
+  voucherOrderId: integer("voucher_order_id"),
+  message: text("message"),
+  /** The card's colours (lib/vouchers/model Colourway) as JSON. */
+  colourway: text("colourway"),
+  /** The unguessable /v/<token> link. Unique when set (partial index in tenant.ts). */
+  viewToken: text("view_token"),
+  cancelledAt: integer("cancelled_at"),
 });
 
 export const payments = sqliteTable(
@@ -3615,6 +3626,54 @@ export const offerOrders = sqliteTable("offer_orders", {
   arrival: text("arrival"),
 });
 export type OfferOrder = typeof offerOrders.$inferSelect;
+
+/**
+ * A gift voucher bought in the business's online store (lib/vouchers). One
+ * voucher per order. `colourway` is the card's colours as JSON, kept so a
+ * voucher never changes colour when the brand palette does. `site_url` is
+ * the site the buyer was on (its own domain in production), so emails sent
+ * later by the ticker link back to the right place.
+ */
+export const voucherOrders = sqliteTable("voucher_orders", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  kind: text("kind", { enum: ["amount", "treatment"] }).notNull(),
+  valueCents: integer("value_cents").notNull(),
+  therapyId: integer("therapy_id").references(() => therapies.id, { onDelete: "set null" }),
+  buyerName: text("buyer_name").notNull(),
+  buyerEmail: text("buyer_email").notNull(),
+  recipientName: text("recipient_name").notNull(),
+  recipientEmail: text("recipient_email"),
+  fromName: text("from_name").notNull(),
+  message: text("message"),
+  colourway: text("colourway").notNull(),
+  deliverTo: text("deliver_to", { enum: ["buyer", "recipient"] }).notNull(),
+  /** YYYY-MM-DD (sent at 09:00 Irish time that day), or null for at once. */
+  deliverOn: text("deliver_on"),
+  status: text("status", { enum: ["pending", "paid", "expired", "refunded", "failed"] }).notNull().default("pending"),
+  stripeAccountId: text("stripe_account_id").notNull(),
+  stripeSessionId: text("stripe_session_id").unique(),
+  paymentIntentId: text("payment_intent_id"),
+  giftVoucherId: integer("gift_voucher_id").references(() => giftVouchers.id, { onDelete: "set null" }),
+  siteId: integer("site_id"),
+  siteUrl: text("site_url").notNull(),
+  deliveredAt: integer("delivered_at"),
+  deliveryError: text("delivery_error"),
+  createdAt: integer("created_at").notNull(),
+  paidAt: integer("paid_at"),
+});
+export type VoucherOrder = typeof voucherOrders.$inferSelect;
+
+/** One use of a voucher. balance_eur on the voucher is its value less the sum of these. */
+export const voucherRedemptions = sqliteTable("voucher_redemptions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  voucherId: integer("voucher_id").notNull().references(() => giftVouchers.id, { onDelete: "cascade" }),
+  amountEur: real("amount_eur").notNull(),
+  appointmentId: integer("appointment_id").references(() => appointments.id, { onDelete: "set null" }),
+  paymentId: integer("payment_id").references(() => payments.id, { onDelete: "set null" }),
+  redeemedByUserId: integer("redeemed_by_user_id"),
+  createdAt: integer("created_at").notNull(),
+});
+export type VoucherRedemption = typeof voucherRedemptions.$inferSelect;
 
 /** The member's own training days for one assigned programme ("1,3,5" = Mon, Wed, Fri). */
 export const trainingPlans = sqliteTable("training_plans", {

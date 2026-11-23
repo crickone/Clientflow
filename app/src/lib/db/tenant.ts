@@ -3273,6 +3273,65 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     addColumn("program_enrolments", "assigned_at", "assigned_at INTEGER");
   }
 
+  // The online voucher store (lib/vouchers). Not wrapped in a swallowing
+  // try/catch, for the reason given above the DIY training block: every
+  // drizzle select on gift_vouchers names the new columns, so a failed ALTER
+  // must fail the open rather than leave a cached connection without them.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS voucher_orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind TEXT NOT NULL CHECK (kind IN ('amount', 'treatment')),
+      value_cents INTEGER NOT NULL,
+      therapy_id INTEGER REFERENCES therapies(id) ON DELETE SET NULL,
+      buyer_name TEXT NOT NULL,
+      buyer_email TEXT NOT NULL,
+      recipient_name TEXT NOT NULL,
+      recipient_email TEXT,
+      from_name TEXT NOT NULL,
+      message TEXT,
+      colourway TEXT NOT NULL,
+      deliver_to TEXT NOT NULL CHECK (deliver_to IN ('buyer', 'recipient')),
+      deliver_on TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      stripe_account_id TEXT NOT NULL,
+      stripe_session_id TEXT UNIQUE,
+      payment_intent_id TEXT,
+      gift_voucher_id INTEGER REFERENCES gift_vouchers(id) ON DELETE SET NULL,
+      site_id INTEGER,
+      site_url TEXT NOT NULL,
+      delivered_at INTEGER,
+      delivery_error TEXT,
+      created_at INTEGER NOT NULL,
+      paid_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_voucher_orders_pi ON voucher_orders(payment_intent_id);
+    CREATE INDEX IF NOT EXISTS idx_voucher_orders_delivery ON voucher_orders(status, deliver_to, delivered_at);
+    CREATE TABLE IF NOT EXISTS voucher_redemptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      voucher_id INTEGER NOT NULL REFERENCES gift_vouchers(id) ON DELETE CASCADE,
+      amount_eur REAL NOT NULL,
+      appointment_id INTEGER REFERENCES appointments(id) ON DELETE SET NULL,
+      payment_id INTEGER REFERENCES payments(id) ON DELETE SET NULL,
+      redeemed_by_user_id INTEGER,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_voucher_redemptions_voucher ON voucher_redemptions(voucher_id, created_at);
+  `);
+  {
+    const giftCols = sqlite.prepare("PRAGMA table_info(gift_vouchers)").all() as Array<{ name: string }>;
+    const addGiftColumn = (column: string, ddl: string) => {
+      if (giftCols.length && !giftCols.some((c) => c.name === column)) sqlite.exec(`ALTER TABLE gift_vouchers ADD COLUMN ${ddl}`);
+    };
+    addGiftColumn("source", "source TEXT NOT NULL DEFAULT 'staff'");
+    addGiftColumn("kind", "kind TEXT NOT NULL DEFAULT 'amount'");
+    addGiftColumn("voucher_order_id", "voucher_order_id INTEGER");
+    addGiftColumn("message", "message TEXT");
+    addGiftColumn("colourway", "colourway TEXT");
+    addGiftColumn("view_token", "view_token TEXT");
+    addGiftColumn("cancelled_at", "cancelled_at INTEGER");
+    sqlite.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_gift_vouchers_view_token ON gift_vouchers(view_token) WHERE view_token IS NOT NULL");
+  }
+
   // Dashboard slice 2: stamp each event recorder's start date once.
   try {
     sqlite.exec(RECORDER_START_SQL);
