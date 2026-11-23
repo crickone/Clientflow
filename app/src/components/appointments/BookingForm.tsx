@@ -194,7 +194,8 @@ export function BookingForm({
   }, [voucherCode, paymentMethod]);
 
   // What the voucher pays towards this booking: a money voucher up to its
-  // balance; a treatment voucher the whole session if it is that treatment.
+  // balance; a treatment voucher the session price up to the treatment's
+  // listed price (the same sum the server does), if it is that treatment.
   const voucherWrongTreatment =
     voucherInfo.state === "valid" && voucherInfo.kind === "treatment" && voucherInfo.therapyId !== therapyId;
   const voucherCovers =
@@ -203,8 +204,11 @@ export function BookingForm({
       : voucherInfo.kind === "treatment"
         ? voucherWrongTreatment
           ? 0
-          : price
+          : Math.min(price, therapyById.get(therapyId as number)?.defaultPriceEur ?? 0)
         : Math.min(voucherInfo.balance, price);
+  // A treatment voucher with no listed price to pay against is refused by the server.
+  const voucherNoPrice =
+    voucherInfo.state === "valid" && voucherInfo.kind === "treatment" && !voucherWrongTreatment && voucherCovers <= 0;
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -271,7 +275,7 @@ export function BookingForm({
       fd.set("voucherCode", voucherCode);
       // If the voucher balance can't cover the session, the operator must
       // pick a secondary method for the remainder.
-      if (voucherInfo.state === "valid" && !voucherWrongTreatment && voucherCovers < price) {
+      if (voucherInfo.state === "valid" && !voucherWrongTreatment && !voucherNoPrice && voucherCovers < price) {
         fd.set("secondaryPaymentMethod", secondaryPaymentMethod);
       }
     }
@@ -888,9 +892,15 @@ export function BookingForm({
                       <div style={{ color: "#dc2626" }}>
                         This voucher is for {voucherInfo.therapyName ?? "a different treatment"}.
                       </div>
+                    ) : voucherNoPrice ? (
+                      <div style={{ color: "#dc2626" }}>
+                        This voucher cannot be applied: the treatment has no price.
+                      </div>
                     ) : voucherInfo.kind === "treatment" ? (
                       <div style={{ color: "var(--text-secondary)" }}>
-                        Pays for this session. The voucher is then used up.
+                        {voucherCovers < price
+                          ? "Pays for this session up to the treatment's listed price. The voucher is then used up."
+                          : "Pays for this session. The voucher is then used up."}
                       </div>
                     ) : (
                       price > 0 &&
@@ -914,6 +924,7 @@ export function BookingForm({
             {/* Split payment: shown when the voucher pays less than the session */}
             {voucherInfo.state === "valid" &&
               !voucherWrongTreatment &&
+              !voucherNoPrice &&
               price > 0 &&
               voucherCovers < price && (
                 <div

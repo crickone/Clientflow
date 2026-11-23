@@ -34,7 +34,7 @@ const requireLocal = createRequire(import.meta.url);
   const schema = requireLocal("../db/schema") as typeof import("../db/schema");
   const { eq } = requireLocal("drizzle-orm") as typeof import("drizzle-orm");
   const { withVoucherTenant, seedTherapy } = requireLocal("./testSupport") as typeof import("./testSupport");
-  const { redeemAtBooking, lookupVoucher } = requireLocal("./redeem") as typeof import("./redeem");
+  const { redeemAtBooking, lookupVoucher, recordVoucherUse, VoucherBalanceError } = requireLocal("./redeem") as typeof import("./redeem");
   const { balanceFrom } = requireLocal("./model") as typeof import("./model");
 
   await withVoucherTenant("voucher-redeem-test", (tid) =>
@@ -129,6 +129,23 @@ const requireLocal = createRequire(import.meta.url);
       assert.equal(pays(a6).length, 0);
       assert.equal(uses(vf.id).length, 0);
       assert.equal(get(vf.id).balanceEur, 40);
+
+      // Two uses read the same balance: the second would overspend and is refused with nothing written.
+      const vr = voucher("GC-2026-HHHH", { valueEur: 50, balanceEur: 50 });
+      const a7 = appt(massage, 40);
+      const a8 = appt(massage, 40);
+      const useOf = (appointmentId: number) => ({
+        voucherId: vr.id, redemptionEur: 40, paymentEur: 40, clientId: client!.id, appointmentId, packageId: null, userId: 7, note: null,
+        remainder: { amountEur: 5, method: "cash" as const, note: "rest" },
+      });
+      recordVoucherUse(useOf(a7), now);
+      assert.equal(get(vr.id).balanceEur, 10);
+      assert.throws(() => recordVoucherUse(useOf(a8), now), VoucherBalanceError, "a second use over the remaining balance is refused");
+      assert.equal(pays(a8).length, 0, "no payment rows left behind");
+      assert.equal(uses(vr.id).length, 1, "no second redemption");
+      assert.equal(get(vr.id).balanceEur, 10, "balance untouched");
+      const viaBooking = book("GC-2026-HHHH", a8, 40, massage, "cash");
+      assert.ok(viaBooking.ok && viaBooking.voucherEur === 10, "a fresh booking only takes what is left");
     }),
   );
 

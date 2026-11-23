@@ -217,11 +217,10 @@ export async function POST(req: NextRequest) {
         .run();
     }
 
-    if (parsed.paymentMethod === "voucher") {
+    if (parsed.paymentMethod === "voucher" && voucherCode.trim()) {
       // The voucher pays what it can and any rest is a second payment, with
       // one voucher_redemptions row and the new balance (lib/vouchers/redeem).
       // An expired voucher is still taken: staff saw the warning on the form.
-      if (!voucherCode.trim()) return rollback(apptId, "Enter the voucher code.");
       const staff = await getSessionUser();
       const used = redeemAtBooking({
         code: voucherCode,
@@ -234,7 +233,8 @@ export async function POST(req: NextRequest) {
       });
       if (!used.ok) return rollback(apptId, used.error);
     } else {
-      // No voucher — single payment row for the full session.
+      // No voucher, or a paper voucher with no code (the old desk path): a
+      // single payment row for the full session.
       db.insert(payments)
         .values({
           clientId: resolvedClientId,

@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { giftVouchers, payments, therapies, voucherRedemptions } from "@/lib/db/schema";
@@ -67,7 +67,20 @@ export interface VoucherUse {
   remainder: { amountEur: number; method: OtherMethod; note: string } | null;
 }
 
-/** Payment rows, the redemption and the new balance, all or nothing. */
+/** The voucher no longer holds what this use takes. Thrown inside the transaction, so nothing is kept. */
+export class VoucherBalanceError extends Error {
+  constructor() {
+    super("The voucher does not have enough balance left.");
+    this.name = "VoucherBalanceError";
+  }
+}
+
+/**
+ * Payment rows, the redemption and the new balance, all or nothing. The
+ * balance update only applies while the stored balance still covers the use,
+ * so two uses can never overspend; otherwise it throws VoucherBalanceError
+ * and the whole transaction is rolled back.
+ */
 export function recordVoucherUse(u: VoucherUse, now = Date.now()): { paymentId: number } {
   return db.transaction((tx) => {
     const [pay] = tx
@@ -106,15 +119,17 @@ export function recordVoucherUse(u: VoucherUse, now = Date.now()): { paymentId: 
         createdAt: now,
       })
       .run();
-    tx.update(giftVouchers)
+    const updated = tx
+      .update(giftVouchers)
       .set({
         balanceEur: sql`max(0, round((${giftVouchers.balanceEur} - ${u.redemptionEur}) * 100) / 100.0)`,
         isRedeemed: sql`case when round((${giftVouchers.balanceEur} - ${u.redemptionEur}) * 100) <= 0 then 1 else 0 end`,
         redeemedByClientId: sql`coalesce(${giftVouchers.redeemedByClientId}, ${u.clientId})`,
         redeemedAt: new Date(now),
       })
-      .where(eq(giftVouchers.id, u.voucherId))
+      .where(and(eq(giftVouchers.id, u.voucherId), sql`round(${giftVouchers.balanceEur} * 100) >= ${toCents(u.redemptionEur)}`))
       .run();
+    if (updated.changes !== 1) throw new VoucherBalanceError();
     return { paymentId: pay!.id };
   });
 }
@@ -165,7 +180,9 @@ export function redeemAtBooking(input: {
       error: `The voucher pays ${formatEuro(split.voucherEur)} of ${formatEuro(input.priceEur)}. Choose how the other ${formatEuro(split.remainderEur)} is paid.`,
     };
   }
-  const { paymentId } = recordVoucherUse(
+  let paymentId: number;
+  try {
+    ({ paymentId } = recordVoucherUse(
     {
       voucherId: v.id,
       redemptionEur: split.redemptionEur,
@@ -178,6 +195,11 @@ export function redeemAtBooking(input: {
       remainder: split.remainderEur > 0 ? { amountEur: split.remainderEur, method: method as OtherMethod, note: `Rest after voucher ${v.code}` } : null,
     },
     now,
-  );
+    ));
+  } catch (err) {
+    // Another use took the balance since it was read: nothing was written.
+    if (err instanceof VoucherBalanceError) return { ok: false, error: "This voucher does not have enough balance left." };
+    throw err;
+  }
   return { ok: true, voucherEur: split.voucherEur, remainderEur: split.remainderEur, paymentId, expired: v.expired };
 }

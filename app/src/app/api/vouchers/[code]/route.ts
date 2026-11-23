@@ -12,7 +12,13 @@ export async function GET(_req: Request, props: { params: Promise<{ code: string
   const denied = await guard("user");
   if (denied) return denied;
 
-  const v = lookupVoucher(decodeURIComponent(params.code));
+  let code: string;
+  try {
+    code = decodeURIComponent(params.code);
+  } catch {
+    return NextResponse.json({ ok: false });
+  }
+  const v = lookupVoucher(code);
   if (!v) return NextResponse.json({ ok: false });
   // An expired voucher is a warning, not a refusal: staff may still take it.
   return NextResponse.json({

@@ -87,9 +87,10 @@ export async function createAppointmentAction(formData: FormData) {
   const apptId = appt[0].id;
 
   // Record payment. A voucher follows the booking form's rules (lib/vouchers/redeem).
-  if (parsed.paymentMethod === "voucher") {
+  // A paper voucher with no code is recorded as it always was: one "voucher" payment.
+  if (parsed.paymentMethod === "voucher" && parsed.voucherCode?.trim()) {
     const used = redeemAtBooking({
-      code: parsed.voucherCode ?? "",
+      code: parsed.voucherCode,
       clientId: parsed.clientId,
       appointmentId: apptId,
       priceEur: parsed.totalPriceEur,
