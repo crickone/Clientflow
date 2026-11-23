@@ -21,6 +21,9 @@ type FlagRow = { key: string; mode: string; percent: number; allow: string; upda
  */
 export async function withVoucherTenant<T>(slug: string, fn: (tid: number, accountId: string) => Promise<T> | T): Promise<T> {
   const dbFile = `tenants/${slug}/${slug}.db`;
+  const scratchDir = path.join(process.cwd(), "data", "tenants", slug);
+  // A killed earlier run can leave its DB behind; clear it so this run starts clean.
+  fs.rmSync(scratchDir, { recursive: true, force: true });
   controlSqlite.prepare("DELETE FROM tenants WHERE slug = ?").run(slug);
   const { id } = controlSqlite
     .prepare("INSERT INTO tenants (slug, name, db_file, is_active) VALUES (?, ?, ?, 1) RETURNING id")
@@ -47,7 +50,7 @@ export async function withVoucherTenant<T>(slug: string, fn: (tid: number, accou
       controlSqlite.prepare("DELETE FROM platform_flags WHERE key = 'voucher_store'").run();
     }
     controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(id);
-    fs.rmSync(path.join(process.cwd(), "data", "tenants", slug), { recursive: true, force: true });
+    fs.rmSync(scratchDir, { recursive: true, force: true });
   }
 }
 
