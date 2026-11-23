@@ -106,7 +106,20 @@ export function parseAmountList(text: string): number[] | null {
 export type Checked<T> = { ok: true; value: T } | { ok: false; error: string };
 
 /** What the settings form saves. Strict: every problem is a sentence for the owner. */
-export function validateStoreSettings(draft: VoucherStoreSettings): Checked<VoucherStoreSettings> {
+export function validateStoreSettings(input: VoucherStoreSettings): Checked<VoucherStoreSettings> {
+  // The draft comes from a request body: never throw on a malformed one. Coerce
+  // the lists and strings to empty so every check below is safe to run, and
+  // report a wrong type as an ordinary error rather than saving it.
+  const malformed =
+    !Array.isArray(input.amounts) || !Array.isArray(input.therapyIds) || typeof input.intro !== "string" || typeof input.bookUrl !== "string";
+  const draft: VoucherStoreSettings = {
+    ...input,
+    amounts: Array.isArray(input.amounts) ? input.amounts : [],
+    therapyIds: Array.isArray(input.therapyIds) ? input.therapyIds : [],
+    intro: typeof input.intro === "string" ? input.intro : "",
+    bookUrl: typeof input.bookUrl === "string" ? input.bookUrl : "",
+  };
+  if (malformed) return { ok: false, error: "Those settings could not be read. Reload the page and try again." };
   if (draft.amounts.some((a) => !isWholeEuro(a))) {
     return { ok: false, error: `Amounts must be whole euros from €${MIN_VOUCHER_EUR} to €${MAX_VOUCHER_EUR}.` };
   }
@@ -193,13 +206,26 @@ export function addMonths(date: string, months: number): string {
   return ymd(y, mo, Math.min(+m[3], daysInMonth(y, mo)));
 }
 
+/**
+ * Whole years later. 29 February in a non-leap year rolls FORWARD to 1 March,
+ * so the result is never earlier than the full years asked for (a voucher must
+ * last at least 5 years).
+ */
 export function addYears(date: string, years: number): string {
+  const m = YMD.exec(date);
+  if (!m) throw new Error(`not a date: ${date}`);
+  const y = +m[1] + years;
+  if (+m[2] === 2 && +m[3] === 29 && Number.isInteger(y) && daysInMonth(y, 2) < 29) return ymd(y, 3, 1);
   return addMonths(date, years * 12);
 }
 
-/** The expiry printed on a voucher: purchase date plus the setting, never under 5 years. */
+/**
+ * The expiry printed on a voucher: purchase date plus the setting, never under
+ * 5 years and never over the maximum. A non-finite setting counts as the minimum.
+ */
 export function expiryDate(purchaseDate: string, years: number): string {
-  return addYears(purchaseDate, Math.max(MIN_EXPIRY_YEARS, Math.floor(years)));
+  const whole = Number.isFinite(years) ? Math.floor(years) : MIN_EXPIRY_YEARS;
+  return addYears(purchaseDate, Math.min(MAX_EXPIRY_YEARS, Math.max(MIN_EXPIRY_YEARS, whole)));
 }
 
 /** The latest day a buyer may choose for the gift email: 12 months ahead. */
@@ -289,10 +315,15 @@ export function splitPayment(
   priceEur: number,
   treatmentPriceEur: number | null = null,
 ): PaymentSplit {
-  const price = Math.max(0, toCents(priceEur));
-  const balance = Math.max(0, toCents(v.balanceEur));
+  // Non-finite money counts as nothing, so a result is never NaN or negative.
+  const cents = (eur: number | null | undefined) => (typeof eur === "number" && Number.isFinite(eur) ? Math.max(0, toCents(eur)) : 0);
+  const price = cents(priceEur);
+  const balance = cents(v.balanceEur);
   if (v.kind === "treatment") {
-    const covers = Math.min(price, Math.max(0, toCents(treatmentPriceEur ?? priceEur)));
+    // A used-up voucher covers nothing. A missing treatment price covers nothing
+    // too: the booking price is never a stand-in for it.
+    if (balance <= 0) return { voucherEur: 0, remainderEur: price / 100, redemptionEur: 0 };
+    const covers = Math.min(price, cents(treatmentPriceEur));
     return { voucherEur: covers / 100, remainderEur: (price - covers) / 100, redemptionEur: balance / 100 };
   }
   const covers = Math.min(price, balance);
@@ -554,7 +585,8 @@ export interface OrderContext {
 
 export type OrderCheck = { ok: true; order: ValidOrder } | { ok: false; field: OrderDraftField; error: string };
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+// No whitespace, comma, semicolon, angle bracket or quote anywhere: one plain address only.
+const EMAIL = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]{2,}$/;
 
 export function isEmail(s: string): boolean {
   return s.length <= 254 && EMAIL.test(s);
@@ -572,8 +604,9 @@ export function validateOrder(draft: OrderDraft, ctx: OrderContext): OrderCheck 
   if (draft.kind === "treatment") {
     const t = ctx.treatments.find((x) => x.id === draft.therapyId && ctx.settings.therapyIds.includes(x.id));
     if (!t) return { ok: false, field: "therapyId", error: "Choose a treatment." };
-    if (toCents(t.priceEur) <= 0) return { ok: false, field: "therapyId", error: "This treatment can't be bought online yet." };
-    valueCents = toCents(t.priceEur);
+    const priceCents = toCents(t.priceEur);
+    if (!(priceCents > 0) || !Number.isFinite(priceCents)) return { ok: false, field: "therapyId", error: "This treatment can't be bought online yet." };
+    valueCents = priceCents;
     therapyId = t.id;
     therapyName = t.name;
   } else if (draft.kind === "amount") {

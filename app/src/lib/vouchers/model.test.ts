@@ -57,6 +57,16 @@ assert.ok(!validateStoreSettings({ ...base, intro: "x".repeat(201) }).ok, "intro
 assert.ok(!validateStoreSettings({ ...base, bookUrl: "javascript:alert(1)" }).ok, "booking link must be http(s)");
 assert.ok(!validateStoreSettings({ ...base, amounts: [], allowCustom: false, therapyIds: [] }).ok, "nothing for sale cannot be switched on");
 assert.ok(validateStoreSettings({ ...base, enabled: false, amounts: [], allowCustom: false, therapyIds: [] }).ok, "but can be saved switched off");
+for (const bad of [
+  { amounts: "x" as unknown as number[] },
+  { therapyIds: "y" as unknown as number[] },
+  { intro: 5 as unknown as string },
+  { bookUrl: 7 as unknown as string },
+  { amounts: null as unknown as number[], intro: undefined as unknown as string },
+]) {
+  assert.doesNotThrow(() => validateStoreSettings({ ...base, ...bad }), "malformed settings never throw");
+  assert.equal(validateStoreSettings({ ...base, ...bad }).ok, false, "malformed settings are an error result");
+}
 assert.deepEqual(parseAmountList("25, 50 €100"), [25, 50, 100]);
 assert.equal(parseAmountList("25, fifty"), null);
 
@@ -73,7 +83,11 @@ assert.match(checkAmount(s, null) ?? "", /Choose an amount/);
 // ── dates ─────────────────────────────────────────────────────────────────
 assert.equal(expiryDate("2026-11-23", 5), "2031-11-23");
 assert.equal(expiryDate("2026-11-23", 2), "2031-11-23", "never under 5 years");
-assert.equal(expiryDate("2028-02-29", 5), "2033-02-28", "29 February becomes the 28th");
+assert.equal(expiryDate("2028-02-29", 5), "2033-03-01", "29 February rolls forward to 1 March, never short of 5 years");
+assert.equal(expiryDate("2028-02-29", 8), "2036-02-29", "a leap year keeps the 29th");
+assert.equal(expiryDate("2026-11-23", Number.NaN), "2031-11-23", "NaN years counts as 5");
+assert.equal(expiryDate("2026-11-23", Infinity), "2031-11-23", "non-finite years counts as 5");
+assert.equal(expiryDate("2026-11-23", 1e9), "2046-11-23", "huge years clamp to the 20-year maximum");
 assert.equal(addMonths("2026-01-31", 1), "2026-02-28");
 assert.equal(latestDeliveryDate("2026-11-23"), "2027-11-23");
 assert.equal(formatLongDate("2031-11-23"), "23 November 2031");
@@ -102,6 +116,21 @@ assert.deepEqual(splitPayment({ kind: "amount", balanceEur: 50 }, 30), { voucher
 assert.deepEqual(splitPayment({ kind: "amount", balanceEur: 0.1 + 0.2 }, 0.3), { voucherEur: 0.3, remainderEur: 0, redemptionEur: 0.3 }, "cents, not floats");
 assert.deepEqual(splitPayment({ kind: "treatment", balanceEur: 70 }, 80, 80), { voucherEur: 80, remainderEur: 0, redemptionEur: 70 }, "treatment at today's price, voucher used up");
 assert.deepEqual(splitPayment({ kind: "treatment", balanceEur: 70 }, 110, 80), { voucherEur: 80, remainderEur: 30, redemptionEur: 70 }, "an extra on the same booking is paid separately");
+
+const zero = { voucherEur: 0, remainderEur: 0, redemptionEur: 0 };
+assert.deepEqual(splitPayment({ kind: "treatment", balanceEur: 0 }, 80, 80), { ...zero, remainderEur: 80 }, "a used-up treatment voucher covers nothing");
+assert.deepEqual(splitPayment({ kind: "treatment", balanceEur: -5 }, 80, 80), { ...zero, remainderEur: 80 }, "a negative balance covers nothing");
+assert.deepEqual(splitPayment({ kind: "treatment", balanceEur: 70 }, 80), { voucherEur: 0, remainderEur: 80, redemptionEur: 70 }, "no treatment price: covers 0, never the booking price");
+assert.deepEqual(splitPayment({ kind: "treatment", balanceEur: 70 }, 50, 80), { voucherEur: 50, remainderEur: 0, redemptionEur: 70 }, "never covers more than the booking price");
+assert.deepEqual(splitPayment({ kind: "amount", balanceEur: 0 }, 80), { ...zero, remainderEur: 80 }, "an empty money voucher covers nothing");
+for (const [bal, price] of [[20, 80], [80, 20], [50, 50], [0, 10], [Number.NaN, 30], [30, Number.NaN], [Infinity, 30]] as const) {
+  const r = splitPayment({ kind: "amount", balanceEur: bal }, price);
+  const cap = Math.min(Number.isFinite(bal) ? Math.max(0, bal) : 0, Number.isFinite(price) ? Math.max(0, price) : 0);
+  assert.ok(r.voucherEur >= 0 && r.remainderEur >= 0 && r.redemptionEur >= 0, `no negatives: ${bal}, ${price}`);
+  assert.ok(Number.isFinite(r.voucherEur) && Number.isFinite(r.remainderEur) && Number.isFinite(r.redemptionEur), `no NaN: ${bal}, ${price}`);
+  assert.ok(r.voucherEur <= cap + 1e-9, `money voucher never exceeds balance or price: ${bal}, ${price}`);
+}
+assert.deepEqual(splitPayment({ kind: "treatment", balanceEur: Number.NaN }, Number.NaN, Number.NaN), zero, "NaN everywhere is zero");
 
 const today = "2026-11-23";
 assert.equal(voucherState({ valueEur: 50, balanceEur: 50, expiryDate: "2031-11-23", cancelledAt: null }, today), "active");
@@ -190,6 +219,14 @@ assert.equal(fail({ deliverOn: "2027-11-24" }), "deliverOn", "not over 12 months
 assert.equal(fail({ deliverOn: "2027-11-23" }), null, "12 months ahead exactly is fine");
 assert.equal(fail({ deliverOn: "2026-02-30" }), "deliverOn", "a real date");
 assert.equal(fail({ buyerEmail: "x@y" }), "buyerEmail");
+assert.equal(fail({ recipientEmail: "a@x.ie,b@y.ie" }), "recipientEmail", "one address only: comma");
+assert.equal(fail({ recipientEmail: "a@x.ie;b@y.ie" }), "recipientEmail", "one address only: semicolon");
+assert.equal(fail({ recipientEmail: "<a@x.ie>" }), "recipientEmail", "no angle brackets");
+assert.equal(fail({ buyerEmail: "\"a\"@x.ie" }), "buyerEmail", "no quotes");
+assert.equal(fail({ buyerEmail: "a b@x.ie" }), "buyerEmail", "no spaces");
+const nanCtx = { ...ctx, treatments: [{ id: 3, name: "Swedish massage", priceEur: Number.NaN }], settings: { ...ctx.settings, therapyIds: [3] } };
+const nanOrder = validateOrder({ ...draft, kind: "treatment", amountEur: null, therapyId: 3 }, nanCtx);
+assert.ok(!nanOrder.ok && nanOrder.field === "therapyId", "a NaN treatment price cannot be bought");
 assert.equal(fail({ buyerName: "" }), "buyerName");
 const toMe = validateOrder({ ...draft, deliverTo: "buyer", recipientEmail: "", deliverOn: "2026-12-24" }, ctx);
 assert.ok(toMe.ok && toMe.order.recipientEmail === null && toMe.order.deliverOn === null, "sent to me: no recipient email, no date");
