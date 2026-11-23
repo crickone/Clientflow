@@ -13,5 +13,9 @@ export async function GET(req: Request) {
     .split(",")
     .map((s) => Number(s))
     .filter((n) => Number.isInteger(n) && n > 0);
-  return NextResponse.json(adPreviewData(ids, new URL(req.url).searchParams.get("account")));
+  const photos = (new URL(req.url).searchParams.get("photos") ?? "")
+    .split(",")
+    .map((s) => Number(s))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  return NextResponse.json(adPreviewData(ids, new URL(req.url).searchParams.get("account"), photos));
 }

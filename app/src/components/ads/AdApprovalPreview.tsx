@@ -43,7 +43,7 @@ const hostOf = (url?: string) => {
  * the operator approves what people will actually see.
  */
 export function AdApprovalPreview({ name, input }: { name: string; input: Record<string, unknown> }) {
-  const [data, setData] = useState<{ brand: Brand; designs: Record<number, string[]>; currency: string; socialPosts: number[]; versions: Record<number, { feed: string | null; tall: string | null }> } | null>(null);
+  const [data, setData] = useState<{ brand: Brand; designs: Record<number, string[]>; currency: string; socialPosts: number[]; versions: Record<number, { feed: string | null; tall: string | null }>; photos?: Record<number, string> } | null>(null);
   const currency = data?.currency ?? "EUR";
   const ads = useMemo(
     () => adsOf(name, input, (n) => new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: n % 1 ? 2 : 0 }).format(n)),
@@ -51,29 +51,37 @@ export function AdApprovalPreview({ name, input }: { name: string; input: Record
   );
   const designIds = useMemo(() => [...new Set(ads.map((a) => Number(a.ad.creative?.designId)).filter((n) => n > 0))], [ads]);
   const designKey = designIds.join(",");
+  // Library photos an ad uses as-is (creative.source "library").
+  const photoKey = useMemo(
+    () => [...new Set(ads.flatMap((a) => (a.ad.creative?.source === "library" ? (a.ad.creative.imageAssetIds ?? []).map(Number) : [])).filter((n) => n > 0))].join(","),
+    [ads],
+  );
   const account = typeof input.adAccountId === "string" ? input.adAccountId : "";
   const [i, setI] = useState(0);
 
   useEffect(() => {
-    if (!designKey && name !== "draft_ad_campaign" && name !== "add_ad_to_campaign") return;
+    if (!designKey && !photoKey && name !== "draft_ad_campaign" && name !== "add_ad_to_campaign") return;
     let live = true;
-    fetch(`/api/ads/preview?designs=${designKey}&account=${encodeURIComponent(account)}`)
+    fetch(`/api/ads/preview?designs=${designKey}&photos=${photoKey}&account=${encodeURIComponent(account)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => live && d && setData(d))
       .catch(() => undefined);
     return () => {
       live = false;
     };
-  }, [designKey, account, name]);
+  }, [designKey, photoKey, account, name]);
 
   if (!ads.length) return null;
   const cur = ads[Math.min(i, ads.length - 1)];
   const c = cur.ad.creative;
-  const images = data?.designs[Number(c?.designId)] ?? [];
+  const fromLibrary = c?.source === "library";
+  const images = fromLibrary
+    ? (c?.imageAssetIds ?? []).map((id) => data?.photos?.[Number(id)]).filter((u): u is string => Boolean(u))
+    : (data?.designs[Number(c?.designId)] ?? []);
   // A Content Studio ad version: the 4:5 feed image in feeds and the 9:16 one in
   // Stories and Reels, as the campaign will run it. A design shows its slides.
-  const version = data?.versions[Number(c?.designId)];
-  const shown = version?.feed ? [version.feed] : c?.format === "single" ? images.slice(0, 1) : images;
+  const version = fromLibrary ? undefined : data?.versions[Number(c?.designId)];
+  const shown = version?.feed ? [version.feed] : fromLibrary ? images : c?.format === "single" ? images.slice(0, 1) : images;
   const preview: PreviewAd = {
     pageName: data?.brand.pageName ?? "Your Page",
     instagramHandle: data?.brand.instagramHandle ?? null,
@@ -107,7 +115,11 @@ export function AdApprovalPreview({ name, input }: { name: string; input: Record
       </div>
       <div className="aap-where">{cur.where}</div>
       <div className="aap-mock">{data ? <AdPreview ad={preview} platforms={cur.platforms} /> : <div className="aap-loading">Loading the ad…</div>}</div>
-      {data && images.length === 0 && <div className="aap-warn">This design has no images yet. Generate it in Content Studio first, or the ad can't launch.</div>}
+      {data && images.length === 0 && (
+        <div className="aap-warn">
+          {fromLibrary ? "That photo is no longer in your library. Pick another, or the ad can't launch." : "This design has no images yet. Generate it in Content Studio first, or the ad can't launch."}
+        </div>
+      )}
       {data && images.length > 0 && data.socialPosts.includes(Number(c?.designId)) && (
         <div className="aap-warn">
           This picture was made as a social post, not an ad, so its words can be wrong for an ad (for example &ldquo;link in bio&rdquo;). Ask Adonis to make a new ad instead.

@@ -6,7 +6,7 @@ import { getBusinessProfile } from "@/lib/businessProfile";
 import { listAdAccounts } from "@/lib/facebook/grants";
 import { getPostingPage, listFacebookPages } from "@/lib/facebook/pages";
 import { listCarousels } from "@/lib/image/carousels";
-import { listLibraryAssets } from "@/lib/image/library";
+import { getLibraryAsset, listLibraryAssets } from "@/lib/image/library";
 import { renderFileUrl } from "@/lib/image/renderStore.client";
 import { postableRenders } from "@/lib/social/schedule";
 import { getPreferredPostingPageId } from "@/lib/social/publisher";
@@ -28,7 +28,7 @@ import { adVersionImages, listAdCreatives } from "@/lib/ads/creatives";
  * Page's name, handle and logo, and each named design's images in order.
  * Unknown or unrendered designs come back with no images.
  */
-export function adPreviewData(designIds: number[], adAccountId?: string | null): { brand: BuilderBrand; designs: Record<number, string[]>; currency: string; socialPosts: number[]; versions: Record<number, { feed: string | null; tall: string | null }> } {
+export function adPreviewData(designIds: number[], adAccountId?: string | null, photoIds: number[] = []): { brand: BuilderBrand; designs: Record<number, string[]>; currency: string; socialPosts: number[]; versions: Record<number, { feed: string | null; tall: string | null }>; photos: Record<number, string> } {
   const tenantId = getCurrentMembership()!.tenant.id;
   const page = getPostingPage(tenantId, getPreferredPostingPageId(tenantId));
   const designs: Record<number, string[]> = {};
@@ -44,7 +44,14 @@ export function adPreviewData(designIds: number[], adAccountId?: string | null):
     if (v) versions[id] = { feed: v.feed ? renderFileUrl(v.feed) : null, tall: v.tall ? renderFileUrl(v.tall) : null };
     else socialPosts.push(id);
   }
+  // The business's own library photos an ad uses as-is (creative.source "library").
+  const photos: Record<number, string> = {};
+  for (const id of photoIds.slice(0, 40)) {
+    const a = getLibraryAsset(id);
+    if (a && a.kind !== "video" && a.kind !== "file") photos[id] = `/api/content-studio/image-library/file/${encodeURIComponent(a.filename)}`;
+  }
   return {
+    photos,
     versions,
     socialPosts,
     currency,
