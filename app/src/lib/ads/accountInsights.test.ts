@@ -45,6 +45,17 @@ const requireLocal = createRequire(import.meta.url);
   assert.equal(m.stateOf("ACTIVE"), "active");
   assert.equal(m.stateOf("ADSET_PAUSED"), "paused");
   assert.equal(m.stateOf("WITH_ISSUES"), "issue");
+  // Review state: Ads Manager's "In review" and "Rejected", from the ads' own statuses.
+  assert.equal(m.reviewStateOf("ACTIVE", ["PENDING_REVIEW", "IN_PROCESS"]), "in_review", "all ads being checked");
+  assert.equal(m.reviewStateOf("ACTIVE", ["PENDING_REVIEW", "ACTIVE"]), "active", "one ad delivering is enough");
+  assert.equal(m.reviewStateOf("ACTIVE", ["DISAPPROVED", "DISAPPROVED"]), "rejected", "all ads refused");
+  assert.equal(m.reviewStateOf("ACTIVE", ["DISAPPROVED", "ACTIVE"]), "active", "some refused, others delivering: keep the campaign state");
+  assert.equal(m.reviewStateOf("ACTIVE", ["DISAPPROVED", "PENDING_REVIEW"]), "active", "refused plus checking is not all one thing");
+  assert.equal(m.reviewStateOf("ACTIVE", []), "active", "no ads: nothing to say");
+  assert.equal(m.reviewStateOf("ACTIVE", undefined), "active", "ads unknown: today's behaviour");
+  assert.equal(m.reviewStateOf("PAUSED", ["PENDING_REVIEW"]), "paused", "paused stays paused");
+  assert.equal(m.reviewStateOf("ARCHIVED", ["DISAPPROVED"]), "ended", "archived stays ended");
+  assert.equal(m.disapprovedCount(["DISAPPROVED", "ACTIVE", "disapproved"]), 2);
   assert.equal(m.rangeOf("bogus").key, "30d", "an unknown range falls back to 30 days");
   assert.equal(m.adsManagerUrl("act_123", "999"), "https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=123&selected_campaign_ids=999");
   // Revenue matching: the ad link's utm_campaign is the Meta campaign id.
@@ -82,6 +93,7 @@ const requireLocal = createRequire(import.meta.url);
   };
 
   let refused = false;
+  let adsDown = false;
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = new URL(String(input));
     if (refused) return new Response(JSON.stringify({ error: { message: "Error validating access token", code: 190 } }), { status: 400 });
@@ -93,6 +105,18 @@ const requireLocal = createRequire(import.meta.url);
           { id: "c-old", name: "Summer HBOT", objective: "OUTCOME_TRAFFIC", effective_status: "PAUSED" },
           { id: "c-paused-spent", name: "Infrared push", objective: "OUTCOME_TRAFFIC", effective_status: "PAUSED" },
           { id: "c-ours", name: "Built here", objective: "OUTCOME_ENGAGEMENT", effective_status: "ACTIVE" },
+        ],
+      });
+    }
+    if (url.pathname.endsWith("/act_77/ads")) {
+      if (adsDown) return new Response(JSON.stringify({ error: { message: "Unsupported request", code: 100 } }), { status: 400 });
+      return json({
+        data: [
+          { id: "a1", campaign_id: "c-ours", effective_status: "PENDING_REVIEW" },
+          { id: "a2", campaign_id: "c-ours", effective_status: "IN_PROCESS" },
+          { id: "a3", campaign_id: "c-lead", effective_status: "ACTIVE" },
+          { id: "a4", campaign_id: "c-lead", effective_status: "DISAPPROVED" },
+          { id: "a5", campaign_id: "c-paused-spent", effective_status: "DISAPPROVED" },
         ],
       });
     }
@@ -142,13 +166,24 @@ const requireLocal = createRequire(import.meta.url);
       assert.equal(a.costPerLead, 10, "cost per lead uses lead campaigns' spend only");
       assert.equal(a.conversations, 4);
 
+      assert.equal(ours.state, "in_review", "all of its ads are still being checked");
+      assert.equal(lead.state, "active", "one refused ad does not change a campaign whose other ad delivers");
+      assert.equal(lead.disapproved, 1);
+      assert.equal(a.campaigns[2].state, "paused", "a paused campaign stays paused");
+
+      // The ads call failing falls back to the campaign's own status, with no error on the account.
+      adsDown = true;
+      const noAds = await getAdsOverview(tid, "30d", { fresh: true });
+      assert.equal(noAds!.accounts[0].error, null);
+      assert.equal(noAds!.accounts[0].campaigns.find((c) => c.id === "c-ours")!.state, "active");
+
       // A refused token: reported on the account, and the reconnect is marked.
       refused = true;
       const bad = await getAdsOverview(tid, "7d", { fresh: true });
       assert.match(bad!.accounts[0].error ?? "", /access token/);
       assert.equal(health.connectionProblems(tid).some((p) => p.kind === "ads"), true, "the ads connection is marked for reconnect");
     });
-    console.log("accountInsights: every campaign on the ad account, results by objective, totals, refusals; 34 checks passed.");
+    console.log("accountInsights: every campaign on the ad account, results by objective, totals, refusals, review state; all checks passed.");
   } finally {
     cleanup();
   }

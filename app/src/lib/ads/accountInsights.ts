@@ -18,7 +18,8 @@ import {
   resultKindFor,
   resultsOf,
   RESULT_LABEL,
-  stateOf,
+  reviewStateOf,
+  disapprovedCount,
   adsManagerUrl,
   type CampaignState,
   type InsightRow,
@@ -44,6 +45,8 @@ export interface CampaignPerformance {
   id: string;
   name: string;
   state: CampaignState;
+  /** Ads Meta refused in this campaign (only counted when the ads call worked). */
+  disapproved: number;
   objectiveKind: ResultKind;
   resultLabel: string;
   results: number;
@@ -108,6 +111,7 @@ async function getAll<T>(path: string, token: string, params: Record<string, str
 
 type MetaCampaign = { id: string; name?: string; objective?: string; effective_status?: string };
 type CampaignInsight = InsightRow & { campaign_id?: string };
+type MetaAd = { campaign_id?: string; effective_status?: string };
 
 const FIELDS = "spend,impressions,reach,clicks,inline_link_clicks,actions";
 
@@ -136,11 +140,20 @@ async function accountPerformance(
   };
   try {
     const act = account.adAccountId.startsWith("act_") ? account.adAccountId : `act_${account.adAccountId}`;
-    const [campaigns, insights, totals] = await Promise.all([
+    const [campaigns, insights, totals, ads] = await Promise.all([
       getAll<MetaCampaign>(`${act}/campaigns`, token, { fields: "id,name,objective,effective_status" }),
       getAll<CampaignInsight>(`${act}/insights`, token, { level: "campaign", fields: `campaign_id,${FIELDS}`, date_preset: preset }),
       get<{ data?: InsightRow[] }>(`${act}/insights`, token, { fields: FIELDS, date_preset: preset }),
+      // Review state comes from the ads. Fail-soft: without it a campaign shows its own status.
+      getAll<MetaAd>(`${act}/ads`, token, { fields: "campaign_id,effective_status" }).catch(() => [] as MetaAd[]),
     ]);
+    const adStatuses = new Map<string, string[]>();
+    for (const ad of ads) {
+      if (!ad.campaign_id || !ad.effective_status) continue;
+      const list = adStatuses.get(ad.campaign_id) ?? [];
+      list.push(ad.effective_status);
+      adStatuses.set(ad.campaign_id, list);
+    }
     const byId = new Map(insights.map((r) => [r.campaign_id ?? "", r]));
 
     const rows: CampaignPerformance[] = [];
@@ -148,8 +161,8 @@ async function accountPerformance(
     for (const c of campaigns) {
       const ins = byId.get(c.id);
       const numbers = numbersOf(ins);
-      const state = stateOf(c.effective_status);
-      if (numbers.spend === 0 && state !== "active") {
+      const state = reviewStateOf(c.effective_status, adStatuses.get(c.id));
+      if (numbers.spend === 0 && state !== "active" && state !== "in_review" && state !== "rejected") {
         quiet++;
         continue;
       }
@@ -162,6 +175,7 @@ async function accountPerformance(
         id: c.id,
         name: c.name ?? c.id,
         state,
+        disapproved: disapprovedCount(adStatuses.get(c.id)),
         objectiveKind: kind,
         resultLabel: RESULT_LABEL[kind],
         results,
@@ -171,8 +185,9 @@ async function accountPerformance(
         builtHere: Boolean(localId),
       });
     }
-    // Running first, then by spend.
-    rows.sort((a, b) => Number(b.state === "active") - Number(a.state === "active") || b.numbers.spend - a.numbers.spend);
+    // Running first (in review counts as running), then by spend.
+    const live = (r: CampaignPerformance) => Number(r.state === "active" || r.state === "in_review");
+    rows.sort((a, b) => live(b) - live(a) || b.numbers.spend - a.numbers.spend);
 
     const sales = rows.reduce((s, r) => s + r.ours.sales, 0);
     const revenue = Math.round(rows.reduce((s, r) => s + r.ours.revenue, 0) * 100) / 100;

@@ -19,6 +19,7 @@ import { getPreferredPostingPageId } from "@/lib/social/publisher";
 import { postableRenders } from "@/lib/social/schedule";
 import { renderFilePath } from "@/lib/image/renderStore";
 import { logActivity } from "@/lib/queries";
+import { reviewStateOf } from "@/lib/ads/accountInsightsModel";
 import {
   AD_URL_TAGS,
   PIXEL_OBJECTIVES,
@@ -101,6 +102,8 @@ export interface AdInsights {
   resultLabel: string;
   costPerResult: number | null;
   adSets: Array<{ adSetId: string; name: string; spend: number; results: number }>;
+  /** Meta's review of the ads while the campaign is on: all still being checked, or all refused. */
+  reviewState?: "in_review" | "rejected" | null;
 }
 
 function toRow(r: typeof adCampaigns.$inferSelect): AdCampaignRow {
@@ -604,7 +607,10 @@ export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
     }
 
     await graph("POST", ids.campaignId, token, { status: "ACTIVE" });
-    update(id, { status: "active", metaIds: JSON.stringify(ids), launchedAt: new Date(), error: null });
+    // Every new ad starts in Meta's review: say so now, before any refresh. insightsAt stays
+    // empty, so the campaign page pulls the real numbers as soon as it opens.
+    const firstLook: AdInsights = { spend: 0, impressions: 0, reach: 0, clicks: 0, results: 0, resultLabel: RESULT_ACTION[current.objective].label, costPerResult: null, adSets: [], reviewState: "in_review" };
+    update(id, { status: "active", metaIds: JSON.stringify(ids), launchedAt: new Date(), error: null, insights: JSON.stringify(firstLook) });
     await logActivity("ads.launched", `Ad campaign "${current.name}" launched`, { adCampaignId: id });
     return getAdCampaign(id)!;
   } catch (err) {
@@ -785,9 +791,19 @@ export async function refreshAdInsights(id: number): Promise<AdCampaignRow> {
   const fields = "spend,impressions,reach,clicks,actions";
   const total = (await graph<{ data?: InsightRow[] }>("GET", `${c.metaIds.campaignId}/insights`, token, { fields, date_preset: "maximum" })).data?.[0] ?? {};
   const bySet = (await graph<{ data?: InsightRow[] }>("GET", `${c.metaIds.campaignId}/insights`, token, { fields: `${fields},adset_id,adset_name`, level: "adset", date_preset: "maximum" })).data ?? [];
+  // Review state from the ads. Read-only; if Meta will not say, keep what we had.
+  let reviewState: AdInsights["reviewState"] = c.insights?.reviewState ?? null;
+  try {
+    const ads = (await graph<{ data?: Array<{ effective_status?: string }> }>("GET", `${c.metaIds.campaignId}/ads`, token, { fields: "effective_status", limit: "200" })).data ?? [];
+    const state = c.status === "active" ? reviewStateOf("ACTIVE", ads.map((a) => a.effective_status)) : "other";
+    reviewState = state === "in_review" || state === "rejected" ? state : null;
+  } catch {
+    // keep the previous value
+  }
   const results = resultsOf(total, c.objective);
   const spend = Number(total.spend ?? 0);
   const insights: AdInsights = {
+    reviewState,
     spend,
     impressions: Number(total.impressions ?? 0),
     reach: Number(total.reach ?? 0),

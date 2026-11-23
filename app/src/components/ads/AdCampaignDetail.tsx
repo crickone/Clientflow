@@ -15,7 +15,7 @@ import { refreshAdInsightsAction, setAdCampaignStatusAction, setAdPlacementsActi
 import type { AdInsights } from "@/lib/ads/service";
 import { PLATFORM_LABEL, PLATFORMS, type Platforms } from "@/lib/ads/spec";
 import { Segmented } from "./builder/controls";
-import { AD_STATUS, money } from "./status";
+import { AD_STATUS, money, shownStatus } from "./status";
 
 /**
  * A launched campaign: what it has spent and achieved (pulled from Meta on
@@ -57,7 +57,7 @@ export function AdCampaignDetail({
   const [budgets, setBudgets] = useState(adSets.map((s) => String(s.dailyBudget)));
   const [shared, setShared] = useState(String(campaignBudget ?? ""));
   const [where, setWhere] = useState<Platforms>(platforms);
-  const st = AD_STATUS[status] ?? AD_STATUS.draft;
+  const st = AD_STATUS[shownStatus(status, insights?.reviewState)] ?? AD_STATUS.draft;
 
   function refresh(quiet = false) {
     start(async () => {
@@ -180,6 +180,12 @@ export function AdCampaignDetail({
           )}
         </span>
       </Card>
+
+      {status === "active" && insights?.reviewState === "rejected" && (
+        <div style={{ padding: 14, border: "1px solid var(--danger)", borderRadius: "var(--radius)", fontSize: 13.5, color: "var(--text-secondary)" }}>
+          Meta rejected these ads. Open Ads Manager to see why, change the ad and launch again.
+        </div>
+      )}
 
       <Card style={{ padding: 20, display: "grid", gap: 14 }}>
         <div style={{ display: "flex", alignItems: "center" }}>

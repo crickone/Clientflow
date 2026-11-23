@@ -128,7 +128,7 @@ export function costPer(spend: number, results: number): number | null {
   return results > 0 ? Math.round((spend / results) * 100) / 100 : null;
 }
 
-export type CampaignState = "active" | "paused" | "issue" | "ended" | "other";
+export type CampaignState = "active" | "in_review" | "rejected" | "paused" | "issue" | "ended" | "other";
 
 /** Meta's effective_status, in the few words a business needs. */
 export function stateOf(effectiveStatus: string | null | undefined): CampaignState {
@@ -152,6 +152,29 @@ export function stateOf(effectiveStatus: string | null | undefined): CampaignSta
     default:
       return "other";
   }
+}
+
+const IN_REVIEW = new Set(["PENDING_REVIEW", "IN_PROCESS"]);
+
+/**
+ * What a campaign's ads say about review, the way Ads Manager shows it: an
+ * ACTIVE campaign whose ads are all still being checked is "In review", and
+ * one whose ads were all refused is "Rejected". Some refused and some
+ * delivering keeps the campaign's own state (see disapprovedCount). Campaigns
+ * that are paused, archived or without ads are never changed.
+ */
+export function reviewStateOf(campaignStatus: string | null | undefined, adStatuses: ReadonlyArray<string | null | undefined> | null | undefined): CampaignState {
+  const own = stateOf(campaignStatus);
+  const ads = (adStatuses ?? []).map((s) => (s ?? "").toUpperCase());
+  if (own !== "active" || ads.length === 0) return own;
+  if (ads.every((s) => IN_REVIEW.has(s))) return "in_review";
+  if (ads.every((s) => s === "DISAPPROVED")) return "rejected";
+  return own;
+}
+
+/** How many of a campaign's ads Meta refused. */
+export function disapprovedCount(adStatuses: ReadonlyArray<string | null | undefined> | null | undefined): number {
+  return (adStatuses ?? []).filter((s) => (s ?? "").toUpperCase() === "DISAPPROVED").length;
 }
 
 /** Ads Manager's page for one campaign on an ad account ("act_123"). */

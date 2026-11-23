@@ -3,7 +3,7 @@ import { Eye, Globe, Heart, Megaphone, MessageCircle, MousePointerClick, Shoppin
 
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { AD_STATUS, money } from "./status";
+import { AD_STATUS, money, shownStatus } from "./status";
 
 export interface AdCampaignListItem {
   id: number;
@@ -16,6 +16,8 @@ export interface AdCampaignListItem {
   results: number | null;
   resultLabel: string | null;
   error: string | null;
+  /** Meta's review of a live campaign's ads, when it is still checking or refused them. */
+  reviewState?: "in_review" | "rejected" | null;
 }
 
 const OBJECTIVE_ICON: Record<string, typeof Megaphone> = { awareness: Eye, traffic: MousePointerClick, engagement: Heart, leads: UserPlus, website_leads: Globe, sales: ShoppingBag, messages: MessageCircle };
@@ -40,7 +42,7 @@ export function AdCampaignList({ campaigns }: { campaigns: AdCampaignListItem[] 
   return (
     <div className="adc-grid">
       {campaigns.map((c) => {
-        const st = AD_STATUS[c.status] ?? AD_STATUS.draft;
+        const st = AD_STATUS[shownStatus(c.status, c.reviewState)] ?? AD_STATUS.draft;
         const Icon = OBJECTIVE_ICON[c.objective] ?? Megaphone;
         return (
           <Link key={c.id} href={`/marketing/ads/${c.id}`} className="adc-card">

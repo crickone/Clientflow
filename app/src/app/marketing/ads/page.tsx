@@ -39,6 +39,7 @@ export default async function AdsPage(props: { searchParams?: Promise<{ range?: 
     results: c.insights?.results ?? null,
     resultLabel: c.insights?.resultLabel ?? null,
     error: c.error,
+    reviewState: c.insights?.reviewState ?? null,
   }));
 
   // Meta's numbers for every campaign on the ad account, Ads Manager ones too.

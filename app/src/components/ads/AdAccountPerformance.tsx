@@ -7,8 +7,10 @@ import type { AdsOverview, AccountPerformance } from "@/lib/ads/accountInsights"
 import { RANGES } from "@/lib/ads/accountInsightsModel";
 import { money } from "./status";
 
-const STATE: Record<string, { label: string; tone: "success" | "neutral" | "warning" }> = {
+const STATE: Record<string, { label: string; tone: "success" | "neutral" | "warning" | "danger" | "info" }> = {
   active: { label: "Active", tone: "success" },
+  in_review: { label: "In review", tone: "info" },
+  rejected: { label: "Rejected", tone: "danger" },
   paused: { label: "Paused", tone: "neutral" },
   issue: { label: "Needs attention", tone: "warning" },
   ended: { label: "Ended", tone: "neutral" },
