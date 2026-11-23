@@ -2815,6 +2815,10 @@ a {
 .adb-design { display: grid; gap: 6px; padding: 0; border: none; background: none; text-align: left; cursor: pointer; color: var(--text-secondary); font-size: 12.5px; }
 .adb-design-img { aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden; border: 2px solid transparent; background: var(--surface-2); }
 .adb-design:hover .adb-design-img { border-color: var(--hairline-strong); }
+.adb-edit-link { display: inline-flex; align-items: center; gap: 6px; margin-left: 10px; padding: 6px 12px; border: 1px solid var(--hairline); border-radius: 999px; background: transparent; color: var(--text-secondary); font-size: 12.5px; font-weight: 500; cursor: pointer; }
+.adb-design .adb-edit-link { margin: 4px 0 0; align-self: flex-start; }
+.adb-edit-link:hover, .adb-design:hover .adb-edit-link { color: var(--text-primary); border-color: var(--hairline-strong); }
+.adb-edit-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .adb-design[data-on="true"] .adb-design-img { border-color: var(--accent); }
 .adb-design[data-on="true"] { color: var(--text-primary); }
 .adb-design:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 10px; }

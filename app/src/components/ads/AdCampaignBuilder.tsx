@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check, Plus, Rocket, Save, Search, Trash2, Upload, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Pencil, Plus, Rocket, Save, Search, Trash2, Upload, X } from "lucide-react";
 import { AdPreview } from "./builder/AdPreview";
 import { AgeRange, BudgetStepper, DateChoice, ObjectiveCards, Segmented } from "./builder/controls";
 import { toast } from "sonner";
@@ -1030,6 +1030,9 @@ export function AdCampaignBuilder({
                     <h3>
                       {spec.adSets.length > 1 ? x.name || `Ad set ${j + 1}` : splitLabel(OBJECTIVE_LABEL[spec.objective])[0]}
                       <small>{whereOf(x)}</small>
+                      <button type="button" className="adb-edit-link" onClick={() => (setActiveSet(j), go(1))}>
+                        <Pencil size={13} /> Edit audience and dates
+                      </button>
                     </h3>
                     <div className="adb-hint">
                       {sharedBudget ? runsOf(x) : `${money(x.dailyBudget, currency)} a day · ${runsOf(x)}`}
@@ -1045,6 +1048,9 @@ export function AdCampaignBuilder({
                             </span>
                             <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{a.creative.headline || a.name}</span>
                             <span>{CTA_LABEL[a.creative.cta]}</span>
+                            <span className="adb-edit-link" aria-hidden>
+                              <Pencil size={13} /> Edit ad
+                            </span>
                           </button>
                         );
                       })}
