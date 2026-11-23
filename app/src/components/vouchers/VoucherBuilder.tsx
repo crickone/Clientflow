@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { AlertCircle } from "lucide-react";
 
 import { RevealCard } from "@/components/vouchers/RevealCard";
 import {
@@ -100,10 +102,30 @@ export function VoucherBuilder(p: VoucherBuilderProps) {
   const errorFor = (field: OrderDraftField) =>
     error && error.field === field ? (
       <p className="vb__error" role="alert" id={`vb-err-${field}`}>
-        {error.message}
+        <AlertCircle size={16} aria-hidden className="vb__errorIcon" />
+        <span>{error.message}</span>
       </p>
     ) : null;
-  const invalid = (field: OrderDraftField) => (error?.field === field ? { "aria-invalid": true, "aria-describedby": `vb-err-${field}` } : {});
+  // aria-invalid + aria-describedby for a field; `extra` is an always-on description (the counter).
+  const invalid = (field: OrderDraftField, extra?: string) => {
+    const ids = [extra, error?.field === field ? `vb-err-${field}` : undefined].filter(Boolean).join(" ");
+    return {
+      ...(error?.field === field ? { "aria-invalid": true as const } : {}),
+      ...(ids ? { "aria-describedby": ids } : {}),
+    };
+  };
+  // Typing in (or changing) a field clears that field's own error, and only that one.
+  const clear = (...fields: Array<OrderDraftField | "form">) => setError((e) => (e && fields.includes(e.field) ? null : e));
+
+  // Coming back from Stripe with the browser's back button restores this page
+  // from the back/forward cache with busy still true: free the Pay button.
+  useEffect(() => {
+    const onShow = (ev: PageTransitionEvent) => {
+      if (ev.persisted) setBusy(false);
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
 
   async function pay(e: React.FormEvent) {
     e.preventDefault();
@@ -166,19 +188,28 @@ export function VoucherBuilder(p: VoucherBuilderProps) {
           <form className="vb__form" onSubmit={pay} noValidate>
             <fieldset>
               <legend>1. Choose the gift</legend>
-              <div className="vb__chips" id="vb-amountEur" tabIndex={-1}>
+              <div className="vb__chips" id={choice.kind === "custom" ? undefined : "vb-amountEur"} tabIndex={-1}>
                 {p.settings.amounts.map((a) => (
-                  <button key={a} type="button" className="vb__chip" aria-pressed={choice.kind === "amount" && choice.euros === a} onClick={() => setChoice({ kind: "amount", euros: a })}>
+                  <button key={a} type="button" className="vb__chip" aria-pressed={choice.kind === "amount" && choice.euros === a} onClick={() => {
+                      setChoice({ kind: "amount", euros: a });
+                      clear("amountEur", "therapyId", "kind");
+                    }}>
                     {formatEuro(a)}
                   </button>
                 ))}
                 {p.settings.allowCustom && (
-                  <button type="button" className="vb__chip" aria-pressed={choice.kind === "custom"} onClick={() => setChoice({ kind: "custom" })}>
+                  <button type="button" className="vb__chip" aria-pressed={choice.kind === "custom"} onClick={() => {
+                      setChoice({ kind: "custom" });
+                      clear("amountEur", "therapyId", "kind");
+                    }}>
                     Other amount
                   </button>
                 )}
                 {p.treatments.length > 0 && (
-                  <button type="button" className="vb__chip" aria-pressed={choice.kind === "treatment"} onClick={() => setChoice({ kind: "treatment" })}>
+                  <button type="button" className="vb__chip" aria-pressed={choice.kind === "treatment"} onClick={() => {
+                      setChoice({ kind: "treatment" });
+                      clear("amountEur", "therapyId", "kind");
+                    }}>
                     A treatment
                   </button>
                 )}
@@ -188,14 +219,28 @@ export function VoucherBuilder(p: VoucherBuilderProps) {
                   <span>
                     Amount in euros, {formatEuro(p.settings.customMin)} to {formatEuro(p.settings.customMax)}
                   </span>
-                  <input inputMode="numeric" pattern="[0-9]*" value={custom} onChange={(e) => setCustom(e.target.value.replace(/[^0-9]/g, ""))} {...invalid("amountEur")} />
+                  <input
+                    id="vb-amountEur"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    aria-required="true"
+                    value={custom}
+                    onChange={(e) => {
+                      setCustom(e.target.value.replace(/[^0-9]/g, ""));
+                      clear("amountEur");
+                    }}
+                    {...invalid("amountEur")}
+                  />
                 </label>
               )}
               {choice.kind === "treatment" && (
                 <label className="vb__field">
                   <span>Treatment</span>
                   <span className="vb__select">
-                    <select id="vb-therapyId" value={therapyId ?? ""} onChange={(e) => setTherapyId(Number(e.target.value) || null)} {...invalid("therapyId")}>
+                    <select id="vb-therapyId" value={therapyId ?? ""} onChange={(e) => {
+                        setTherapyId(Number(e.target.value) || null);
+                        clear("therapyId");
+                      }} {...invalid("therapyId")}>
                       {p.treatments.map((t) => (
                         <option key={t.id} value={t.id}>
                           {t.name}, {formatEuro(t.priceEur)}
@@ -216,19 +261,52 @@ export function VoucherBuilder(p: VoucherBuilderProps) {
               <legend>2. Who is it for?</legend>
               <label className="vb__field">
                 <span>To</span>
-                <input id="vb-toName" value={toName} maxLength={60} autoComplete="off" onChange={(e) => setToName(e.target.value)} {...invalid("toName")} />
+                <input
+                  id="vb-toName"
+                  value={toName}
+                  maxLength={60}
+                  autoComplete="off"
+                  aria-required={deliverTo === "recipient" ? "true" : undefined}
+                  onChange={(e) => {
+                    setToName(e.target.value);
+                    clear("toName");
+                  }}
+                  {...invalid("toName")}
+                />
               </label>
               {errorFor("toName")}
               <label className="vb__field">
                 <span>From</span>
-                <input id="vb-fromName" value={fromName} maxLength={60} onChange={(e) => setFromName(e.target.value)} {...invalid("fromName")} />
+                <input
+                  id="vb-fromName"
+                  value={fromName}
+                  maxLength={60}
+                  aria-required="true"
+                  onChange={(e) => {
+                    setFromName(e.target.value);
+                    clear("fromName");
+                  }}
+                  {...invalid("fromName")}
+                />
               </label>
               {errorFor("fromName")}
               <label className="vb__field">
                 <span>Message (optional)</span>
-                <textarea id="vb-message" value={message} maxLength={200} rows={3} onChange={(e) => setMessage(e.target.value)} {...invalid("message")} />
+                <textarea
+                  id="vb-message"
+                  value={message}
+                  maxLength={200}
+                  rows={3}
+                  onChange={(e) => {
+                    setMessage(e.target.value);
+                    clear("message");
+                  }}
+                  {...invalid("message", "vb-message-count")}
+                />
               </label>
-              <p className="vb__hint">{200 - message.length} characters left</p>
+              <p className="vb__hint" id="vb-message-count">
+                {200 - message.length} characters left
+              </p>
               {errorFor("message")}
             </fieldset>
 
@@ -243,7 +321,10 @@ export function VoucherBuilder(p: VoucherBuilderProps) {
                     aria-pressed={c.id === colourwayId}
                     aria-label={c.name}
                     title={c.name}
-                    onClick={() => setColourwayId(c.id)}
+                    onClick={() => {
+                      setColourwayId(c.id);
+                      clear("colourwayId");
+                    }}
                     style={{ background: `linear-gradient(135deg, ${c.base}, ${c.base2})`, boxShadow: `inset 0 0 0 3px ${c.foil[1]}` }}
                   />
                 ))}
@@ -254,10 +335,16 @@ export function VoucherBuilder(p: VoucherBuilderProps) {
             <fieldset>
               <legend>4. How should it arrive?</legend>
               <div className="vb__chips">
-                <button type="button" className="vb__chip" aria-pressed={deliverTo === "recipient"} onClick={() => setDeliverTo("recipient")}>
+                <button type="button" className="vb__chip" aria-pressed={deliverTo === "recipient"} onClick={() => {
+                    setDeliverTo("recipient");
+                    clear("deliverTo");
+                  }}>
                   Email it to {shownName}
                 </button>
-                <button type="button" className="vb__chip" aria-pressed={deliverTo === "buyer"} onClick={() => setDeliverTo("buyer")}>
+                <button type="button" className="vb__chip" aria-pressed={deliverTo === "buyer"} onClick={() => {
+                    setDeliverTo("buyer");
+                    clear("deliverTo", "recipientEmail", "deliverOn");
+                  }}>
                   Send it to me
                 </button>
               </div>
@@ -265,11 +352,26 @@ export function VoucherBuilder(p: VoucherBuilderProps) {
                 <>
                   <label className="vb__field">
                     <span>Their email</span>
-                    <input id="vb-recipientEmail" type="email" inputMode="email" autoComplete="off" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} {...invalid("recipientEmail")} />
+                    <input
+                      id="vb-recipientEmail"
+                      type="email"
+                      inputMode="email"
+                      autoComplete="off"
+                      aria-required="true"
+                      value={recipientEmail}
+                      onChange={(e) => {
+                        setRecipientEmail(e.target.value);
+                        clear("recipientEmail");
+                      }}
+                      {...invalid("recipientEmail")}
+                    />
                   </label>
                   {errorFor("recipientEmail")}
                   <div className="vb__chips">
-                    <button type="button" className="vb__chip" aria-pressed={when === "now"} onClick={() => setWhen("now")}>
+                    <button type="button" className="vb__chip" aria-pressed={when === "now"} onClick={() => {
+                        setWhen("now");
+                        clear("deliverOn");
+                      }}>
                       Now
                     </button>
                     <button type="button" className="vb__chip" aria-pressed={when === "date"} onClick={() => setWhen("date")}>
@@ -279,7 +381,19 @@ export function VoucherBuilder(p: VoucherBuilderProps) {
                   {when === "date" && (
                     <label className="vb__field">
                       <span>Date (it arrives at 9am)</span>
-                      <input id="vb-deliverOn" type="date" min={p.today} max={latest} value={deliverOn} onChange={(e) => setDeliverOn(e.target.value)} {...invalid("deliverOn")} />
+                      <input
+                        id="vb-deliverOn"
+                        type="date"
+                        min={p.today}
+                        max={latest}
+                        aria-required="true"
+                        value={deliverOn}
+                        onChange={(e) => {
+                          setDeliverOn(e.target.value);
+                          clear("deliverOn");
+                        }}
+                        {...invalid("deliverOn")}
+                      />
                     </label>
                   )}
                   {errorFor("deliverOn")}
@@ -292,22 +406,46 @@ export function VoucherBuilder(p: VoucherBuilderProps) {
               <legend>5. Your details</legend>
               <label className="vb__field">
                 <span>Your name</span>
-                <input id="vb-buyerName" autoComplete="name" value={buyerName} maxLength={60} onChange={(e) => setBuyerName(e.target.value)} {...invalid("buyerName")} />
+                <input
+                  id="vb-buyerName"
+                  autoComplete="name"
+                  aria-required="true"
+                  value={buyerName}
+                  maxLength={60}
+                  onChange={(e) => {
+                    setBuyerName(e.target.value);
+                    clear("buyerName");
+                  }}
+                  {...invalid("buyerName")}
+                />
               </label>
               {errorFor("buyerName")}
               <label className="vb__field">
                 <span>Your email (for the receipt)</span>
-                <input id="vb-buyerEmail" type="email" inputMode="email" autoComplete="email" value={buyerEmail} onChange={(e) => setBuyerEmail(e.target.value)} {...invalid("buyerEmail")} />
+                <input
+                  id="vb-buyerEmail"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  aria-required="true"
+                  value={buyerEmail}
+                  onChange={(e) => {
+                    setBuyerEmail(e.target.value);
+                    clear("buyerEmail");
+                  }}
+                  {...invalid("buyerEmail")}
+                />
               </label>
               {errorFor("buyerEmail")}
             </fieldset>
 
             {error?.field === "form" || error?.field === "kind" || error?.field === "deliverTo" ? (
               <p className="vb__error" role="alert">
-                {error.message}
+                <AlertCircle size={16} aria-hidden className="vb__errorIcon" />
+                <span>{error.message}</span>
               </p>
             ) : null}
-            <button type="submit" className="vb__pay" disabled={busy} aria-busy={busy} style={{ background: colourway.base, color: colourway.ink }}>
+            <button type="submit" className="vb__pay" disabled={busy} aria-busy={busy} style={{ background: colourway.base, color: colourway.ink, ["--vb-base" as string]: colourway.base, ["--vb-ink" as string]: colourway.ink }}>
               {busy ? "Opening secure payment" : priceEur > 0 ? `Pay ${formatEuro(priceEur)}` : "Pay"}
             </button>
             <p className="vb__hint">
@@ -340,17 +478,39 @@ const VB_CSS = `
 .vb textarea{min-height:96px;resize:vertical}
 .vb__select{position:relative;display:block}
 .vb select{appearance:none;-webkit-appearance:none;padding-right:40px;cursor:pointer}
+/* Kept on purpose: the native dropdown list is painted by the browser on a light panel even on dark sites, and the select inherits a light text colour there. */
 .vb select option{color:#111;background:#fff}
 .vb__select svg{position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:.75}
 .vb__swatches{display:flex;flex-wrap:wrap;gap:12px;outline:none}
 .vb__swatch{width:48px;height:48px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
 .vb__swatch[aria-pressed="true"]{outline:2px solid currentColor;outline-offset:3px}
 .vb__hint{margin:4px 0 0;font-size:13px;opacity:.7;line-height:1.5}
-.vb__error{margin:4px 0 12px;font-size:14px;line-height:1.4;color:#c62828;font-weight:600}
+.vb__error{display:flex;align-items:flex-start;gap:8px;margin:4px 0 12px;padding-left:10px;border-left:3px solid currentColor;font-size:14px;line-height:1.4;font-weight:600}
+.vb__errorIcon{flex:none;margin-top:1px}
 .vb__pay{display:block;width:100%;min-height:54px;padding:0 24px;border:0;border-radius:999px;font:inherit;font-size:17px;font-weight:600;cursor:pointer;margin-top:4px}
 .vb__pay[disabled]{opacity:.65;cursor:progress}
 .vb__closed{padding:clamp(20px,4vw,32px);border:1px solid rgba(127,127,127,.4);border-radius:14px}
 .vb__closed h2{margin:0 0 .4em;font-size:clamp(22px,3vw,28px)}
 .vb__closed p{margin:0;line-height:1.6;opacity:.85}
 .vb :focus-visible{outline:2px solid currentColor;outline-offset:3px}
+.vb__pay:focus-visible{outline:2px solid var(--vb-base,currentColor);outline-offset:2px;box-shadow:inset 0 0 0 2px var(--vb-ink,#fff)}
 `;
+
+
+/**
+ * The "confirming your payment" view re-checks on its own: the server page
+ * asks Stripe again each time it renders. Every 5 seconds, at most 12 times.
+ */
+export function AutoRefresh({ everyMs = 5000, max = 12 }: { everyMs?: number; max?: number }) {
+  const router = useRouter();
+  useEffect(() => {
+    let n = 0;
+    const id = window.setInterval(() => {
+      n += 1;
+      router.refresh();
+      if (n >= max) window.clearInterval(id);
+    }, everyMs);
+    return () => window.clearInterval(id);
+  }, [router, everyMs, max]);
+  return null;
+}

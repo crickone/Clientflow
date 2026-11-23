@@ -24,7 +24,7 @@ import { canTakePayments, getStripeConnection } from "@/lib/stripe/connection";
 import { SiteTracking } from "@/components/cms/SiteTracking";
 import { SiteBeacon } from "@/components/cms/SiteBeacon";
 import { RevealCard } from "@/components/vouchers/RevealCard";
-import { VoucherBuilder } from "@/components/vouchers/VoucherBuilder";
+import { AutoRefresh, VoucherBuilder } from "@/components/vouchers/VoucherBuilder";
 import { fulfilVoucherCheckout } from "@/lib/vouchers/fulfil";
 import {
   colourways,
@@ -82,7 +82,12 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const town = p.location.split(",")[0]?.trim() ?? "";
   const years = runWithTenant(resolved.tenantId, () => getStoreSettings().expiryYears);
   const title = `Gift Vouchers${town ? ` ${town}` : ""} | ${resolved.site.name}`;
-  const description = `Buy a ${resolved.site.name} gift voucher online. Choose an amount or a treatment, add a message and send it by email. Valid for ${years} years.`;
+  const name = resolved.site.name;
+  const article = /^[aeiou]/i.test(name.trim()) ? "an" : "a";
+  const phone = p.phone.trim();
+  const description =
+    `Get ${article} ${name} gift voucher${town ? ` in ${town}` : ""}. Choose an amount or a treatment, add a message and email it. ` +
+    `Valid for ${years} ${years === 1 ? "year" : "years"}. ${phone ? `Buy online or call ${phone}.` : "Buy online."}`;
   const canonical = siteUrl(resolved, "/vouchers", host);
   return {
     title,
@@ -212,7 +217,10 @@ export default async function VoucherStorePage(props: Props) {
                   )}
                 </>
               ) : (
-                <p>We are confirming your payment with Stripe. Your receipt will arrive by email in a few minutes.</p>
+                <>
+                  <p>We are confirming your payment with Stripe. Your receipt will arrive by email in a few minutes.</p>
+                  <AutoRefresh />
+                </>
               )}
             </div>
           </section>
