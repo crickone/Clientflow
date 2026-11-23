@@ -7,11 +7,11 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
-import { giftVouchers, payments } from "@/lib/db/schema";
+import { giftVouchers, packages, payments } from "@/lib/db/schema";
 import { logActivity } from "@/lib/queries";
 import { onPaymentRecorded } from "@/lib/pipeline/stage";
 import { createPackage } from "@/lib/packages";
-import { recordVoucherUse } from "@/lib/vouchers/redeem";
+import { recordVoucherUse, VoucherBalanceError } from "@/lib/vouchers/redeem";
 
 const sellSchema = z.object({
   clientId: z.coerce.number().int().positive(),
@@ -95,7 +95,7 @@ export async function lookupVoucherAction(
   };
 }
 
-export async function sellPackageAction(formData: FormData) {
+export async function sellPackageAction(formData: FormData): Promise<{ ok: false; error: string } | void> {
   const staff = await requireUser();
   const parsed = sellSchema.parse({
     clientId: formData.get("clientId"),
@@ -160,17 +160,29 @@ export async function sellPackageAction(formData: FormData) {
   // Voucher payment row (if any), its redemption and the new balance, together
   // (lib/vouchers/redeem), so the voucher's history shows this use too.
   if (voucherRow && voucherApplied > 0) {
-    recordVoucherUse({
-      voucherId: voucherRow.id,
-      redemptionEur: voucherApplied,
-      paymentEur: voucherApplied,
-      clientId: parsed.clientId,
-      appointmentId: null,
-      packageId,
-      userId: staff.id,
-      note: `Voucher ${voucherRow.code} applied to package: ${parsed.packageName}`,
-      remainder: null,
-    });
+    try {
+      recordVoucherUse({
+        voucherId: voucherRow.id,
+        redemptionEur: voucherApplied,
+        paymentEur: voucherApplied,
+        clientId: parsed.clientId,
+        appointmentId: null,
+        packageId,
+        userId: staff.id,
+        note: `Voucher ${voucherRow.code} applied to package: ${parsed.packageName}`,
+        remainder: null,
+      });
+    } catch (err) {
+      // Another use took the balance since it was read. The voucher use rolled
+      // back with nothing written, so remove the package created just above:
+      // no half-recorded sale. (The payment row needs the package id, so the
+      // package has to exist first.)
+      if (err instanceof VoucherBalanceError) {
+        db.delete(packages).where(eq(packages.id, packageId)).run();
+        return { ok: false, error: "This voucher does not have enough balance left." };
+      }
+      throw err;
+    }
   }
 
   // Remaining payment via chosen method (only if there's a balance to collect)

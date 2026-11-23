@@ -168,7 +168,8 @@ export function SellPackageForm({
     fd.set("packageName", finalName);
     if (voucher && voucher.code) fd.set("voucherCode", voucher.code);
     try {
-      await sellPackageAction(fd);
+      const res = await sellPackageAction(fd);
+      if (res && !res.ok) toast.error(res.error);
     } catch (err) {
       if (err instanceof Error && err.message.includes("NEXT_REDIRECT")) return;
       toast.error(err instanceof Error ? err.message : "Sell failed.");

@@ -16,7 +16,14 @@ export async function GET(_request: Request, props: { params: Promise<{ code: st
   const denied = await guard("user");
   if (denied) return denied;
   const params = await props.params;
-  const v = getVoucherByCode(decodeURIComponent(params.code));
+  let code: string;
+  try {
+    code = decodeURIComponent(params.code);
+  } catch {
+    // A malformed percent-escape is not a voucher.
+    return new NextResponse("Voucher not found", { status: 404 });
+  }
+  const v = getVoucherByCode(code);
   if (!v) return new NextResponse("Voucher not found", { status: 404 });
   const tenantId = getCurrentTenant().id;
   const order = orderForVoucher(v);

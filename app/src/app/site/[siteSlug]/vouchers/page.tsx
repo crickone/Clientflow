@@ -57,6 +57,11 @@ type Props = {
 
 const PATH = ["vouchers"];
 
+/** The buyer back from Stripe: the page may show the voucher code and gift link. */
+function isReturnFromCheckout(sp: { paid?: string; session_id?: string }): boolean {
+  return Boolean(sp.paid || sp.session_id);
+}
+
 function storeOpen(site: PublicSite): boolean {
   return storeFlagOn(site.tenantId) && runWithTenant(site.tenantId, () => getStoreSettings().enabled);
 }
@@ -97,6 +102,8 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
     openGraph: { title, description, url: canonical, siteName: resolved.site.name, type: "website" },
     // The thank-you view carries an order number: never indexed.
     robots: searchParams.paid ? { index: false, follow: false } : { index: true, follow: true },
+    // The thank-you view shows the code and the gift link: keep the URL from third parties.
+    ...(isReturnFromCheckout(searchParams) ? { referrer: "no-referrer" as const } : {}),
   };
 }
 
@@ -168,6 +175,7 @@ export default async function VoucherStorePage(props: Props) {
   const business = getBusinessProfileForTenant(tid);
   const chrome = getSiteChrome(resolved.db, resolved.site.id, resolved.resolvedVia === "host" ? resolved.site.slug : null);
   const purchase = searchParams.paid ? await purchaseState(tid, searchParams) : null;
+  const thankYou = purchase !== null || isReturnFromCheckout(searchParams);
   const store = runWithTenant(tid, () => {
     const settings = getStoreSettings();
     return { settings, treatments: storeTreatments(settings.therapyIds), palette: colourways(brandPaletteForTenant(tid)) };
@@ -177,8 +185,15 @@ export default async function VoucherStorePage(props: Props) {
 
   return (
     <>
-      <SiteTracking siteSlug={resolved.site.slug} pixelId={resolved.site.metaPixelId} googleTagId={resolved.site.googleTagId} />
-      <SiteBeacon />
+      {/* The thank-you view shows the spendable code and gift link, and its URL carries the
+          order and session ids. Tracking and the page-view beacon both report the full URL,
+          so they render on the store form view only (guarded in bundledSites.test.ts). */}
+      {!thankYou && (
+        <>
+          <SiteTracking siteSlug={resolved.site.slug} pixelId={resolved.site.metaPixelId} googleTagId={resolved.site.googleTagId} />
+          <SiteBeacon />
+        </>
+      )}
       <div dangerouslySetInnerHTML={{ __html: chrome.head }} />
       <style dangerouslySetInnerHTML={{ __html: CHROME_CONTENT_CSS + THANKS_CSS }} />
       {chrome.header && <div dangerouslySetInnerHTML={{ __html: chrome.header }} />}

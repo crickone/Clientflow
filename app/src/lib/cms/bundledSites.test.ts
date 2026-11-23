@@ -107,7 +107,30 @@ for (const file of siteRoutes) {
   if (/permanentRedirect|\bredirect\(/.test(src) && !/pc\.template|<T /.test(src)) continue;
   // The campaign landing page renders its own surface, outside site chrome.
   if (rel.includes("[campaignSlug]")) continue;
-  check(`${rel} renders <SiteTracking>`, /<SiteTracking\b/.test(stripComments(src)));
+  // Block comments too: the exempt pages explain themselves in comments that name the tags.
+  const code = stripComments(src.replace(/\/\*[\s\S]*?\*\//g, ""));
+  // EXEMPTION 1: the voucher gift page. Its URL is the voucher's secret and it shows the
+  // spendable code; <SiteTracking> (Meta Pixel / Google tag) and <SiteBeacon> both report
+  // the full URL, so this page must render neither.
+  if (rel.split(path.sep).join("/") === "site/[siteSlug]/v/[token]/page.tsx") {
+    check(`${rel} renders neither <SiteTracking> nor <SiteBeacon> (voucher secret in the URL)`, !/<SiteTracking\b|<SiteBeacon\b/.test(code));
+    check(`${rel} sends no referrer`, /referrer:\s*"no-referrer"/.test(code));
+    continue;
+  }
+  // EXEMPTION 2: the voucher store's thank-you view (?paid / session_id) shows the code and
+  // gift link. Tracking is required on the store form view, and must be switched off on the
+  // thank-you view: it renders only under `!thankYou`.
+  if (rel.split(path.sep).join("/") === "site/[siteSlug]/vouchers/page.tsx") {
+    check(`${rel} renders <SiteTracking> on the store form view`, /<SiteTracking\b/.test(code));
+    check(`${rel} renders <SiteBeacon> on the store form view`, /<SiteBeacon\b/.test(code));
+    check(
+      `${rel} keeps tracking and beacon off the thank-you view`,
+      /\{!thankYou && \(\s*<>\s*<SiteTracking\b[^>]*\/>\s*<SiteBeacon \/>\s*<\/>\s*\)\}/.test(code),
+    );
+    check(`${rel} sends no referrer on the thank-you view`, /referrer:\s*"no-referrer"/.test(code));
+    continue;
+  }
+  check(`${rel} renders <SiteTracking>`, /<SiteTracking\b/.test(code));
 }
 
 console.log(`bundledSites.test.ts: ${passed} checks passed`);

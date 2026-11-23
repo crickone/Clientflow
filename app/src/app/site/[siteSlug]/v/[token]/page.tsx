@@ -1,8 +1,14 @@
 /**
  * The recipient's gift page, /v/<token> on the business's own site. The
  * token is the voucher's unguessable view_token, separate from the short
- * code staff take at the desk. Inside the site's own chrome, with the site's
- * consent-gated tracking like every public page. Never indexed.
+ * code staff take at the desk. Inside the site's own chrome. Never indexed.
+ *
+ * DELIBERATELY NO <SiteTracking> OR <SiteBeacon>: the URL is the voucher's
+ * secret and the page shows its spendable code, and both components report the
+ * full URL (Meta Pixel / Google tag after consent, and first-party page views).
+ * The referrer policy is no-referrer so the token is not sent to third-party
+ * resources in the site's chrome (fonts, scripts) either. The guard in
+ * lib/cms/bundledSites.test.ts exempts this file by name.
  *
  * The voucher is looked up by token only, inside the host-resolved tenant. A
  * wrong or malformed token shows the plain not-found page. A cancelled voucher
@@ -20,7 +26,6 @@ import { siteRequestHost } from "@/lib/cms/requestHost";
 import { CHROME_CONTENT_CSS, getSiteChrome } from "@/lib/cms/siteChrome";
 import { runWithTenant } from "@/lib/db/tenant";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
-import { SiteTracking } from "@/components/cms/SiteTracking";
 import { RevealCard } from "@/components/vouchers/RevealCard";
 import { PrintButton } from "@/components/vouchers/PrintButton";
 import {
@@ -60,6 +65,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   return {
     title: data && !data.cancelled ? `A gift from ${data.v.purchaserName} | ${resolved!.site.name}` : "Gift voucher",
     robots: { index: false, follow: false },
+    referrer: "no-referrer",
   };
 }
 
@@ -76,7 +82,6 @@ export default async function GiftPage(props: Props) {
     const cPhoneHref = business.phone ? `tel:${business.phone.replace(/[^0-9+]/g, "")}` : null;
     return (
       <>
-        <SiteTracking siteSlug={resolved.site.slug} pixelId={resolved.site.metaPixelId} googleTagId={resolved.site.googleTagId} />
         <div dangerouslySetInnerHTML={{ __html: chrome.head }} />
         <style dangerouslySetInnerHTML={{ __html: CHROME_CONTENT_CSS + GIFT_CSS }} />
         {chrome.header && <div dangerouslySetInnerHTML={{ __html: chrome.header }} />}
@@ -115,7 +120,6 @@ export default async function GiftPage(props: Props) {
 
   return (
     <>
-      <SiteTracking siteSlug={resolved.site.slug} pixelId={resolved.site.metaPixelId} googleTagId={resolved.site.googleTagId} />
       <div dangerouslySetInnerHTML={{ __html: chrome.head }} />
       <style dangerouslySetInnerHTML={{ __html: CHROME_CONTENT_CSS + GIFT_CSS }} />
       {chrome.header && <div dangerouslySetInnerHTML={{ __html: chrome.header }} />}
