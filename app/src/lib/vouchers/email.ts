@@ -187,7 +187,7 @@ export function renderReceiptEmail(i: ReceiptEmailInput): { subject: string; htm
     heading: "Your gift voucher",
     bodyHtml,
     footer: `Sent by ${i.brand.businessName}.`,
-    logoUrl: i.brand.logoUrl ?? undefined,
+    logoUrl: i.brand.logoUrl ? escapeHtml(i.brand.logoUrl) : undefined,
     logoWidth: 160,
   });
   return { subject: `Your ${i.brand.businessName} gift voucher`, html };
