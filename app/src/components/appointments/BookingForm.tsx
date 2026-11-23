@@ -24,6 +24,20 @@ interface Props {
   defaultWalkInName?: string;
 }
 
+/** What /api/vouchers/<code> says about a code typed at the desk. */
+type VoucherInfo =
+  | { state: "idle" | "invalid" | "empty" | "cancelled" }
+  | {
+      state: "valid";
+      kind: "amount" | "treatment";
+      balance: number;
+      therapyId: number | null;
+      therapyName: string | null;
+      recipientName: string | null;
+      expiryDate: string;
+      expired: boolean;
+    };
+
 export function BookingForm({
   therapies,
   clients,
@@ -77,10 +91,7 @@ export function BookingForm({
     "cash" | "card" | "bank_transfer"
   >("card");
   const [voucherCode, setVoucherCode] = useState(defaultVoucherCode ?? "");
-  const [voucherInfo, setVoucherInfo] = useState<{
-    state: "idle" | "valid" | "invalid" | "expired" | "empty";
-    balance?: number;
-  }>({ state: "idle" });
+  const [voucherInfo, setVoucherInfo] = useState<VoucherInfo>({ state: "idle" });
   const [activePackages, setActivePackages] = useState<Package[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -151,18 +162,29 @@ export function BookingForm({
         .then(
           (d: {
             ok: boolean;
-            redeemable?: boolean;
-            expired?: boolean;
             empty?: boolean;
+            cancelled?: boolean;
+            expired?: boolean;
+            kind?: "amount" | "treatment";
             balanceEur?: number;
+            therapyId?: number | null;
+            therapyName?: string | null;
+            recipientName?: string | null;
+            expiryDate?: string;
           }) => {
             if (!d.ok) setVoucherInfo({ state: "invalid" });
-            else if (d.expired) setVoucherInfo({ state: "expired" });
+            else if (d.cancelled) setVoucherInfo({ state: "cancelled" });
             else if (d.empty) setVoucherInfo({ state: "empty" });
             else
               setVoucherInfo({
                 state: "valid",
+                kind: d.kind === "treatment" ? "treatment" : "amount",
                 balance: d.balanceEur ?? 0,
+                therapyId: d.therapyId ?? null,
+                therapyName: d.therapyName ?? null,
+                recipientName: d.recipientName ?? null,
+                expiryDate: d.expiryDate ?? "",
+                expired: d.expired === true,
               });
           },
         )
@@ -170,6 +192,19 @@ export function BookingForm({
     }, 250);
     return () => clearTimeout(id);
   }, [voucherCode, paymentMethod]);
+
+  // What the voucher pays towards this booking: a money voucher up to its
+  // balance; a treatment voucher the whole session if it is that treatment.
+  const voucherWrongTreatment =
+    voucherInfo.state === "valid" && voucherInfo.kind === "treatment" && voucherInfo.therapyId !== therapyId;
+  const voucherCovers =
+    voucherInfo.state !== "valid"
+      ? 0
+      : voucherInfo.kind === "treatment"
+        ? voucherWrongTreatment
+          ? 0
+          : price
+        : Math.min(voucherInfo.balance, price);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -236,11 +271,7 @@ export function BookingForm({
       fd.set("voucherCode", voucherCode);
       // If the voucher balance can't cover the session, the operator must
       // pick a secondary method for the remainder.
-      if (
-        voucherInfo.state === "valid" &&
-        voucherInfo.balance != null &&
-        voucherInfo.balance < price
-      ) {
+      if (voucherInfo.state === "valid" && !voucherWrongTreatment && voucherCovers < price) {
         fd.set("secondaryPaymentMethod", secondaryPaymentMethod);
       }
     }
@@ -840,36 +871,51 @@ export function BookingForm({
                   gap: 4,
                 }}
               >
-                {voucherInfo.state === "valid" && voucherInfo.balance != null ? (
+                {voucherInfo.state === "valid" ? (
                   <>
                     <div style={{ color: "#047857", fontWeight: 500 }}>
-                      Valid voucher · €{voucherInfo.balance.toFixed(2)} balance
+                      {voucherInfo.kind === "treatment"
+                        ? `Treatment voucher: one ${voucherInfo.therapyName ?? "session"}`
+                        : `Money voucher: €${voucherInfo.balance.toFixed(2)} left`}
+                      {voucherInfo.recipientName ? ` · for ${voucherInfo.recipientName}` : ""}
                     </div>
-                    {price > 0 && voucherInfo.balance >= price && (
-                      <div style={{ color: "var(--text-secondary)" }}>
-                        Deduct €{price.toFixed(2)} → €
-                        {(voucherInfo.balance - price).toFixed(2)} remaining
-                        after this session
+                    {voucherInfo.expired && (
+                      <div style={{ color: "#b45309" }}>
+                        This voucher&apos;s date ({voucherInfo.expiryDate}) has passed. You can still take it.
                       </div>
+                    )}
+                    {voucherWrongTreatment ? (
+                      <div style={{ color: "#dc2626" }}>
+                        This voucher is for {voucherInfo.therapyName ?? "a different treatment"}.
+                      </div>
+                    ) : voucherInfo.kind === "treatment" ? (
+                      <div style={{ color: "var(--text-secondary)" }}>
+                        Pays for this session. The voucher is then used up.
+                      </div>
+                    ) : (
+                      price > 0 &&
+                      voucherInfo.balance >= price && (
+                        <div style={{ color: "var(--text-secondary)" }}>
+                          Pays €{price.toFixed(2)}. €{(voucherInfo.balance - price).toFixed(2)} stays on the voucher.
+                        </div>
+                      )
                     )}
                   </>
                 ) : voucherInfo.state === "empty" ? (
-                  <div style={{ color: "#b45309" }}>
-                    Voucher fully redeemed (no balance left).
-                  </div>
-                ) : voucherInfo.state === "expired" ? (
-                  <div style={{ color: "#dc2626" }}>Voucher has expired.</div>
+                  <div style={{ color: "#b45309" }}>This voucher has been used.</div>
+                ) : voucherInfo.state === "cancelled" ? (
+                  <div style={{ color: "#dc2626" }}>This voucher was cancelled.</div>
                 ) : (
                   <div style={{ color: "#dc2626" }}>Voucher not found.</div>
                 )}
               </div>
             )}
 
-            {/* Split-payment picker — shown when balance < session price */}
+            {/* Split payment: shown when the voucher pays less than the session */}
             {voucherInfo.state === "valid" &&
-              voucherInfo.balance != null &&
+              !voucherWrongTreatment &&
               price > 0 &&
-              voucherInfo.balance < price && (
+              voucherCovers < price && (
                 <div
                   style={{
                     marginTop: 14,
@@ -896,10 +942,8 @@ export function BookingForm({
                       marginBottom: 12,
                     }}
                   >
-                    Voucher covers €{voucherInfo.balance.toFixed(2)} of €
-                    {price.toFixed(2)}. The remaining €
-                    {(price - voucherInfo.balance).toFixed(2)} will be charged
-                    by:
+                    The voucher pays €{voucherCovers.toFixed(2)} of €{price.toFixed(2)}. The other €
+                    {(price - voucherCovers).toFixed(2)} is paid by:
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {(["card", "cash", "bank_transfer"] as const).map((m) => (
@@ -908,7 +952,7 @@ export function BookingForm({
                         type="button"
                         onClick={() => setSecondaryPaymentMethod(m)}
                         style={{
-                          padding: "6px 14px",
+                          padding: "8px 16px",
                           fontSize: 12,
                           borderRadius: "var(--radius)",
                           border: `1px solid ${

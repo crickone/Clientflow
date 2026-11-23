@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
@@ -11,6 +11,7 @@ import { giftVouchers, payments } from "@/lib/db/schema";
 import { logActivity } from "@/lib/queries";
 import { onPaymentRecorded } from "@/lib/pipeline/stage";
 import { createPackage } from "@/lib/packages";
+import { recordVoucherUse } from "@/lib/vouchers/redeem";
 
 const sellSchema = z.object({
   clientId: z.coerce.number().int().positive(),
@@ -49,6 +50,8 @@ export async function lookupVoucherAction(
     .where(eq(giftVouchers.code, code))
     .get();
   if (!v) return { ok: false, error: "Voucher not found." };
+  if (v.cancelledAt) return { ok: false, error: "This voucher was cancelled." };
+  if (v.kind === "treatment") return { ok: false, error: "A treatment voucher is used when its session is booked." };
 
   const today = new Date().toISOString().slice(0, 10);
   if (v.expiryDate < today) return { ok: false, error: "Voucher has expired." };
@@ -93,7 +96,7 @@ export async function lookupVoucherAction(
 }
 
 export async function sellPackageAction(formData: FormData) {
-  await requireUser();
+  const staff = await requireUser();
   const parsed = sellSchema.parse({
     clientId: formData.get("clientId"),
     therapyId: formData.get("therapyId"),
@@ -117,6 +120,8 @@ export async function sellPackageAction(formData: FormData) {
       .where(eq(giftVouchers.code, code))
       .get();
     if (!v) throw new Error("Voucher not found.");
+    if (v.cancelledAt) throw new Error("This voucher was cancelled.");
+    if (v.kind === "treatment") throw new Error("A treatment voucher is used when its session is booked.");
     const today = new Date().toISOString().slice(0, 10);
     if (v.expiryDate < today) throw new Error("Voucher has expired.");
     if (v.balanceEur <= 0) throw new Error("Voucher has no balance left.");
@@ -152,29 +157,20 @@ export async function sellPackageAction(formData: FormData) {
     notes: parsed.notes ?? null,
   });
 
-  // Voucher payment row (if any)
+  // Voucher payment row (if any), its redemption and the new balance, together
+  // (lib/vouchers/redeem), so the voucher's history shows this use too.
   if (voucherRow && voucherApplied > 0) {
-    const newBalance = Math.max(0, voucherRow.balanceEur - voucherApplied);
-    db.update(giftVouchers)
-      .set({
-        balanceEur: newBalance,
-        isRedeemed: newBalance === 0,
-        redeemedAt: newBalance === 0 ? new Date() : undefined,
-        redeemedByClientId: sql`COALESCE(${giftVouchers.redeemedByClientId}, ${parsed.clientId})`,
-      })
-      .where(eq(giftVouchers.id, voucherRow.id))
-      .run();
-
-    db.insert(payments)
-      .values({
-        clientId: parsed.clientId,
-        packageId,
-        voucherId: voucherRow.id,
-        amountEur: voucherApplied,
-        paymentMethod: "voucher",
-        notes: `Voucher ${voucherRow.code} applied to package: ${parsed.packageName}`,
-      })
-      .run();
+    recordVoucherUse({
+      voucherId: voucherRow.id,
+      redemptionEur: voucherApplied,
+      paymentEur: voucherApplied,
+      clientId: parsed.clientId,
+      appointmentId: null,
+      packageId,
+      userId: staff.id,
+      note: `Voucher ${voucherRow.code} applied to package: ${parsed.packageName}`,
+      remainder: null,
+    });
   }
 
   // Remaining payment via chosen method (only if there's a balance to collect)

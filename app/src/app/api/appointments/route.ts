@@ -7,11 +7,12 @@ import { db } from "@/lib/db";
 import {
   appointments,
   clients,
-  giftVouchers,
   packages,
   packageTemplates,
   payments,
 } from "@/lib/db/schema";
+import { getSessionUser } from "@/lib/auth";
+import { redeemAtBooking } from "@/lib/vouchers/redeem";
 import { logActivity } from "@/lib/queries";
 import { appointmentStatusDates } from "@/lib/statusDates";
 import { checkBookingSlot } from "@/lib/schedule";
@@ -216,74 +217,22 @@ export async function POST(req: NextRequest) {
         .run();
     }
 
-    let voucherId: number | null = null;
-    let voucherDeducted = 0;
-    if (parsed.paymentMethod === "voucher" && voucherCode) {
-      const v = db
-        .select()
-        .from(giftVouchers)
-        .where(eq(giftVouchers.code, voucherCode.trim()))
-        .get();
-      const today = new Date().toISOString().slice(0, 10);
-      if (!v) return rollback(apptId, "Voucher not found.");
-      if (v.expiryDate < today) return rollback(apptId, "Voucher has expired.");
-      const balance = v.balanceEur ?? v.valueEur;
-      const secondaryMethod = (fd.get("secondaryPaymentMethod") as string) || "";
-      if (balance < parsed.totalPriceEur) {
-        // Need to split: voucher covers the balance, the rest comes from a
-        // secondary method (cash / card / bank_transfer).
-        const allowed = ["cash", "card", "bank_transfer"];
-        if (!allowed.includes(secondaryMethod)) {
-          return rollback(
-            apptId,
-            `Voucher balance €${balance.toFixed(2)} doesn't cover the €${parsed.totalPriceEur.toFixed(2)} session — choose a method for the €${(parsed.totalPriceEur - balance).toFixed(2)} remainder.`,
-          );
-        }
-      }
-      voucherId = v.id;
-      voucherDeducted = Math.min(balance, parsed.totalPriceEur);
-      const newBalance = balance - voucherDeducted;
-      db.update(giftVouchers)
-        .set({
-          balanceEur: newBalance,
-          isRedeemed: newBalance <= 0.01 ? true : false,
-          redeemedByClientId: resolvedClientId,
-          redeemedAt: new Date(),
-        })
-        .where(eq(giftVouchers.id, v.id))
-        .run();
-
-      // Voucher portion of the payment.
-      db.insert(payments)
-        .values({
-          clientId: resolvedClientId,
-          appointmentId: apptId,
-          packageId: null,
-          voucherId,
-          amountEur: voucherDeducted,
-          paymentMethod: "voucher",
-          notes: null,
-        })
-        .run();
-
-      // Remainder, if any, by the secondary method.
-      const remainder = parsed.totalPriceEur - voucherDeducted;
-      if (remainder > 0.01) {
-        db.insert(payments)
-          .values({
-            clientId: resolvedClientId,
-            appointmentId: apptId,
-            packageId: null,
-            voucherId: null,
-            amountEur: remainder,
-            paymentMethod: secondaryMethod as
-              | "cash"
-              | "card"
-              | "bank_transfer",
-            notes: `Top-up after voucher ${v.code}`,
-          })
-          .run();
-      }
+    if (parsed.paymentMethod === "voucher") {
+      // The voucher pays what it can and any rest is a second payment, with
+      // one voucher_redemptions row and the new balance (lib/vouchers/redeem).
+      // An expired voucher is still taken: staff saw the warning on the form.
+      if (!voucherCode.trim()) return rollback(apptId, "Enter the voucher code.");
+      const staff = await getSessionUser();
+      const used = redeemAtBooking({
+        code: voucherCode,
+        clientId: resolvedClientId,
+        appointmentId: apptId,
+        priceEur: parsed.totalPriceEur,
+        therapyIds,
+        secondaryMethod: (fd.get("secondaryPaymentMethod") as string) || null,
+        userId: staff?.id ?? null,
+      });
+      if (!used.ok) return rollback(apptId, used.error);
     } else {
       // No voucher — single payment row for the full session.
       db.insert(payments)

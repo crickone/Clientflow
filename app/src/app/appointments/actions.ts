@@ -9,7 +9,6 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import {
   appointments,
-  giftVouchers,
   packages,
   payments,
   sessions,
@@ -17,6 +16,7 @@ import {
 } from "@/lib/db/schema";
 import { logActivity } from "@/lib/queries";
 import { appointmentStatusDates } from "@/lib/statusDates";
+import { redeemAtBooking } from "@/lib/vouchers/redeem";
 import {
   onAppointmentBooked,
   onAppointmentStatus,
@@ -48,7 +48,7 @@ function addMinutes(time: string, mins: number): string {
 }
 
 export async function createAppointmentAction(formData: FormData) {
-  await requireUser();
+  const staff = await requireUser();
   const therapyIds = formData
     .getAll("therapyIds")
     .map((v) => Number(v))
@@ -86,34 +86,28 @@ export async function createAppointmentAction(formData: FormData) {
     .all();
   const apptId = appt[0].id;
 
-  // Record payment
-  if (parsed.totalPriceEur > 0 || parsed.paymentMethod === "package") {
-    let voucherId: number | undefined;
-    if (parsed.paymentMethod === "voucher" && parsed.voucherCode) {
-      const v = db
-        .select()
-        .from(giftVouchers)
-        .where(eq(giftVouchers.code, parsed.voucherCode.trim()))
-        .get();
-      if (v && !v.isRedeemed) {
-        voucherId = v.id;
-        db.update(giftVouchers)
-          .set({
-            isRedeemed: true,
-            redeemedByClientId: parsed.clientId,
-            redeemedAt: new Date(),
-          })
-          .where(eq(giftVouchers.id, v.id))
-          .run();
-      }
+  // Record payment. A voucher follows the booking form's rules (lib/vouchers/redeem).
+  if (parsed.paymentMethod === "voucher") {
+    const used = redeemAtBooking({
+      code: parsed.voucherCode ?? "",
+      clientId: parsed.clientId,
+      appointmentId: apptId,
+      priceEur: parsed.totalPriceEur,
+      therapyIds: parsed.therapyIds,
+      secondaryMethod: null,
+      userId: staff.id,
+    });
+    if (!used.ok) {
+      db.delete(appointments).where(eq(appointments.id, apptId)).run();
+      throw new Error(used.error);
     }
-
+  } else if (parsed.totalPriceEur > 0 || parsed.paymentMethod === "package") {
     db.insert(payments)
       .values({
         clientId: parsed.clientId,
         appointmentId: apptId,
         packageId: parsed.packageId ?? null,
-        voucherId: voucherId ?? null,
+        voucherId: null,
         amountEur:
           parsed.paymentMethod === "package" ? 0 : parsed.totalPriceEur,
         paymentMethod: parsed.paymentMethod,

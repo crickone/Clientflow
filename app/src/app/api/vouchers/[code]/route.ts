@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getVoucherByCode } from "@/lib/queries";
 import { guard } from "@/lib/api/guard";
+import { lookupVoucher } from "@/lib/vouchers/redeem";
 
 export const dynamic = "force-dynamic";
 
@@ -12,17 +12,22 @@ export async function GET(_req: Request, props: { params: Promise<{ code: string
   const denied = await guard("user");
   if (denied) return denied;
 
-  const voucher = await getVoucherByCode(params.code);
-  if (!voucher) return NextResponse.json({ ok: false });
-  const today = new Date().toISOString().slice(0, 10);
-  const expired = voucher.expiryDate < today;
-  const empty = (voucher.balanceEur ?? 0) <= 0;
+  const v = lookupVoucher(decodeURIComponent(params.code));
+  if (!v) return NextResponse.json({ ok: false });
+  // An expired voucher is a warning, not a refusal: staff may still take it.
   return NextResponse.json({
     ok: true,
-    redeemable: !expired && !empty,
-    expired,
-    empty,
-    valueEur: voucher.valueEur,
-    balanceEur: voucher.balanceEur ?? voucher.valueEur,
+    redeemable: v.state !== "used" && v.state !== "cancelled",
+    expired: v.expired,
+    empty: v.state === "used",
+    cancelled: v.state === "cancelled",
+    kind: v.kind,
+    therapyId: v.therapyId,
+    therapyName: v.therapyName,
+    recipientName: v.recipientName,
+    purchaserName: v.purchaserName,
+    expiryDate: v.expiryDate,
+    valueEur: v.valueEur,
+    balanceEur: v.balanceEur,
   });
 }
