@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 import { giftVouchers } from "@/lib/db/schema";
 import { logActivity } from "@/lib/queries";
 import { getBusinessProfile } from "@/lib/businessProfile";
-import { codePrefix } from "@/lib/vouchers/model";
+import { codePrefix, dublinDate, expiryDate as minExpiryDate, MIN_EXPIRY_YEARS } from "@/lib/vouchers/model";
 import { newVoucherCode } from "@/lib/vouchers/store";
 
 const voucherSchema = z.object({
@@ -42,6 +42,11 @@ export async function createVoucherAction(formData: FormData) {
 
   // A unique code with this business's own prefix ("OH-2026-K7QX").
   const code = newVoucherCode(codePrefix(getBusinessProfile().businessName));
+  // Irish law: a gift voucher lasts at least 5 years. An earlier date typed at
+  // the desk is moved up to the minimum rather than refused.
+  const purchaseDate = dublinDate(Date.now());
+  const floor = minExpiryDate(purchaseDate, MIN_EXPIRY_YEARS);
+  const expiry = parsed.expiryDate < floor ? floor : parsed.expiryDate;
 
   db.insert(giftVouchers)
     .values({
@@ -55,8 +60,8 @@ export async function createVoucherAction(formData: FormData) {
       valueEur: parsed.valueEur,
       balanceEur: parsed.valueEur, // starts at full value; deducted per use
       isRedeemed: false,
-      purchaseDate: new Date().toISOString().slice(0, 10),
-      expiryDate: parsed.expiryDate,
+      purchaseDate,
+      expiryDate: expiry,
     })
     .run();
 

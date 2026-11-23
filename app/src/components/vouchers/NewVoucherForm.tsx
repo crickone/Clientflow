@@ -189,6 +189,7 @@ export function NewVoucherForm({ clients: initialClients, therapies }: Props) {
               name="expiryDate"
               type="date"
               defaultValue={defaultExpiry}
+              min={defaultExpiry}
               required
             />
           </div>
