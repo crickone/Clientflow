@@ -31,6 +31,10 @@ export function describeMap(types: TypeName[]): string {
     "Dates are Irish dates, YYYY-MM-DD. Datetimes are 'YYYY-MM-DD HH:mm', Irish time; a date value filters a datetime by its day.",
     "Conditions: { field, op, value } with op eq, ne, gt, gte, lt, lte, in, contains, between, isNull; or { link, exists, where } for has / has no linked records.",
     "Results are capped (50 rows, 100 groups). Use map_count for totals instead of counting rows yourself.",
+    "Weeks run Monday to Sunday. This week is the one that contains today; last week is the Monday-to-Sunday week before it.",
+    "A booking counts whether it was booked, attended or a no-show. Leave out cancelled ones unless asked.",
+    "An empty datetime means it never happened: lastContactedAt null = we have never messaged them. For 'not contacted in N days', include them.",
+    "List only the records that answer the question. Don't name people who don't match, such as a 'left out' or 'not on the list' section, unless asked.",
     MAP_ROUTING,
   );
   return lines.join("\n");
