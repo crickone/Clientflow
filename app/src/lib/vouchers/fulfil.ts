@@ -53,6 +53,15 @@ export async function fulfilVoucherCheckout(
     if (session.payment_status !== "paid") return { status: "unpaid" as const, orderId: order.id };
     if (session.amount_total !== order.valueCents || (session.currency ?? "").toLowerCase() !== "eur") {
       console.error(`[vouchers] amount mismatch on order ${order.id}: paid ${session.amount_total} ${session.currency}, expected ${order.valueCents} eur`);
+      try {
+        await logActivity(
+          "voucher_payment_mismatch",
+          `Voucher order ${order.id} was paid ${session.amount_total} ${(session.currency ?? "").toLowerCase()} (cents) but expected ${order.valueCents} eur (cents). No voucher was made. Check it in Stripe.`,
+          { orderId: order.id, paidCents: session.amount_total, paidCurrency: session.currency, expectedCents: order.valueCents },
+        );
+      } catch (err) {
+        console.error("[vouchers] mismatch log failed", err);
+      }
       return { status: "mismatch" as const, orderId: order.id };
     }
 
@@ -94,10 +103,15 @@ export async function fulfilVoucherCheckout(
     if (!voucher) return { status: "already" as const, orderId: order.id };
 
     const paid = getVoucherOrder(order.id)!;
-    await logActivity("voucher_sale", `${order.buyerName} bought a gift voucher online for ${order.recipientName} (${voucherTitle({ kind: order.kind, valueEur: order.valueCents / 100, therapyName: therapyName(order.therapyId) })})`, {
-      orderId: order.id,
-      voucherId: voucher.id,
-    });
+    try {
+      await logActivity("voucher_sale", `${order.buyerName} bought a gift voucher online for ${order.recipientName} (${voucherTitle({ kind: order.kind, valueEur: order.valueCents / 100, therapyName: therapyName(order.therapyId) })})`, {
+        orderId: order.id,
+        voucherId: voucher.id,
+      });
+    } catch (err) {
+      // A log failure must not stop the receipt and gift emails.
+      console.error("[vouchers] sale log failed", err);
+    }
 
     const receipt = await sendReceipt(tenantId, paid, voucher, send);
     if (paid.deliverTo === "buyer") {
@@ -133,12 +147,12 @@ export function refundVoucherOrder(tenantId: number, paymentIntentId: string, no
     if (!v) return true;
     if (Math.round(v.balanceEur * 100) >= Math.round(v.valueEur * 100)) {
       cancelVoucher(v.id, now);
-      void logActivity("voucher_refund", `Voucher ${v.code} was refunded in Stripe and has been cancelled.`, { orderId: order.id, voucherId: v.id });
+      void logActivity("voucher_refund", `Voucher ${v.code} was refunded in Stripe and has been cancelled.`, { orderId: order.id, voucherId: v.id }).catch((err) => console.error("[vouchers] refund log failed", err));
     } else {
       void logActivity("voucher_refund_part_used", `Voucher ${v.code} was refunded in Stripe after part of it was used. Check it with the buyer.`, {
         orderId: order.id,
         voucherId: v.id,
-      });
+      }).catch((err) => console.error("[vouchers] refund log failed", err));
     }
     return true;
   });

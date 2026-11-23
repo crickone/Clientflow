@@ -100,6 +100,10 @@ globalThis.fetch = (async () => new Response("{}", { status: 500 })) as typeof f
     const a = order();
     assert.equal((await fulfil.fulfilVoucherCheckout(tid, accountId, session(a, { payment_status: "unpaid" }), mailer, now)).status, "unpaid");
     assert.equal((await fulfil.fulfilVoucherCheckout(tid, accountId, session(a, { amount_total: 100 }), mailer, now)).status, "mismatch");
+    const mismatchLog = tdb.select().from(schema.activityLog).where(eq(schema.activityLog.type, "voucher_payment_mismatch")).all();
+    assert.equal(mismatchLog.length, 1, "a paid-but-mismatched order is recorded for staff");
+    assert.ok(mismatchLog[0]!.message.includes(`order ${a.id}`), "the entry names the order");
+    assert.ok(mismatchLog[0]!.message.includes("100 eur") && mismatchLog[0]!.message.includes("5000 eur"), "the entry names what was paid and what was expected");
     assert.equal((await fulfil.fulfilVoucherCheckout(tid, "acct_other", session(a), mailer, now)).status, "not_found");
     assert.equal(vouchers().length, 0);
 
@@ -203,6 +207,21 @@ globalThis.fetch = (async () => new Response("{}", { status: 500 })) as typeof f
     res = await post({ type: "checkout.session.expired", account: accountId, data: { object: { id: f.session, metadata: { kind: "voucher" } } } });
     assert.equal(res.status, 200);
     assert.equal(getOrder(f.id).status, "expired");
+    // An expiry event for an order that is already paid leaves it paid.
+    res = await post({ type: "checkout.session.expired", account: accountId, data: { object: { id: a.session, metadata: { kind: "voucher" } } } });
+    assert.equal(res.status, 200);
+    assert.equal(getOrder(a.id).status, "paid", "an expired event never undoes a paid order");
+    assert.equal(getOrder(a.id).giftVoucherId, v.id);
+    // A partial refund (refunded: false) leaves the voucher untouched.
+    const h = order({ deliverTo: "buyer", recipientEmail: null });
+    await fulfil.fulfilVoucherCheckout(tid, accountId, session(h), mailer, now);
+    const hv = getOrder(h.id).giftVoucherId!;
+    res = await post({ type: "charge.refunded", account: accountId, data: { object: { payment_intent: h.pi, refunded: false } } });
+    assert.equal(res.status, 200);
+    assert.equal(getOrder(h.id).status, "paid", "a partial refund does not refund the order");
+    const hRow = tdb.select().from(schema.giftVouchers).where(eq(schema.giftVouchers.id, hv)).get()!;
+    assert.equal(hRow.cancelledAt, null);
+    assert.equal(hRow.balanceEur, 50);
     res = await post({ type: "charge.refunded", account: accountId, data: { object: { payment_intent: e.pi, refunded: true } } });
     assert.equal(res.status, 200);
     assert.equal(getOrder(e.id).status, "refunded", "a refund finds the voucher order by its payment id");
