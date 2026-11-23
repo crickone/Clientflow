@@ -200,12 +200,13 @@ export function countOffersOnSale(): number {
 }
 
 /** The latest paid or refunded orders across all offers, with the offer's name. */
-export function listRecentOrders(limit = 5): (OfferOrder & { offerTitle: string })[] {
+/** Latest paid or refunded orders taken on one Stripe account (so test-mode sales on an old account don't show as live ones). */
+export function listRecentOrders(accountId: string, limit = 5): (OfferOrder & { offerTitle: string })[] {
   return db
     .select({ order: offerOrders, offerTitle: offers.title })
     .from(offerOrders)
     .innerJoin(offers, eq(offers.id, offerOrders.offerId))
-    .where(or(eq(offerOrders.status, "paid"), eq(offerOrders.status, "refunded")))
+    .where(and(eq(offerOrders.stripeAccountId, accountId), or(eq(offerOrders.status, "paid"), eq(offerOrders.status, "refunded"))))
     .orderBy(desc(offerOrders.createdAt))
     .limit(limit)
     .all()

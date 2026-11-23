@@ -34,7 +34,7 @@ export default async function StripeSettingsPage(props: { searchParams: Promise<
         unfinished={searchParams.unfinished === "1"}
         error={error}
         offersOnSale={conn ? countOffersOnSale() : 0}
-        recent={conn ? listRecentOrders(5).map((o) => ({ id: o.id, name: o.name || o.email || "Buyer", offer: o.offerTitle, amountCents: o.amountCents, at: o.paidAt ?? o.createdAt, refunded: o.status === "refunded", clientId: o.clientId })) : []}
+        recent={conn ? listRecentOrders(conn.accountId, 5).map((o) => ({ id: o.id, name: o.name || o.email || "Buyer", offer: o.offerTitle, amountCents: o.amountCents, at: o.paidAt ?? o.createdAt, refunded: o.status === "refunded", clientId: o.clientId })) : []}
       />
     </div>
   );

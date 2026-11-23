@@ -92,7 +92,12 @@ export function StripeSettings({ configured, canLinkExisting, connection, justCo
         {
           done: offersOnSale > 0,
           title: offersOnSale > 0 ? `${offersOnSale} ${offersOnSale === 1 ? "offer" : "offers"} on sale` : "Put an offer on sale",
-          detail: offersOnSale > 0 ? "Buy buttons are live on those campaign pages." : "Add an offer to a campaign and switch it on.",
+          detail:
+            offersOnSale === 0
+              ? "Add an offer to a campaign and switch it on."
+              : connection.livemode && !connection.chargesEnabled
+                ? "Their Buy buttons show once Stripe switches payments on."
+                : "Buy buttons are live on those campaign pages.",
           action: { href: "/marketing/campaigns", label: "Campaigns", external: false },
         },
       ]
