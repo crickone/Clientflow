@@ -52,18 +52,42 @@ function score(page: PhotoPage, words: string[]): number {
 /**
  * Up to `max` photographs: from the best-matching pages first (a blog post
  * counts for less than a service page), then the home page, then anywhere.
+ * A campaign about two or more things ("Infrared + HBOT") takes photos in
+ * turn from the best page for each, so every subject shows, not just the
+ * first page's pictures.
  */
 export function pickPhotos(pages: PhotoPage[], words: string[], max = 4): string[] {
+  const blogPenalty = (p: PhotoPage) => (/\bblog\b/.test(p.path) ? 1 : 0);
   const ranked = pages
-    .map((p) => ({ p, s: score(p, words) - (/\bblog\b/.test(p.path) ? 1 : 0) }))
+    .map((p) => ({ p, s: score(p, words) - blogPenalty(p) }))
     .sort((a, b) => b.s - a.s || (a.p.path === "/" ? -1 : 0));
   const home = pages.find((p) => p.path === "/");
-  const order = [...ranked.filter((r) => r.s > 0).map((r) => r.p), ...(home ? [home] : []), ...pages];
   const out: string[] = [];
+  const add = (src: string) => {
+    if (out.length < max && !out.includes(src)) out.push(src);
+  };
+
+  // The best page for each topic word that has one, without repeats.
+  const perWord: PhotoPage[] = [];
+  for (const w of words) {
+    const best = pages
+      .map((p) => ({ p, s: score(p, [w]) - blogPenalty(p) }))
+      .filter((r) => r.s > 0 && photosIn(r.p.html).length > 0)
+      .sort((a, b) => b.s - a.s)[0];
+    if (best && !perWord.includes(best.p)) perWord.push(best.p);
+  }
+  if (perWord.length > 1) {
+    const lists = perWord.map((p) => photosIn(p.html));
+    for (let i = 0; out.length < max && lists.some((l) => i < l.length); i++) {
+      for (const l of lists) if (i < l.length) add(l[i]);
+    }
+  }
+
+  const order = [...ranked.filter((r) => r.s > 0).map((r) => r.p), ...(home ? [home] : []), ...pages];
   for (const page of order) {
     for (const src of photosIn(page.html)) {
       if (out.length >= max) return out;
-      if (!out.includes(src)) out.push(src);
+      add(src);
     }
   }
   return out;

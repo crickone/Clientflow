@@ -31,4 +31,11 @@ check("then the home page fills the rest", picks[3] === "/sites/oh/assets/recept
 check("nothing matching falls back to the home page", pickPhotos([home, massage], ["yoga"], 2)[0] === "/sites/oh/assets/reception.jpg");
 check("no pages, no photos", pickPhotos([], ["massage"]).length === 0);
 
+const hbot = { path: "/hbot", title: "HBOT in Clonmel", html: '<img src="/a/hbot-1.jpg"><img src="/a/hbot-2.jpg"><img src="/a/hbot-3.jpg"><img src="/a/hbot-4.jpg">' };
+const infrared = { path: "/infrared", title: "Infrared in Clonmel", html: '<img src="/a/ir-1.jpg"><img src="/a/ir-2.jpg"><img src="/a/ir-3.jpg">' };
+const irBlog = { path: "/blog-infrared-and-aches", title: "Infrared and aches", html: '<img src="/a/ir-blog.jpg">' };
+const two = pickPhotos([home, hbot, irBlog, infrared], topicWords("Black Friday Infrared + HBOT 2026"), 4);
+check("a campaign about two things shows photos of both, in turn", two.join() === "/a/ir-1.jpg,/a/hbot-1.jpg,/a/ir-2.jpg,/a/hbot-2.jpg");
+check("one subject still fills from its own page", pickPhotos([home, hbot, infrared], ["hbot"], 3).join() === "/a/hbot-1.jpg,/a/hbot-2.jpg,/a/hbot-3.jpg");
+
 console.log(`sitePhotosModel: ${passed} checks passed`);
