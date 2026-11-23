@@ -36,7 +36,8 @@ export function NewVoucherForm({ clients: initialClients, therapies }: Props) {
 
   const defaultExpiry = useMemo(() => {
     const d = new Date();
-    d.setFullYear(d.getFullYear() + 1);
+    // Irish law: a gift voucher lasts at least 5 years (Consumer Rights Act 2022).
+    d.setFullYear(d.getFullYear() + 5);
     return d.toISOString().slice(0, 10);
   }, []);
 

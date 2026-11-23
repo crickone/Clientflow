@@ -3,13 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { giftVouchers } from "@/lib/db/schema";
 import { logActivity } from "@/lib/queries";
-import { genVoucherCode } from "@/lib/utils";
+import { getBusinessProfile } from "@/lib/businessProfile";
+import { codePrefix } from "@/lib/vouchers/model";
+import { newVoucherCode } from "@/lib/vouchers/store";
 
 const voucherSchema = z.object({
   purchaserName: z.string().min(1),
@@ -39,11 +40,8 @@ export async function createVoucherAction(formData: FormData) {
     expiryDate: formData.get("expiryDate"),
   });
 
-  // Generate a unique code
-  let code = genVoucherCode();
-  while (db.select().from(giftVouchers).where(eq(giftVouchers.code, code)).get()) {
-    code = genVoucherCode();
-  }
+  // A unique code with this business's own prefix ("OH-2026-K7QX").
+  const code = newVoucherCode(codePrefix(getBusinessProfile().businessName));
 
   db.insert(giftVouchers)
     .values({

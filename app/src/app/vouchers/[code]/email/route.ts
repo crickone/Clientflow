@@ -1,49 +1,35 @@
 import { NextResponse } from "next/server";
-import { getVoucherByCode } from "@/lib/queries";
-import { renderVoucherEmail } from "@/lib/voucherEmail";
+
+import { guard } from "@/lib/api/guard";
+import { getCurrentTenant } from "@/lib/db/tenant";
+import { renderGiftEmail, voucherBrand } from "@/lib/vouchers/email";
+import { colourways, parseColourway, voucherTitle } from "@/lib/vouchers/model";
+import { brandPaletteForTenant, getVoucherByCode, orderForVoucher, therapyName } from "@/lib/vouchers/store";
 
 export const dynamic = "force-dynamic";
 
-const DEMO = {
-  code: "DEMO-2026-RNV",
-  valueEur: 150,
-  expiryDate: "2027-05-10",
-  purchaserName: "Aoife Murphy",
-  recipientName: "Cillian",
-  message:
-    "For all the late nights and early mornings — go take an hour for yourself. You've earned it." as
-      | string
-      | null,
-  therapyName: null as string | null,
-};
-
-export async function GET(request: Request, props: { params: Promise<{ code: string }> }) {
+/**
+ * Staff preview of a voucher's gift email, exactly as the recipient gets it:
+ * this business's name, logo and colours (lib/vouchers/email).
+ */
+export async function GET(_request: Request, props: { params: Promise<{ code: string }> }) {
+  const denied = await guard("user");
+  if (denied) return denied;
   const params = await props.params;
-  const code = decodeURIComponent(params.code);
-  const url = new URL(request.url);
-  const baseUrl = `${url.protocol}//${url.host}`;
-
-  const isDemoCode =
-    code.toLowerCase() === "demo" || code.toUpperCase().startsWith("DEMO-");
-  let voucher: typeof DEMO;
-  if (isDemoCode) {
-    voucher = { ...DEMO, code };
-  } else {
-    const row = await getVoucherByCode(code);
-    if (!row) return new NextResponse("Voucher not found", { status: 404 });
-    voucher = {
-      code: row.code,
-      valueEur: row.valueEur,
-      expiryDate: row.expiryDate,
-      purchaserName: row.purchaserName,
-      recipientName: row.recipientName ?? "you",
-      message: null,
-      therapyName: null,
-    };
-  }
-
-  const { html } = renderVoucherEmail({ voucher, baseUrl });
-  return new NextResponse(html, {
-    headers: { "content-type": "text/html; charset=utf-8" },
+  const v = getVoucherByCode(decodeURIComponent(params.code));
+  if (!v) return new NextResponse("Voucher not found", { status: 404 });
+  const tenantId = getCurrentTenant().id;
+  const order = orderForVoucher(v);
+  const { html } = renderGiftEmail({
+    brand: voucherBrand(tenantId, order?.siteId ?? null, order?.siteUrl ?? null),
+    colourway: parseColourway(v.colourway) ?? colourways(brandPaletteForTenant(tenantId))[0]!,
+    fromName: v.purchaserName,
+    toName: v.recipientName || "you",
+    message: v.message,
+    title: voucherTitle({ kind: v.kind, valueEur: v.valueEur, therapyName: therapyName(v.therapyId) }),
+    code: v.code,
+    expiry: v.expiryDate,
+    revealUrl: order && v.viewToken ? `${order.siteUrl}/v/${v.viewToken}` : "#",
   });
+  return new NextResponse(html, { headers: { "content-type": "text/html; charset=utf-8" } });
 }

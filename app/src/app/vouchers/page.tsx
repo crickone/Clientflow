@@ -95,8 +95,8 @@ export default async function VouchersPage() {
             title="Writing the physical voucher"
             body={
               <>
-                Open the new voucher and write the <strong>code</strong> (e.g.{" "}
-                <code style={codeStyle}>XX-2026-A4F2</code>), the{" "}
+                Open the new voucher and write the <strong>code</strong> (it looks like{" "}
+                <code style={codeStyle}>AB-2026-K7QX</code>), the{" "}
                 <strong>recipient name</strong>, the <strong>value</strong>, and the{" "}
                 <strong>expiry date</strong> on the physical card. Hand it to the
                 purchaser.
