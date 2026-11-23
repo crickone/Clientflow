@@ -1,5 +1,7 @@
 import "server-only";
 
+import { SITE_HOST_HEADER } from "@/lib/cms/proxyHost";
+
 /**
  * Minimal in-memory fixed-window rate limiter. The app runs as a single Node
  * process (one Railway instance — SQLite is single-writer, we never scale > 1),
@@ -72,6 +74,15 @@ export function resetRateLimit(key: string): void {
  * (NextRequest satisfies it) rather than importing `next/server`.
  */
 export function clientIp(req: Request): string {
+  // Through the Cloudflare Worker (a client's own domain), Railway sees only
+  // Cloudflare's address, so every visitor would share one bucket. The
+  // middleware sets SITE_HOST_HEADER only for a verified Worker request (and
+  // strips it from anything else), so there Cloudflare's CF-Connecting-IP is
+  // the visitor. Same rule as the Conversions API (lib/facebook/capi.ts).
+  if (req.headers.get(SITE_HOST_HEADER)) {
+    const cf = req.headers.get("cf-connecting-ip")?.trim();
+    if (cf) return cf;
+  }
   const xff = req.headers.get("x-forwarded-for");
   if (xff) {
     const parts = xff.split(",").map((s) => s.trim()).filter(Boolean);
