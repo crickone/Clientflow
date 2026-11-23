@@ -81,6 +81,31 @@ async function main() {
     assert.equal(res.headers.get("x-middleware-rewrite"), null, "forged: not rewritten");
     assert.notEqual(res.headers.get("x-middleware-request-x-adonis-site-host"), "www.victim.ie", "forged: the domain does not reach the page");
   }
+  {
+    // The voucher store and the gift page live on the client's own domain,
+    // and the Pay button posts to the platform's checkout route from there.
+    for (const [path, expected] of [
+      ["/vouchers", "/site/example/vouchers"],
+      ["/v/AbCdEfGhIjKlMnOpQrStUvWx", "/site/example/v/AbCdEfGhIjKlMnOpQrStUvWx"],
+    ] as const) {
+      const res = middleware(new NextRequest(`https://www.example-client.ie${path}`, { headers: { host: "www.example-client.ie" } }));
+      assert.ok(res.headers.get("x-middleware-rewrite")?.endsWith(expected), `${path}: rewritten to ${expected}`);
+      assert.equal(res.headers.get("location"), null, `${path}: no login redirect`);
+    }
+    const proxied = middleware(
+      new NextRequest(`${railway}/vouchers?paid=4&session_id=cs_test_1`, {
+        headers: { host: "clientflow-production-ee94.up.railway.app", "x-adonis-site-host": "www.optimalhealthatinspire.ie", "x-adonis-proxy-key": "a-test-secret-of-some-length" },
+      }),
+    );
+    assert.ok(proxied.headers.get("x-middleware-rewrite")?.includes("/site/_host/vouchers"), "proxied: the store is served from the site");
+    for (const host of ["www.example-client.ie", "app.adonisagent.ie"]) {
+      const res = middleware(new NextRequest(`https://${host}/api/voucher-store/checkout`, { method: "POST", headers: { host } }));
+      assert.equal(res.headers.get("location"), null, `${host}: the checkout route is reachable without a session`);
+      assert.equal(res.headers.get("x-middleware-rewrite"), null, `${host}: the checkout route is not rewritten into the site`);
+    }
+    const staff = middleware(new NextRequest("https://app.adonisagent.ie/vouchers/store", { headers: { host: "app.adonisagent.ie" } }));
+    assert.equal(staff.headers.get("location"), "https://app.adonisagent.ie/login", "on the app host /vouchers is still the signed-in staff page");
+  }
   console.log("middleware: mapped-domain rewrite and public-route checks passed.");
 }
 

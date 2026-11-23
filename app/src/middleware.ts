@@ -38,6 +38,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/social/video/", // video ads Meta fetches when an ad is uploaded — signed-token-verified inside the route handler
   "/api/stripe/webhook", // Stripe Connect events (payments on businesses' accounts) — Stripe-Signature-verified inside the route handler
   "/api/offers/checkout", // landing-page Buy button → Stripe Checkout; signed-token-verified inside the route handler, rate-limited
+  "/api/voucher-store/checkout", // the voucher store's Pay button → Stripe Checkout; signed-token-verified inside the route handler, rate-limited
   "/api/health", // unauthenticated liveness probe (control-DB ping; leaks nothing) — must not 307→/login for uptime monitors
   "/api/csp-report", // browsers' Content-Security-Policy violation reports (report-only policy below); rate-limited, logs only
 ];
