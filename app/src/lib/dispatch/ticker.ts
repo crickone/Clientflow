@@ -22,6 +22,7 @@ import { scoreLeadsIfDue } from "@/lib/leadScore";
 import { processDueLeads } from "@/lib/facebook/leadQueue";
 import { processDueCapiEvents } from "@/lib/facebook/capi";
 import { resealAllSecrets } from "@/lib/security/resealSecrets";
+import { dispatchDueVoucherGifts } from "@/lib/vouchers/deliver";
 
 /**
  * The dispatch ticker: everything that was booked for a time, sent when that
@@ -31,6 +32,7 @@ import { resealAllSecrets } from "@/lib/security/resealSecrets";
  *   - social posts booked for a slot (lib/social/schedule.ts)
  *   - blog posts scheduled to go live (lib/cms/blog.ts)
  *   - the campaign nurture sequence's delayed messages (lib/automations/nurture.ts)
+ *   - gift vouchers bought for a date, emailed at 09:00 Irish time (lib/vouchers/deliver.ts)
  *
  * A minute-granularity loop of its own, like the voice dialler and unlike
  * the daily scheduler: a post booked for 9:00 that goes at 9:30 is late in a
@@ -53,6 +55,7 @@ export interface DispatchSummary {
   postsPublished: number;
   blogsPublished: number;
   nurtureSent: number;
+  vouchersSent: number;
 }
 
 /**
@@ -72,7 +75,7 @@ export async function runDispatchForTenant(
 }
 
 function emptySummary(): DispatchSummary {
-  return { tenants: 0, emailsStarted: 0, postsPublished: 0, blogsPublished: 0, nurtureSent: 0 };
+  return { tenants: 0, emailsStarted: 0, postsPublished: 0, blogsPublished: 0, nurtureSent: 0, vouchersSent: 0 };
 }
 
 async function runTenant(tenantId: number, baseUrl: string, summary: DispatchSummary): Promise<void> {
@@ -110,6 +113,14 @@ async function runTenant(tenantId: number, baseUrl: string, summary: DispatchSum
       summary.nurtureSent += await dispatchDueAutomationQueue(tenantId);
     } catch (err) {
       console.error(`[dispatch] tenant ${tenantId} nurture queue failed:`, err);
+    }
+    // Gift vouchers bought for a date: emailed at 09:00 Irish time that day.
+    // Not gated on the store flag, so a voucher already paid for is still
+    // delivered if the store is later switched off.
+    try {
+      summary.vouchersSent += await dispatchDueVoucherGifts(tenantId);
+    } catch (err) {
+      console.error(`[dispatch] tenant ${tenantId} voucher gifts failed:`, err);
     }
     // Members' wearables: each connection pulled at most hourly (Garmin pushes instead).
     await syncWearablesIfStale(tenantId).catch((err) => console.error(`[dispatch] tenant ${tenantId} wearables failed:`, err));

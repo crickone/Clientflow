@@ -4,6 +4,7 @@ import { verifyStripeSignature } from "@/lib/stripe/encode";
 import { tenantForStripeAccount, updateStripeAccountStatus, removeStripeConnection } from "@/lib/stripe/connection";
 import { stripeEnv, type CheckoutSession, type StripeAccount } from "@/lib/stripe/api";
 import { expireOrder, fulfilCheckout, recoverAbandonedCheckout, refundOrder } from "@/lib/offers/fulfil";
+import { expireVoucherOrder, fulfilVoucherCheckout, refundVoucherOrder } from "@/lib/vouchers/fulfil";
 
 export const dynamic = "force-dynamic";
 
@@ -32,21 +33,32 @@ export async function POST(req: NextRequest) {
   const tenantId = account ? tenantForStripeAccount(account) : null;
   const obj = event.data?.object ?? {};
   if (!tenantId) return NextResponse.json({ ok: true, ignored: "unknown account" });
+  // Gift vouchers from the voucher store carry kind=voucher (lib/vouchers);
+  // everything else is an offer, handled exactly as before.
+  const meta = (obj.metadata ?? {}) as Record<string, unknown>;
+  const isVoucher = meta.kind === "voucher";
 
   try {
     switch (event.type) {
       case "checkout.session.completed":
       case "checkout.session.async_payment_succeeded":
-        await fulfilCheckout(tenantId, account, obj as unknown as CheckoutSession);
+        if (isVoucher) await fulfilVoucherCheckout(tenantId, account, obj as unknown as CheckoutSession);
+        else await fulfilCheckout(tenantId, account, obj as unknown as CheckoutSession);
         break;
       case "checkout.session.expired":
+        if (isVoucher) {
+          expireVoucherOrder(tenantId, String(obj.id ?? ""));
+          break;
+        }
         expireOrder(tenantId, String(obj.id ?? ""));
         // Gave their details but never paid: a lead, and the follow-up if switched on.
         await recoverAbandonedCheckout(tenantId, obj as unknown as CheckoutSession);
         break;
       case "charge.refunded": {
         const pi = typeof obj.payment_intent === "string" ? obj.payment_intent : "";
-        if (pi && obj.refunded === true) refundOrder(tenantId, pi);
+        // A charge may not carry the payment's metadata, so a voucher order is
+        // found by its payment id; anything that isn't one is an offer order.
+        if (pi && obj.refunded === true && !refundVoucherOrder(tenantId, pi)) refundOrder(tenantId, pi);
         break;
       }
       case "account.updated":
