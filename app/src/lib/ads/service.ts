@@ -42,6 +42,7 @@ import {
   type Platforms,
   splitVariants,
   toMinorUnits,
+  usesCampaignBudget,
   validateSpec,
   type AdSpec,
   type CampaignSpec,
@@ -721,12 +722,26 @@ export async function setAdSetBudget(id: number, adSetIndex: number, dailyBudget
   const c = launched(id);
   const entry = c.metaIds.adSets?.[adSetIndex];
   const set = c.spec.adSets[adSetIndex];
+  if (usesCampaignBudget(c.spec)) throw new AdsError("This campaign shares one budget across its ad sets. Change the campaign budget instead.");
   if (!entry || !set) throw new AdsError("No such ad set.");
   if (!(dailyBudget >= 1 && dailyBudget <= 1000)) throw new AdsError("The daily budget must be between 1 and 1000.");
   await graph("POST", entry.adSetId, requireToken(), { daily_budget: toMinorUnits(dailyBudget) });
   set.dailyBudget = dailyBudget;
   update(id, { spec: JSON.stringify(c.spec) });
   await logActivity("ads.budget", `Ad set "${set.name}" budget set to ${dailyBudget} a day`, { adCampaignId: id });
+  return getAdCampaign(id)!;
+}
+
+/** Change a launched campaign's shared daily budget (major units) on Meta and in the plan. */
+export async function setCampaignBudget(id: number, dailyBudget: number): Promise<AdCampaignRow> {
+  const c = launched(id);
+  if (!usesCampaignBudget(c.spec)) throw new AdsError("This campaign has a budget on each ad set. Change an ad set's budget instead.");
+  const cap = 1000 * Math.max(1, c.spec.adSets.length);
+  if (!(dailyBudget >= 1 && dailyBudget <= cap)) throw new AdsError(`The campaign budget must be between 1 and ${cap}.`);
+  await graph("POST", c.metaIds.campaignId, requireToken(), { daily_budget: toMinorUnits(dailyBudget) });
+  c.spec.campaignBudget = dailyBudget;
+  update(id, { spec: JSON.stringify(c.spec) });
+  await logActivity("ads.budget", `Campaign "${c.name}" budget set to ${dailyBudget} a day`, { adCampaignId: id });
   return getAdCampaign(id)!;
 }
 

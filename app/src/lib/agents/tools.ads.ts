@@ -5,6 +5,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import {
   addAdsToCampaign,
   createAdDraft,
+  getAdCampaign,
   launchAdCampaign,
   listAdCampaigns,
   refreshAdInsights,
@@ -13,10 +14,11 @@ import {
   setAdCampaignStatus,
   setAdCampaignPlatforms,
   setAdSetBudget,
+  setCampaignBudget,
   updateAdDraft,
 } from "@/lib/ads/service";
 import { listLibraryAssets } from "@/lib/image/library";
-import { OBJECTIVES, PLATFORM_LABEL, PLATFORMS, platformsOf, totalDailyBudget, validateSpec, type AdSpec, type CampaignSpec, type Platforms } from "@/lib/ads/spec";
+import { OBJECTIVES, PLATFORM_LABEL, PLATFORMS, platformsOf, totalDailyBudget, usesCampaignBudget, validateSpec, type AdSpec, type CampaignSpec, type Platforms } from "@/lib/ads/spec";
 import { listAdAccounts } from "@/lib/facebook/grants";
 import { getAdsOverview } from "@/lib/ads/accountInsights";
 import { offerPagesForAds } from "@/lib/ads/pageData";
@@ -76,7 +78,7 @@ const AD_SCHEMA = {
 const SPEC_SCHEMA = {
   type: "object",
   description:
-    "The whole campaign plan. One campaign, 1-10 ad sets (each with its own daily budget, dates and audience), each holding 1-6 ads built from a Content Studio design.",
+    "The whole campaign plan. One campaign, 1-10 ad sets (each with its own dates and audience, and its own daily budget unless the campaign has a campaignBudget), each holding 1-6 ads built from a Content Studio design.",
   properties: {
     name: { type: "string" },
     objective: { type: "string", enum: [...OBJECTIVES] },
@@ -86,6 +88,11 @@ const SPEC_SCHEMA = {
       enum: ["PURCHASE", "INITIATED_CHECKOUT", "CONTENT_VIEW"],
       description:
         "For objective 'sales' (ads to an offer page, measured by the Pixel): what Meta optimises for. PURCHASE once the offer sells a few a week; INITIATED_CHECKOUT or CONTENT_VIEW give Meta more to learn from while sales are few. Every ad's linkUrl must be the offer page (list_ad_campaigns 'offerPages'). 'website_leads' is the same for enquiries on the website.",
+    },
+    campaignBudget: {
+      type: "number",
+      description:
+        "One daily budget for the whole campaign (major units, per day) that Meta shares across the ad sets. When set, leave each ad set's dailyBudget at 0. Omit it to give each ad set its own dailyBudget.",
     },
     platforms: {
       type: "string",
@@ -110,7 +117,7 @@ const SPEC_SCHEMA = {
         type: "object",
         properties: {
           name: { type: "string" },
-          dailyBudget: { type: "number", description: "Major units of the ad account's currency per day, 1-1000." },
+          dailyBudget: { type: "number", description: "Major units of the ad account's currency per day, 1-1000. Leave at 0 when the campaign has a campaignBudget." },
           startAt: { type: "string", description: "ISO datetime, optional (default: at launch)." },
           endAt: { type: "string", description: "ISO datetime, optional (default: until paused)." },
           audience: {
@@ -153,7 +160,7 @@ const SPEC_SCHEMA = {
             items: AD_SCHEMA as unknown as Record<string, unknown>,
           },
         },
-        required: ["name", "dailyBudget", "audience", "ads"],
+        required: ["name", "audience", "ads"],
       },
     },
   },
@@ -261,7 +268,7 @@ export const ADS_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "set_ad_budget",
-    description: "Change one ad set's daily budget on a launched campaign (adSetIndex is 0-based, in the order list_ad_campaigns shows).",
+    description: "Change a daily budget on a launched campaign. For a campaign with its own ad set budgets, it changes one ad set's budget (adSetIndex is 0-based, in the order list_ad_campaigns shows). When list_ad_campaigns shows a campaignBudget, the whole campaign shares that one budget: this changes the campaign budget and adSetIndex is ignored (pass 0).",
     input_schema: {
       type: "object",
       properties: { campaignId: { type: "integer" }, adSetIndex: { type: "integer" }, dailyBudget: { type: "number" } },
@@ -282,7 +289,8 @@ export async function listAdCampaignsTool(ctx: ToolContext): Promise<ToolResult>
     showsOn: PLATFORM_LABEL[platformsOf(c.spec)],
     adAccountId: c.adAccountId,
     dailyBudget: totalDailyBudget(c.spec),
-    adSets: c.spec.adSets.map((s, i) => ({ index: i, name: s.name, dailyBudget: s.dailyBudget, ads: s.ads.length })),
+    campaignBudget: usesCampaignBudget(c.spec) ? c.spec.campaignBudget : null,
+    adSets: c.spec.adSets.map((s, i) => ({ index: i, name: s.name, dailyBudget: usesCampaignBudget(c.spec) ? null : s.dailyBudget, ads: s.ads.length })),
     results: c.insights ? { spend: c.insights.spend, results: c.insights.results, label: c.insights.resultLabel, costPerResult: c.insights.costPerResult } : null,
     error: c.error,
   }));
@@ -431,7 +439,11 @@ export async function setAdCampaignStatusTool(_ctx: ToolContext, input: Record<s
 /** WRITE — can raise spend. */
 export async function setAdBudgetTool(_ctx: ToolContext, input: Record<string, unknown>): Promise<ToolResult> {
   try {
-    const c = await setAdSetBudget(Number(input.campaignId), Number(input.adSetIndex), Number(input.dailyBudget));
+    const campaignId = Number(input.campaignId);
+    const existing = getAdCampaign(campaignId);
+    const c = existing && usesCampaignBudget(existing.spec)
+      ? await setCampaignBudget(campaignId, Number(input.dailyBudget))
+      : await setAdSetBudget(campaignId, Number(input.adSetIndex), Number(input.dailyBudget));
     return { text: JSON.stringify({ result: `Budget updated on "${c.name}".` }) };
   } catch (e) {
     return err(e);

@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { AdPreview, type PreviewAd } from "./builder/AdPreview";
 import { CTA_LABEL } from "./ctaLabel";
-import { PLATFORM_LABEL, platformsOf, type AdSpec, type CampaignSpec } from "@/lib/ads/spec";
+import { PLATFORM_LABEL, platformsOf, usesCampaignBudget, type AdSpec, type CampaignSpec } from "@/lib/ads/spec";
 
 type Brand = { pageName: string; instagramHandle: string | null; logoUrl: string | null };
 
@@ -15,11 +15,12 @@ function adsOf(name: string, input: Record<string, unknown>, money: (n: number) 
     const spec = (input.spec ?? {}) as Partial<CampaignSpec>;
     const p = platformsOf(spec as CampaignSpec);
     const platforms = PLATFORM_LABEL[p];
+    const shared = usesCampaignBudget(spec as CampaignSpec) ? `${money(Number(spec.campaignBudget))} a day, shared by the campaign` : null;
     return (spec.adSets ?? []).flatMap((set) => {
       const a = set.audience;
       const places = (a?.locations ?? []).map((l) => (l.kind === "country" ? l.name : `${l.name} + ${l.radiusKm} km`)).join(", ");
       const who = a?.genders?.length === 1 ? (a.genders[0] === "female" ? "Women" : "Men") : "Everyone";
-      const where = [platforms, set.dailyBudget ? `${money(set.dailyBudget)} a day` : null, places || null, a ? `${who} ${a.ageMin}–${a.ageMax >= 65 ? "65+" : a.ageMax}` : null].filter(Boolean).join(" · ");
+      const where = [platforms, shared ?? (set.dailyBudget ? `${money(set.dailyBudget)} a day` : null), places || null, a ? `${who} ${a.ageMin}–${a.ageMax >= 65 ? "65+" : a.ageMax}` : null].filter(Boolean).join(" · ");
       return (set.ads ?? []).map((ad) => ({ ad, where, objective: spec.objective ?? null, platforms: p }));
     });
   }

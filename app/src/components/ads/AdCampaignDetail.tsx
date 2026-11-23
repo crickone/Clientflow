@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card, CardLabel, CardValue } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { refreshAdInsightsAction, setAdCampaignStatusAction, setAdPlacementsAction, setAdSetBudgetAction } from "@/app/marketing/ads/actions";
+import { refreshAdInsightsAction, setAdCampaignStatusAction, setAdPlacementsAction, setAdSetBudgetAction, setCampaignBudgetAction } from "@/app/marketing/ads/actions";
 import type { AdInsights } from "@/lib/ads/service";
 import { PLATFORM_LABEL, PLATFORMS, type Platforms } from "@/lib/ads/spec";
 import { Segmented } from "./builder/controls";
@@ -28,6 +28,7 @@ export function AdCampaignDetail({
   status,
   objective,
   currency,
+  campaignBudget,
   adSets,
   insights,
   insightsAt,
@@ -40,6 +41,8 @@ export function AdCampaignDetail({
   status: string;
   objective: string;
   currency: string;
+  /** Set when the campaign shares one daily budget across its ad sets. */
+  campaignBudget?: number | null;
   adSets: Array<{ name: string; dailyBudget: number; ads: number }>;
   insights: AdInsights | null;
   insightsAt: string | null;
@@ -52,6 +55,7 @@ export function AdCampaignDetail({
   const confirm = useConfirm();
   const [busy, start] = useTransition();
   const [budgets, setBudgets] = useState(adSets.map((s) => String(s.dailyBudget)));
+  const [shared, setShared] = useState(String(campaignBudget ?? ""));
   const [where, setWhere] = useState<Platforms>(platforms);
   const st = AD_STATUS[status] ?? AD_STATUS.draft;
 
@@ -74,7 +78,7 @@ export function AdCampaignDetail({
   }, []);
 
   async function setStatus(next: "active" | "paused" | "archived") {
-    const total = adSets.reduce((s, a) => s + a.dailyBudget, 0);
+    const total = campaignBudget ?? adSets.reduce((s, a) => s + a.dailyBudget, 0);
     const copy =
       next === "active"
         ? { title: "Resume this campaign?", body: `It starts spending again, up to ${money(total, currency)} a day.`, confirmLabel: "Resume" }
@@ -103,6 +107,25 @@ export function AdCampaignDetail({
     }
     start(async () => {
       const r = await setAdSetBudgetAction(id, i, amount);
+      if (!r.ok) return void toast.error(r.error);
+      toast.success("Budget updated");
+      router.refresh();
+    });
+  }
+
+  async function saveSharedBudget() {
+    const amount = Number(shared);
+    if (!(amount >= 1)) return void toast.error("The campaign budget must be at least 1.");
+    if (campaignBudget && amount > campaignBudget) {
+      const ok = await confirm({
+        title: "Raise this budget?",
+        body: `The campaign will spend up to ${money(amount, currency)} a day, shared across its ad sets (was ${money(campaignBudget, currency)}).`,
+        confirmLabel: "Raise budget",
+      });
+      if (!ok) return;
+    }
+    start(async () => {
+      const r = await setCampaignBudgetAction(id, amount);
       if (!r.ok) return void toast.error(r.error);
       toast.success("Budget updated");
       router.refresh();
@@ -181,7 +204,24 @@ export function AdCampaignDetail({
       </Card>
 
       <Card style={{ padding: 20, display: "grid", gap: 10 }}>
-        <CardLabel>Ad sets and daily budgets</CardLabel>
+        <CardLabel>{campaignBudget ? "Campaign budget and ad sets" : "Ad sets and daily budgets"}</CardLabel>
+        {campaignBudget ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", paddingBottom: 8, borderBottom: "1px solid var(--hairline)" }}>
+            <div style={{ flex: "1 1 200px" }}>
+              <div style={{ fontSize: 14, color: "var(--text-primary)" }}>One budget for the whole campaign</div>
+              <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>Meta shares it across the ad sets below.</div>
+            </div>
+            {status !== "archived" && (
+              <>
+                <Input aria-label="Daily budget for the campaign" type="number" min={1} value={shared} onChange={(e) => setShared(e.target.value)} style={{ width: 110 }} />
+                <span style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>{currency} a day</span>
+                <Button variant="outline" size="sm" onClick={saveSharedBudget} disabled={busy || Number(shared) === campaignBudget}>
+                  Save
+                </Button>
+              </>
+            )}
+          </div>
+        ) : null}
         {adSets.map((s, i) => {
           const row = insights?.adSets.find((r) => r.name === s.name);
           return (
@@ -196,7 +236,7 @@ export function AdCampaignDetail({
                   </div>
                 )}
               </div>
-              {status !== "archived" && (
+              {status !== "archived" && !campaignBudget && (
                 <>
                   <Input aria-label={`Daily budget for ${s.name}`} type="number" min={1} value={budgets[i]} onChange={(e) => setBudgets((b) => b.map((x, j) => (j === i ? e.target.value : x)))} style={{ width: 110 }} />
                   <span style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>{currency} a day</span>

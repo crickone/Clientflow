@@ -35,6 +35,7 @@ import {
   platformsOf,
   textOptions,
   totalDailyBudget,
+  usesCampaignBudget,
   validateSpec,
   type AdSetSpec,
   type AdSpec,
@@ -242,6 +243,17 @@ export function AdCampaignBuilder({
   const problems = validateSpec(spec);
 
   const patch = (p: Partial<CampaignSpec>) => setSpec((s) => ({ ...s, ...p }));
+  const sharedBudget = usesCampaignBudget(spec);
+  /** On: one budget for the campaign (the ad sets' budgets added up); off: split it back across the ad sets. */
+  const toggleSharedBudget = (on: boolean) =>
+    setSpec((s) => {
+      if (on) {
+        const total = s.adSets.reduce((sum, a) => sum + (Number(a.dailyBudget) || 0), 0);
+        return { ...s, campaignBudget: Math.max(1, total), adSets: s.adSets.map((a) => ({ ...a, dailyBudget: 0 })) };
+      }
+      const each = Math.max(1, Math.round((Number(s.campaignBudget) || 10) / Math.max(1, s.adSets.length)));
+      return { ...s, campaignBudget: null, adSets: s.adSets.map((a) => ({ ...a, dailyBudget: each })) };
+    });
   const patchSet = (i: number, p: Partial<AdSetSpec>) =>
     setSpec((s) => ({ ...s, adSets: s.adSets.map((x, j) => (j === i ? { ...x, ...p } : x)) }));
   const patchAudience = (i: number, p: Partial<AdSetSpec["audience"]>) =>
@@ -388,7 +400,7 @@ export function AdCampaignBuilder({
   };
 
   function addAdSet() {
-    patch({ adSets: [...spec.adSets, newAdSet(designs, spec.adSets.length + 1)] });
+    patch({ adSets: [...spec.adSets, { ...newAdSet(designs, spec.adSets.length + 1), dailyBudget: sharedBudget ? 0 : 10 }] });
     setActiveSet(spec.adSets.length);
   }
 
@@ -490,7 +502,7 @@ export function AdCampaignBuilder({
               <dd>
                 {whereOf(x)}
                 <br />
-                <span style={{ color: "var(--text-tertiary)" }}>{money(x.dailyBudget, currency)} a day · {runsOf(x)}</span>
+                <span style={{ color: "var(--text-tertiary)" }}>{sharedBudget ? runsOf(x) : `${money(x.dailyBudget, currency)} a day · ${runsOf(x)}`}</span>
               </dd>
               <button type="button" className="adb-plan-edit" onClick={() => (setActiveSet(j), go(1))}>Edit</button>
             </div>
@@ -741,8 +753,27 @@ export function AdCampaignBuilder({
               <section className="adb-panel">
                 <header className="adb-panel-head">
                   <h2>Who sees it, and for how much</h2>
-                  <p>This is an ad set: an audience with its own budget and dates. Most campaigns need one; add another to reach a different area or group.</p>
+                  <p>
+                    This is an ad set: an audience with its own {sharedBudget ? "dates" : "budget and dates"}. Most campaigns need one; add another to reach a different area or group.
+                  </p>
                 </header>
+                <div className="adb-section" style={{ borderTop: "none", paddingTop: 0 }}>
+                  <h3>
+                    Budget <small>Meta never spends more than this in a day.</small>
+                  </h3>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--text-secondary)" }}>
+                    <input type="checkbox" checked={sharedBudget} onChange={(e) => toggleSharedBudget(e.target.checked)} />
+                    One budget for the whole campaign
+                  </label>
+                  {sharedBudget ? (
+                    <>
+                      <BudgetStepper id="campaign-budget" value={Number(spec.campaignBudget)} currency={currency} onChange={(n) => patch({ campaignBudget: n })} />
+                      <span className="adb-hint">Meta shares this across the ad sets and puts more on the ones that do better.</span>
+                    </>
+                  ) : (
+                    <span className="adb-hint">Off: each ad set below has its own daily budget.</span>
+                  )}
+                </div>
                 {adSetTabs(true)}
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
                   <div style={{ flex: "1 1 260px", maxWidth: 420 }}>
@@ -761,10 +792,12 @@ export function AdCampaignBuilder({
                   <AudienceEditor key={si} index={si} audience={set.audience} onChange={(p) => patchAudience(si, p)} />
                 </div>
 
-                <div className="adb-section">
-                  <h3>Daily budget <small>Meta never spends more than this in a day.</small></h3>
-                  <BudgetStepper id={`as-budget-${si}`} value={set.dailyBudget} currency={currency} onChange={(n) => patchSet(si, { dailyBudget: n })} />
-                </div>
+                {!sharedBudget && (
+                  <div className="adb-section">
+                    <h3>Daily budget <small>Meta never spends more than this in a day.</small></h3>
+                    <BudgetStepper id={`as-budget-${si}`} value={set.dailyBudget} currency={currency} onChange={(n) => patchSet(si, { dailyBudget: n })} />
+                  </div>
+                )}
 
                 <div className="adb-section">
                   <h3>Schedule</h3>
@@ -999,7 +1032,7 @@ export function AdCampaignBuilder({
                       <small>{whereOf(x)}</small>
                     </h3>
                     <div className="adb-hint">
-                      {money(x.dailyBudget, currency)} a day · {runsOf(x)}
+                      {sharedBudget ? runsOf(x) : `${money(x.dailyBudget, currency)} a day · ${runsOf(x)}`}
                     </div>
                     <div className="adb-designs">
                       {x.ads.map((a, m) => {

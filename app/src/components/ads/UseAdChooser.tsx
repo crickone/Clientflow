@@ -32,6 +32,8 @@ export interface ChooserCampaign {
   status: "draft" | "error" | "active" | "paused";
   objective: Objective;
   currency: string;
+  /** Set when the campaign shares one daily budget across its ad sets. */
+  campaignBudget?: number | null;
   adSets: { name: string; ads: number; dailyBudget: number }[];
 }
 
@@ -115,7 +117,7 @@ export function UseAdChooser({
         title: `Add to a ${campaign.status === "active" ? "live" : "paused"} campaign?`,
         body:
           campaign.status === "active"
-            ? `The ${adCount === 1 ? "ad starts" : "ads start"} running inside “${set.name}” as soon as Meta approves ${adCount === 1 ? "it" : "them"}, from the ad set's existing budget of ${money(set.dailyBudget, campaign.currency)} a day.`
+            ? `The ${adCount === 1 ? "ad starts" : "ads start"} running inside “${set.name}” as soon as Meta approves ${adCount === 1 ? "it" : "them"}, from ${campaign.campaignBudget ? `the campaign's budget of ${money(campaign.campaignBudget, campaign.currency)} a day` : `the ad set's existing budget of ${money(set.dailyBudget, campaign.currency)} a day`}.`
             : `The ${adCount === 1 ? "ad is" : "ads are"} added to “${set.name}” and run when you resume the campaign.`,
         confirmLabel: "Add to campaign",
       });
@@ -268,7 +270,7 @@ export function UseAdChooser({
                           <span className="use-ad-campaign-main">
                             <span className="use-ad-campaign-name">{c.name}</span>
                             <span className="use-ad-campaign-meta">
-                              {OBJECTIVE_SHORT[c.objective]} · {c.adSets.length} ad set{c.adSets.length === 1 ? "" : "s"} · {money(c.adSets.reduce((a, s) => a + s.dailyBudget, 0), c.currency)} a day
+                              {OBJECTIVE_SHORT[c.objective]} · {c.adSets.length} ad set{c.adSets.length === 1 ? "" : "s"} · {money(c.campaignBudget ?? c.adSets.reduce((a, s) => a + s.dailyBudget, 0), c.currency)} a day
                             </span>
                           </span>
                           <span className={`use-ad-status is-${STATUS[c.status].tone}`}>

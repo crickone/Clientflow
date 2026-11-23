@@ -5,6 +5,7 @@ import { AdsNotConnected } from "@/components/ads/AdsNotConnected";
 import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { getAdCreative, ctaWords } from "@/lib/ads/creatives";
 import { listAdCampaigns } from "@/lib/ads/service";
+import { usesCampaignBudget } from "@/lib/ads/spec";
 import { builderData } from "@/lib/ads/pageData";
 import { getGrantInfo, listAdAccounts } from "@/lib/facebook/grants";
 import { isMetaConnected } from "@/lib/social/publisher";
@@ -80,6 +81,7 @@ export default async function UseAdPage(
       status: c.status as ChooserCampaign["status"],
       objective: c.objective,
       currency: currency[c.adAccountId] ?? "",
+      campaignBudget: usesCampaignBudget(c.spec) ? Number(c.spec.campaignBudget) : null,
       adSets: c.spec.adSets.map((s) => ({ name: s.name, ads: s.ads.length, dailyBudget: Number(s.dailyBudget) || 0 })),
     }));
 

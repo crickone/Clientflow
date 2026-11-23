@@ -204,6 +204,17 @@ export interface CampaignSpec {
   platforms?: Platforms;
   /** For "sales": what Meta optimises for (default PURCHASE). */
   conversionEvent?: ConversionEvent;
+  /**
+   * One daily budget for the whole campaign (Meta's Advantage campaign budget),
+   * in major units. Meta shares it across the ad sets, so the ad sets carry no
+   * budget of their own. Absent or null = each ad set has its own dailyBudget.
+   */
+  campaignBudget?: number | null;
+}
+
+/** Whether the plan uses one campaign-level budget instead of one per ad set. */
+export function usesCampaignBudget(spec: Pick<CampaignSpec, "campaignBudget">): boolean {
+  return typeof spec.campaignBudget === "number" && spec.campaignBudget > 0;
 }
 
 const MAX_AD_SETS = 10;
@@ -229,6 +240,13 @@ export function validateSpec(spec: CampaignSpec): string[] {
   if (spec.adSets?.length > MAX_AD_SETS) errors.push(`At most ${MAX_AD_SETS} ad sets per campaign.`);
   errors.push(...placementProblems(spec));
 
+  const sharedBudget = usesCampaignBudget(spec);
+  if (spec.campaignBudget !== undefined && spec.campaignBudget !== null) {
+    const cap = MAX_DAILY_BUDGET * Math.max(1, spec.adSets?.length ?? 1);
+    if (!(spec.campaignBudget >= MIN_DAILY_BUDGET)) errors.push(`The campaign budget must be at least ${MIN_DAILY_BUDGET} a day.`);
+    else if (spec.campaignBudget > cap) errors.push(`The campaign budget is capped at ${cap} a day here; raise it in Ads Manager if you really mean it.`);
+  }
+
   if (spec.objective === "leads") {
     const f = spec.leadForm;
     if (!f) errors.push("A leads campaign needs an instant form.");
@@ -245,8 +263,8 @@ export function validateSpec(spec: CampaignSpec): string[] {
   (spec.adSets ?? []).forEach((set, i) => {
     const where = `Ad set ${i + 1}${set.name ? ` ("${set.name}")` : ""}`;
     if (!set.name?.trim()) errors.push(`${where} needs a name.`);
-    if (!(set.dailyBudget >= MIN_DAILY_BUDGET)) errors.push(`${where}: the daily budget must be at least ${MIN_DAILY_BUDGET}.`);
-    if (set.dailyBudget > MAX_DAILY_BUDGET) errors.push(`${where}: the daily budget is capped at ${MAX_DAILY_BUDGET} a day here; raise it in Ads Manager if you really mean it.`);
+    if (!sharedBudget && !(set.dailyBudget >= MIN_DAILY_BUDGET)) errors.push(`${where}: the daily budget must be at least ${MIN_DAILY_BUDGET}.`);
+    if (!sharedBudget && set.dailyBudget > MAX_DAILY_BUDGET) errors.push(`${where}: the daily budget is capped at ${MAX_DAILY_BUDGET} a day here; raise it in Ads Manager if you really mean it.`);
     if (set.startAt && set.endAt && Date.parse(set.endAt) <= Date.parse(set.startAt)) errors.push(`${where}: the end must be after the start.`);
     if (set.endAt && Date.parse(set.endAt) <= Date.now()) errors.push(`${where}: the end date is in the past.`);
     const a = set.audience;
@@ -384,15 +402,19 @@ export function buildAdSetParams(spec: CampaignSpec, set: AdSetSpec, ctx: AdSetC
   const params: Record<string, unknown> = {
     name: set.name,
     campaign_id: ctx.campaignId,
-    daily_budget: toMinorUnits(set.dailyBudget),
     billing_event: o.billingEvent,
     optimization_goal: o.optimizationGoal,
-    bid_strategy: "LOWEST_COST_WITHOUT_CAP",
     targeting: buildTargeting(set.audience, platformsOf(spec)),
     // ACTIVE under a campaign that stays PAUSED until the whole tree exists, so
     // switching the campaign on is the single launch switch.
     status: "ACTIVE",
   };
+  // With a campaign budget, Meta shares it across the ad sets: the budget and
+  // bid strategy live on the campaign and an ad set carrying them is refused.
+  if (!usesCampaignBudget(spec)) {
+    params.daily_budget = toMinorUnits(set.dailyBudget);
+    params.bid_strategy = "LOWEST_COST_WITHOUT_CAP";
+  }
   if (o.destinationType) params.destination_type = o.destinationType;
   if (o.needsPagePromotedObject) params.promoted_object = { page_id: ctx.pageId };
   if (o.pixelEvent) params.promoted_object = { pixel_id: ctx.pixelId, custom_event_type: o.pixelEvent };
@@ -409,16 +431,27 @@ export function buildAdSetParams(spec: CampaignSpec, set: AdSetSpec, ctx: AdSetC
   return params;
 }
 
-/** POST /act_<id>/campaigns parameters (created PAUSED; budgets live on the ad sets). */
+/**
+ * POST /act_<id>/campaigns parameters (created PAUSED). Budgets live on the ad
+ * sets, unless the plan has a campaign budget: then the campaign carries the
+ * daily budget and bid strategy, and is_adset_budget_sharing_enabled (which is
+ * only for ad-set budgets) is left out.
+ */
 export function buildCampaignParams(spec: CampaignSpec): Record<string, unknown> {
-  return {
+  const params: Record<string, unknown> = {
     name: spec.name,
     objective: objectiveSettings(spec).metaObjective,
     status: "PAUSED",
     buying_type: "AUCTION",
     special_ad_categories: [],
-    is_adset_budget_sharing_enabled: false,
   };
+  if (usesCampaignBudget(spec)) {
+    params.daily_budget = toMinorUnits(spec.campaignBudget as number);
+    params.bid_strategy = "LOWEST_COST_WITHOUT_CAP";
+  } else {
+    params.is_adset_budget_sharing_enabled = false;
+  }
+  return params;
 }
 
 export interface CreativeContext {
@@ -561,8 +594,9 @@ export function buildLeadFormParams(form: LeadFormSpec): Record<string, unknown>
   };
 }
 
-/** Total daily spend across a plan's ad sets, for the confirm-before-launch line. */
+/** Total daily spend: the campaign budget when set, else the ad sets' budgets added up, for the confirm-before-launch line. */
 export function totalDailyBudget(spec: CampaignSpec): number {
+  if (usesCampaignBudget(spec)) return spec.campaignBudget as number;
   return (spec.adSets ?? []).reduce((sum, s) => sum + (Number(s.dailyBudget) || 0), 0);
 }
 

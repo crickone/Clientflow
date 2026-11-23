@@ -17,6 +17,7 @@ import {
   buildLeadFormParams,
   toMinorUnits,
   totalDailyBudget,
+  usesCampaignBudget,
   platformsOf,
   placementProblems,
   AD_URL_TAGS,
@@ -192,5 +193,31 @@ check("lead form asks the chosen fields with the privacy link", form.questions.l
   const tg = buildTargeting(aud) as { custom_audiences?: Array<{ id: string }>; excluded_custom_audiences?: Array<{ id: string }> };
   check("resolved audiences ride on the targeting (so every later update keeps them)", tg.custom_audiences?.[0]?.id === "a1" && tg.excluded_custom_audiences?.[0]?.id === "c9");
   check("none, none", (buildTargeting(base().adSets[0].audience) as typeof tg).custom_audiences === undefined);
+}
+// Campaign budget (Meta's Advantage campaign budget): one daily budget shared by the ad sets.
+{
+  const none = base();
+  const noneCampaign = buildCampaignParams(none);
+  check("without a campaign budget the campaign keeps ad-set budgets", noneCampaign.is_adset_budget_sharing_enabled === false && !("daily_budget" in noneCampaign) && !("bid_strategy" in noneCampaign));
+  const noneSet = buildAdSetParams(none, none.adSets[0], { campaignId: "c1", pageId: "p1" });
+  check("and each ad set keeps its budget and bid strategy", noneSet.daily_budget === 1050 && noneSet.bid_strategy === "LOWEST_COST_WITHOUT_CAP");
+  check("a null campaign budget is the same as none", !usesCampaignBudget(base({ campaignBudget: null })) && totalDailyBudget(base({ campaignBudget: null })) === 10.5);
+
+  const four = (over: Partial<CampaignSpec> = {}) => base({ campaignBudget: 20, adSets: [0, 1, 2, 3].map((i) => ({ ...base().adSets[0], name: `Set ${i}`, dailyBudget: 0, audience: { ...base().adSets[0].audience, advantageAudience: false } })), ...over });
+  const shared = four();
+  const campaign = buildCampaignParams(shared);
+  check("the campaign carries the budget in minor units and the bid strategy", campaign.daily_budget === 2000 && campaign.bid_strategy === "LOWEST_COST_WITHOUT_CAP");
+  check("and no ad-set budget sharing flag", !("is_adset_budget_sharing_enabled" in campaign) && campaign.status === "PAUSED");
+  const set = buildAdSetParams(shared, shared.adSets[0], { campaignId: "c1", pageId: "p1" });
+  check("ad sets send no budget or bid strategy", !("daily_budget" in set) && !("bid_strategy" in set));
+  check("Advantage+ audience stays off", (set.targeting as { targeting_automation: { advantage_audience: number } }).targeting_automation.advantage_audience === 0);
+  check("the rest of the ad set is unchanged", set.billing_event === "IMPRESSIONS" && set.optimization_goal === "LINK_CLICKS" && set.status === "ACTIVE" && set.campaign_id === "c1");
+  check("ad sets at 0 validate under a campaign budget", validateSpec(shared).length === 0);
+  check("ad sets with no budget at all validate too", validateSpec(four({ adSets: four().adSets.map((a) => ({ ...a, dailyBudget: undefined as unknown as number })) })).length === 0);
+  check("a campaign budget below the minimum is rejected", validateSpec(four({ campaignBudget: 0.5 })).some((e) => e.includes("campaign budget") && e.includes("at least")));
+  check("a campaign budget over the cap is rejected", validateSpec(four({ campaignBudget: 4001 })).some((e) => e.includes("campaign budget") && e.includes("capped")));
+  check("the cap grows with the ad sets", validateSpec(four({ campaignBudget: 4000 })).length === 0);
+  check("total daily budget is the campaign budget", totalDailyBudget(shared) === 20);
+  check("a campaign budget ignores stale ad-set budgets in the total", totalDailyBudget(four({ adSets: four().adSets.map((a) => ({ ...a, dailyBudget: 5 })) })) === 20);
 }
 console.log(`ads/spec.test.ts: ${passed} checks passed.`);

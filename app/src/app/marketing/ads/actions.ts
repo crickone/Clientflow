@@ -20,6 +20,7 @@ import {
   setAdCampaignPlatforms,
   setAdCampaignStatus,
   setAdSetBudget,
+  setCampaignBudget,
   updateAdDraft,
 } from "@/lib/ads/service";
 import type { CampaignSpec, Platforms } from "@/lib/ads/spec";
@@ -75,6 +76,10 @@ export async function setAdCampaignStatusAction(id: number, status: "active" | "
 
 export async function setAdSetBudgetAction(id: number, adSetIndex: number, dailyBudget: number): Promise<AdsResult> {
   return run(async () => { await setAdSetBudget(id, adSetIndex, Number(dailyBudget)); return undefined; });
+}
+
+export async function setCampaignBudgetAction(id: number, dailyBudget: number): Promise<AdsResult> {
+  return run(async () => { await setCampaignBudget(id, Number(dailyBudget)); return undefined; });
 }
 
 export async function refreshAdInsightsAction(id: number): Promise<AdsResult> {

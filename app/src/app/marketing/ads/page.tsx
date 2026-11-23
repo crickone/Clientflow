@@ -9,6 +9,7 @@ import { AdAccountPerformance } from "@/components/ads/AdAccountPerformance";
 import { getAdsOverview } from "@/lib/ads/accountInsights";
 import { getCurrentMembership, requireAdminPage } from "@/lib/auth";
 import { listAdCampaigns } from "@/lib/ads/service";
+import { totalDailyBudget } from "@/lib/ads/spec";
 import { getGrantInfo, listAdAccounts } from "@/lib/facebook/grants";
 import { isMetaConnected } from "@/lib/social/publisher";
 
@@ -32,7 +33,7 @@ export default async function AdsPage(props: { searchParams?: Promise<{ range?: 
     name: c.name,
     objective: c.objective,
     status: c.status,
-    dailyBudget: c.spec.adSets.reduce((s, a) => s + (Number(a.dailyBudget) || 0), 0),
+    dailyBudget: totalDailyBudget(c.spec),
     currency: currency[c.adAccountId] ?? "",
     spend: c.insights?.spend ?? null,
     results: c.insights?.results ?? null,
