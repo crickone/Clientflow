@@ -1,22 +1,25 @@
 import Link from "next/link";
-import { Gift, Plus } from "lucide-react";
+import { Gift, Plus, Store } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { VoucherList } from "@/components/vouchers/VoucherList";
-import { listVouchers, getTherapyMap } from "@/lib/queries";
-import { getVenueType } from "@/lib/settings";
+import { getTherapyMap } from "@/lib/queries";
+import { getFeatureFlags, getVenueType } from "@/lib/settings";
+import { getCurrentMembership } from "@/lib/auth";
+import { isModuleOn } from "@/lib/features";
+import { listVoucherRows } from "@/lib/vouchers/store";
 import { getVocab } from "@/lib/vocabulary";
 
 export const dynamic = "force-dynamic";
 
 export default async function VouchersPage() {
   const vocab = getVocab(getVenueType());
-  const [vouchers, therapyMap] = await Promise.all([
-    listVouchers(),
-    getTherapyMap(),
-  ]);
+  const vouchers = listVoucherRows();
+  const therapyMap = await getTherapyMap();
+  // Products > Vouchers > Online store: admins, with the voucher_store module on.
+  const showStore = getCurrentMembership()?.role === "admin" && isModuleOn(getFeatureFlags(), "voucher_store");
 
   return (
     <div className="app-page">
@@ -24,12 +27,22 @@ export default async function VouchersPage() {
         eyebrow="Vouchers"
         title="Gift Vouchers"
         actions={
-          <Link href="/vouchers/new">
-            <Button>
-              <Plus size={15} />
-              Create voucher
-            </Button>
-          </Link>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {showStore && (
+              <Link href="/vouchers/store">
+                <Button variant="secondary">
+                  <Store size={15} />
+                  Online store
+                </Button>
+              </Link>
+            )}
+            <Link href="/vouchers/new">
+              <Button>
+                <Plus size={15} />
+                Create voucher
+              </Button>
+            </Link>
+          </div>
         }
       />
 
@@ -83,7 +96,7 @@ export default async function VouchersPage() {
             body={
               <>
                 Open the new voucher and write the <strong>code</strong> (e.g.{" "}
-                <code style={codeStyle}>RCH-2026-A4F2</code>), the{" "}
+                <code style={codeStyle}>XX-2026-A4F2</code>), the{" "}
                 <strong>recipient name</strong>, the <strong>value</strong>, and the{" "}
                 <strong>expiry date</strong> on the physical card. Hand it to the
                 purchaser.

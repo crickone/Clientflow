@@ -10,7 +10,7 @@ import type { Colourway } from "@/lib/vouchers/model";
  * store's live preview, the recipient's gift page, the thank-you view and
  * the staff voucher page, so the voucher looks the same everywhere.
  *
- * Generalised from the old Renova-only HolographicCard. Every colour comes
+ * Generalised from the old single-business HolographicCard. Every colour comes
  * from the colourway (lib/vouchers/model colourways); the type is the page's
  * own (inherit), so on a client site it is set in the site's typeface.
  *

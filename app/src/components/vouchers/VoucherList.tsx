@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Search, Ticket } from "lucide-react";
-import type { Therapy, Voucher } from "@/lib/db/schema";
+import type { Therapy } from "@/lib/db/schema";
+import type { VoucherRow } from "@/lib/vouchers/store";
+import { deliveryStatus } from "@/lib/vouchers/model";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -12,7 +14,7 @@ import { useVocab } from "@/components/providers/VocabProvider";
 import { formatDate, formatEur } from "@/lib/utils";
 
 interface Props {
-  vouchers: Voucher[];
+  vouchers: VoucherRow[];
   therapyMap: Map<number, Therapy>;
 }
 
@@ -30,6 +32,8 @@ export function VoucherList({ vouchers, therapyMap }: Props) {
         v.purchaserName,
         v.purchaserEmail ?? "",
         v.recipientName ?? "",
+        v.order?.buyerName ?? "",
+        v.order?.recipientEmail ?? "",
       ]
         .join(" ")
         .toLowerCase()
@@ -116,7 +120,10 @@ export function VoucherList({ vouchers, therapyMap }: Props) {
                 const empty = balance <= 0.01;
                 const partiallyUsed =
                   balance > 0.01 && balance < v.valueEur - 0.01;
-                const redeemable = !empty && !expired;
+                const cancelled = v.cancelledAt != null;
+                // Past its date is a warning, not a refusal: staff may still take it.
+                const redeemable = !empty && !cancelled;
+                const delivery = v.order ? deliveryStatus(v.order) : null;
                 return (
                   <tr key={v.id}>
                     <td
@@ -126,10 +133,17 @@ export function VoucherList({ vouchers, therapyMap }: Props) {
                         textTransform: "uppercase",
                       }}
                     >
-                      {v.code}
+                      <Link href={`/vouchers/${encodeURIComponent(v.code)}`} style={{ color: "var(--text-primary)" }}>
+                        {v.code}
+                      </Link>
                     </td>
                     <td style={td}>
-                      <div>{v.purchaserName}</div>
+                      <div>{v.order?.buyerName ?? v.purchaserName}</div>
+                      {v.source === "online" && (
+                        <div style={{ marginTop: 4 }}>
+                          <Badge tone="info">Bought online</Badge>
+                        </div>
+                      )}
                       {v.purchaserEmail && (
                         <div
                           style={{
@@ -142,7 +156,14 @@ export function VoucherList({ vouchers, therapyMap }: Props) {
                         </div>
                       )}
                     </td>
-                    <td style={td}>{v.recipientName ?? "—"}</td>
+                    <td style={td}>
+                      <div>{v.recipientName ?? "—"}</div>
+                      {delivery && (
+                        <div style={{ marginTop: 4 }}>
+                          <Badge tone={delivery.tone}>{delivery.label}</Badge>
+                        </div>
+                      )}
+                    </td>
                     <td style={td}>
                       {t ? (
                         <Badge colour={t.colourHex}>{t.name}</Badge>
@@ -166,7 +187,9 @@ export function VoucherList({ vouchers, therapyMap }: Props) {
                     </td>
                     <td style={td}>{formatDate(v.expiryDate)}</td>
                     <td style={td}>
-                      {empty ? (
+                      {cancelled ? (
+                        <Badge tone="red">Cancelled</Badge>
+                      ) : empty ? (
                         <Badge tone="green">Redeemed</Badge>
                       ) : expired ? (
                         <Badge tone="red">Expired</Badge>
