@@ -105,6 +105,11 @@ async function main() {
     }
     const staff = middleware(new NextRequest("https://app.adonisagent.ie/vouchers/store", { headers: { host: "app.adonisagent.ie" } }));
     assert.equal(staff.headers.get("location"), "https://app.adonisagent.ie/login", "on the app host /vouchers is still the signed-in staff page");
+    for (const host of ["www.example-client.ie", "app.adonisagent.ie"]) {
+      const res = middleware(new NextRequest(`https://${host}/api/vouchers/SOME-CODE`, { headers: { host } }));
+      assert.equal(res.headers.get("location"), `https://${host}/login`, `${host}: the staff voucher API is not public (no session goes to login)`);
+      assert.equal(res.headers.get("x-middleware-rewrite"), null, `${host}: the staff voucher API is not rewritten into the site`);
+    }
   }
   console.log("middleware: mapped-domain rewrite and public-route checks passed.");
 }

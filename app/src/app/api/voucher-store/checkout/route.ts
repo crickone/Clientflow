@@ -16,12 +16,14 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const rl = rateLimit(`voucher-checkout:${clientIp(req)}`, 20, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ ok: false, error: "Too many tries. Please wait a minute." }, { status: 429 });
-  let body: { token?: unknown; order?: unknown };
+  let parsed: unknown;
   try {
-    body = await req.json();
+    parsed = await req.json();
   } catch {
     return NextResponse.json({ ok: false, error: "Bad request." }, { status: 400 });
   }
+  if (typeof parsed !== "object" || parsed === null) return NextResponse.json({ ok: false, error: "Bad request." }, { status: 400 });
+  const body = parsed as { token?: unknown; order?: unknown };
   const claim = verifyVoucherStoreToken(String(body.token ?? ""));
   if (!claim) return NextResponse.json({ ok: false, error: "This page is out of date. Please refresh and try again." }, { status: 400 });
   const r = await startVoucherCheckout(claim, parseOrderDraft(body.order));

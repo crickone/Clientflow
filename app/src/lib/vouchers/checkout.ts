@@ -89,7 +89,7 @@ export async function startVoucherCheckout(claim: VoucherStoreClaim, draft: Orde
       `voucher-order-${claim.tenantId}-${order.id}`,
     );
     if (!r.ok || !r.data.url) {
-      setVoucherOrderStatus(order.id, "failed");
+      setVoucherOrderStatus(order.id, "failed", ["pending"]);
       console.error("[vouchers] checkout failed", r.ok ? "no url" : r.error);
       return { ok: false, error: "Payments aren't working right now. Nothing was charged. Please try again shortly." };
     }

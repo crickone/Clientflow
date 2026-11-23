@@ -125,6 +125,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
     assert.ok(r.ok);
     assert.equal(calls[1]!.body.get("line_items[0][price_data][unit_amount]"), "8000");
     assert.equal(calls[1]!.body.get("line_items[0][price_data][product_data][name]"), "Gift voucher: Swedish massage");
+    assert.ok(![...calls[1]!.body.keys()].some((k) => k.includes("application_fee")), "treatment: no platform fee");
 
     // Stripe failing: the order is marked failed and the buyer is told nothing was charged.
     stripeFails = true;
@@ -134,10 +135,15 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
     assert.equal(failed.length, 1);
     stripeFails = false;
 
-    // The flag off for this business: nothing opens.
+    // The flag off for this business: refused with the flag's message, no Stripe
+    // call, no new order row.
+    const callsBefore = calls.length;
+    const ordersBefore = orders().length;
     controlSqlite.prepare("UPDATE platform_flags SET allow = '[]' WHERE key = 'voucher_store'").run();
     r = await startVoucherCheckout(claim, draft);
-    assert.ok(!r.ok);
+    assert.deepEqual(r, { ok: false, error: "Gift vouchers aren't on sale online yet." }, "flag off: the refusal says the store is not on sale");
+    assert.equal(calls.length, callsBefore, "flag off: no new Stripe call");
+    assert.equal(orders().length, ordersBefore, "flag off: no new voucher_orders row");
   });
 
   console.log("vouchers checkout: token, order, Stripe call, refusals; all passed");
