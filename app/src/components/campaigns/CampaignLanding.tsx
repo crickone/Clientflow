@@ -71,7 +71,7 @@ export function CampaignLanding({ body, business, logoSrc, siteHead, theme, phot
   const run = runLine(dates);
   const [hero, ...more] = photos;
   const strip = more.slice(0, 3);
-  const useBy = selling && offers.every((o) => o.useByDate === offers[0].useByDate) ? dayMonth(offers[0].useByDate) : null;
+  const useBy = selling && offers.every((o) => !o.useWithinDays && o.useByDate === offers[0].useByDate) ? dayMonth(offers[0].useByDate) : null;
   const cta = selling ? { href: "#offer", label: body.ctaLabel.trim() || "See prices" } : { href: "#ask", label: "Get in touch" };
   const contact = [telHref && phone ? `call ${phone}` : "", email ? `email ${email}` : ""].filter(Boolean).join(" or ");
 

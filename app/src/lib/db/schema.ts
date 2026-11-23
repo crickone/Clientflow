@@ -3586,6 +3586,7 @@ export const offers = sqliteTable("offers", {
   saleStartsAt: integer("sale_starts_at"),
   saleEndsAt: integer("sale_ends_at"),
   useByDate: text("use_by_date").notNull(),
+  useWithinDays: integer("use_within_days"),
   terms: text("terms"),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at").notNull(),

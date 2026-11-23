@@ -301,6 +301,7 @@ function resolveCampaignLanding(
           compareAtCents: o.compareAtCents,
           items: o.items.map((i) => ({ name: i.name, sessions: i.sessions, durationMinutes: i.durationMinutes })),
           useByDate: o.useByDate,
+          useWithinDays: o.useWithinDays,
           saleEndsAt: o.saleEndsAt,
           terms: o.terms,
           state: o.state,

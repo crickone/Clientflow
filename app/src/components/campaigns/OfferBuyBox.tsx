@@ -5,7 +5,7 @@ import { Lock } from "lucide-react";
 
 import { readArrival } from "@/components/cms/arrivalClient";
 
-import { formatEur, savingLabel, type OfferState } from "@/lib/offers/model";
+import { formatEur, savingLabel, useByLabel, type OfferState } from "@/lib/offers/model";
 
 export interface LandingOffer {
   id: number;
@@ -14,6 +14,7 @@ export interface LandingOffer {
   compareAtCents: number | null;
   items: { name: string; sessions: number; durationMinutes: number }[];
   useByDate: string;
+  useWithinDays: number | null;
   saleEndsAt: number | null;
   terms: string | null;
   state: OfferState;
@@ -55,10 +56,6 @@ export async function goToCheckout(token: string, offer?: { title: string; price
   }
 }
 
-function useByLabel(date: string) {
-  return new Date(`${date}T12:00:00Z`).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-}
-
 function longDate(ms: number) {
   return new Date(ms).toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Dublin" });
 }
@@ -69,7 +66,6 @@ export function OfferBuyBox({ offer }: { offer: LandingOffer }) {
   const [error, setError] = useState<string | null>(null);
   const saving = savingLabel(offer.priceCents, offer.compareAtCents);
   const open = offer.state === "live" && offer.checkoutToken;
-  const useBy = new Date(`${offer.useByDate}T12:00:00Z`).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
   async function buy() {
     if (!offer.checkoutToken) return;
@@ -103,7 +99,7 @@ export function OfferBuyBox({ offer }: { offer: LandingOffer }) {
         ))}
       </ul>
       <div className="ob-facts">
-        <span>Use by {useBy}</span>
+        <span>{useByLabel(offer)}</span>
         {offer.saleEndsAt !== null && offer.state === "live" && <span>Offer ends {longDate(offer.saleEndsAt)}</span>}
         {offer.left !== null && offer.state === "live" && offer.left <= 20 && <span>{offer.left} left</span>}
       </div>
@@ -138,7 +134,7 @@ export function OfferMenu({ offers }: { offers: LandingOffer[] }) {
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<{ id: number; text: string } | null>(null);
   const same = <T,>(f: (o: LandingOffer) => T) => offers.every((o) => f(o) === f(offers[0]));
-  const shared = { useBy: same((o) => o.useByDate), ends: same((o) => o.saleEndsAt), terms: same((o) => o.terms) };
+  const shared = { useBy: same((o) => useByLabel(o)), ends: same((o) => o.saleEndsAt), terms: same((o) => o.terms) };
   const first = offers[0];
   const anyLive = offers.some((o) => o.state === "live" && o.checkoutToken);
 
@@ -165,7 +161,7 @@ export function OfferMenu({ offers }: { offers: LandingOffer[] }) {
                 <span className="om-name">{item ? `${item.sessions > 1 ? `${item.sessions} x ` : ""}${item.name.replace(/\s*\(\d+\s*min\)\s*$/i, "")}` : o.title}</span>
                 <span className="om-meta">
                   {item?.durationMinutes ? `${item.durationMinutes} min` : o.items.map((i) => `${i.sessions} x ${i.name}`).join(", ")}
-                  {!shared.useBy && ` · use by ${useByLabel(o.useByDate)}`}
+                  {!shared.useBy && ` · ${useByLabel(o).replace(/^Use/, "use")}`}
                   {o.left !== null && o.state === "live" && o.left <= 10 && ` · ${o.left} left`}
                 </span>
               </div>
@@ -190,7 +186,7 @@ export function OfferMenu({ offers }: { offers: LandingOffer[] }) {
         })}
       </ul>
       <div className="ob-facts">
-        {shared.useBy && <span>Use by {useByLabel(first.useByDate)}</span>}
+        {shared.useBy && <span>{useByLabel(first)}</span>}
         {shared.ends && first.saleEndsAt !== null && anyLive && <span>Offer ends {longDate(first.saleEndsAt)}</span>}
       </div>
       {anyLive && (

@@ -87,7 +87,41 @@ export interface OfferInput {
   saleStartsAt: number | null;
   saleEndsAt: number | null;
   useByDate: string;
+  /** Optional: each buyer has this many days from buying; useByDate stays the latest date. */
+  useWithinDays?: number | null;
   terms: string | null;
+}
+
+/** The slice of an offer the expiry and its wording depend on. */
+export interface UseByFields {
+  useByDate: string;
+  useWithinDays?: number | null;
+}
+
+const DUBLIN_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Dublin", year: "numeric", month: "2-digit", day: "2-digit" });
+
+/**
+ * The date (YYYY-MM-DD) a buyer's sessions run out: the earlier of
+ * (purchase day in Europe/Dublin + useWithinDays) and the offer's useByDate.
+ * Without useWithinDays it is just useByDate.
+ */
+export function expiryFor(offer: UseByFields, paidAtMs: number): string {
+  const days = offer.useWithinDays;
+  if (!days) return offer.useByDate;
+  const [y, m, d] = DUBLIN_DAY.format(new Date(paidAtMs)).split("-").map(Number);
+  const target = new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+  return target < offer.useByDate ? target : offer.useByDate;
+}
+
+/** "Use within 14 days of buying" when set, else "Use by 1 March 2027". */
+export function useByLabel(offer: UseByFields): string {
+  if (offer.useWithinDays) return `Use within ${offer.useWithinDays} ${offer.useWithinDays === 1 ? "day" : "days"} of buying`;
+  return `Use by ${formatUseByDate(offer.useByDate)}`;
+}
+
+/** YYYY-MM-DD as "1 March 2027". */
+export function formatUseByDate(date: string): string {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 }
 
 /** Euro text ("49", "49.50", "€49,50") to cents; null if it isn't a price. */
@@ -117,11 +151,15 @@ export function validateOffer(input: OfferInput): { ok: true; value: OfferInput 
     return { ok: false, error: "The sale has to end after it starts." };
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.useByDate)) return { ok: false, error: "Pick the date the sessions must be used by." };
+  const within = input.useWithinDays ?? null;
+  if (within !== null && (!Number.isInteger(within) || within < 1 || within > 365)) {
+    return { ok: false, error: "Use within has to be a whole number of days between 1 and 365, or left blank." };
+  }
   const terms = input.terms?.trim() || null;
   if (terms && terms.length > 1000) return { ok: false, error: "Keep the terms under 1,000 characters." };
   const description = input.description?.trim() || null;
   if (description && description.length > 500) return { ok: false, error: "Keep the description under 500 characters." };
-  return { ok: true, value: { ...input, title, terms, description } };
+  return { ok: true, value: { ...input, useWithinDays: within, title, terms, description } };
 }
 
 /** A percentage off a price, to the cent; never below Stripe's 50c floor. */

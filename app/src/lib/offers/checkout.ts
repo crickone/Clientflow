@@ -3,7 +3,7 @@ import "server-only";
 import { runWithTenant } from "@/lib/db/tenant";
 import { createCheckoutSession } from "@/lib/stripe/api";
 import { canTakePayments, getStripeConnection } from "@/lib/stripe/connection";
-import { formatEur } from "./model";
+import { formatEur, useByLabel } from "./model";
 import { createPendingOrder, getOffer, setOrderSession, setOrderStatus } from "./store";
 import type { Arrival } from "@/lib/arrival";
 import type { CheckoutClaim } from "./checkoutToken";
@@ -45,8 +45,7 @@ export async function startCheckout(
       });
     }
     const includes = offer.items.map((i) => `${i.sessions} x ${i.name}`).join(", ");
-    const useBy = new Date(`${offer.useByDate}T12:00:00Z`).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-    const termsLine = [`Use by ${useBy}.`, offer.terms ?? ""].join(" ").trim().slice(0, 1000);
+    const termsLine = [`${useByLabel(offer)}.`, offer.terms ?? ""].join(" ").trim().slice(0, 1000);
     const sep = claim.returnUrl.includes("?") ? "&" : "?";
     const meta = { tenant_id: String(claim.tenantId), offer_id: String(offer.id), order_id: String(order.id) };
 

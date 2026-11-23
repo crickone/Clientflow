@@ -3,12 +3,8 @@
 import { useState } from "react";
 import { Lock } from "lucide-react";
 
-import { formatEur } from "@/lib/offers/model";
+import { formatEur, useByLabel } from "@/lib/offers/model";
 import { CLOSED, goToCheckout, type LandingOffer } from "./OfferBuyBox";
-
-function formatUseBy(date: string) {
-  return new Date(`${date}T12:00:00Z`).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-}
 
 function ends(ms: number) {
   return new Date(ms).toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Dublin" });
@@ -62,7 +58,7 @@ export function LandingOfferMenu({ offers }: { offers: LandingOffer[] }) {
               <div>
                 <span className="cl-item-name">{name}</span>
                 {meta && <span className="cl-item-meta">{meta}</span>}
-                {!same((x) => x.useByDate) && <span className="cl-item-meta">Use by {formatUseBy(o.useByDate)}</span>}
+                {!same((x) => useByLabel(x)) && <span className="cl-item-meta">{useByLabel(o)}</span>}
               </div>
               <div className="cl-price">
                 {o.compareAtCents !== null && o.compareAtCents > o.priceCents && (
@@ -90,7 +86,7 @@ export function LandingOfferMenu({ offers }: { offers: LandingOffer[] }) {
         })}
       </ul>
       <div className="cl-facts">
-        {same((o) => o.useByDate) && <span>Use by {formatUseBy(first.useByDate)}</span>}
+        {same((o) => useByLabel(o)) && <span>{useByLabel(first)}</span>}
         {same((o) => o.saleEndsAt) && first.saleEndsAt !== null && anyLive && <span>Offer ends {ends(first.saleEndsAt)}</span>}
         {anyLive && (
           <span>

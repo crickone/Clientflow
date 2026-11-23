@@ -92,6 +92,7 @@ export interface OfferFormInput {
   saleStartsAt: number | null;
   saleEndsAt: number | null;
   useByDate: string;
+  useWithinDays: string;
   terms: string;
 }
 
@@ -104,6 +105,7 @@ export async function saveOfferAction(campaignId: number, input: OfferFormInput)
   const compareRaw = String(input.compareAt ?? "").trim();
   const compareAtCents = compareRaw ? parseEuroToCents(compareRaw) : null;
   if (compareRaw && compareAtCents === null) return { ok: false, error: "The usual price isn't a price. Use e.g. 160, or leave it blank." };
+  const withinRaw = String(input.useWithinDays ?? "").trim();
   const limitRaw = String(input.quantityLimit ?? "").trim();
   const quantityLimit = limitRaw ? Number(limitRaw) : null;
   const items = (Array.isArray(input.items) ? input.items : []).map((i) => ({ therapyId: Number(i.therapyId), sessions: Number(i.sessions) }));
@@ -119,6 +121,7 @@ export async function saveOfferAction(campaignId: number, input: OfferFormInput)
     saleStartsAt: Number.isFinite(input.saleStartsAt) ? input.saleStartsAt : null,
     saleEndsAt: Number.isFinite(input.saleEndsAt) ? input.saleEndsAt : null,
     useByDate: String(input.useByDate ?? ""),
+    useWithinDays: withinRaw ? Number(withinRaw) : null,
     terms: String(input.terms ?? ""),
   });
   if (!v.ok) return v;
@@ -150,6 +153,7 @@ export interface DiscountOffersInput {
   saleStartsAt: number | null;
   saleEndsAt: number | null;
   useByDate: string;
+  useWithinDays: string;
   terms: string;
 }
 
@@ -171,6 +175,7 @@ export async function createDiscountOffersAction(campaignId: number, input: Disc
   const services = db.select().from(therapies).where(eq(therapies.isActive, true)).all().filter((t) => ids.includes(t.id));
   if (services.length !== ids.length) return { ok: false, error: "One of those services isn't available any more." };
   const limitRaw = String(input.quantityLimit ?? "").trim();
+  const withinRaw = String(input.useWithinDays ?? "").trim();
   const prefix = String(input.titlePrefix ?? "").trim().slice(0, 40);
 
   const prepared = [];
@@ -186,6 +191,7 @@ export async function createDiscountOffersAction(campaignId: number, input: Disc
       saleStartsAt: Number.isFinite(input.saleStartsAt) ? input.saleStartsAt : null,
       saleEndsAt: Number.isFinite(input.saleEndsAt) ? input.saleEndsAt : null,
       useByDate: String(input.useByDate ?? ""),
+      useWithinDays: withinRaw ? Number(withinRaw) : null,
       terms: String(input.terms ?? ""),
     });
     if (!v.ok) return { ok: false, error: `${t.name}: ${v.error}` };

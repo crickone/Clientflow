@@ -317,6 +317,7 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
                 saleStartsAt: offer.saleStartsAt,
                 saleEndsAt: offer.saleEndsAt,
                 useByDate: offer.useByDate,
+                useWithinDays: offer.useWithinDays,
                 terms: offer.terms,
                 isActive: offer.isActive,
                 state: offer.state,

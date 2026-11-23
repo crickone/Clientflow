@@ -103,6 +103,7 @@ export function saveOffer(id: number | null, campaignId: number, input: OfferInp
     saleStartsAt: input.saleStartsAt,
     saleEndsAt: input.saleEndsAt,
     useByDate: input.useByDate,
+    useWithinDays: input.useWithinDays ?? null,
     terms: input.terms,
     updatedAt: now,
   };

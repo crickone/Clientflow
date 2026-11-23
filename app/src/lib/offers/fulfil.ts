@@ -18,7 +18,7 @@ import { renderEmailShell, sendEmailForTenant, textToParagraphs } from "@/lib/em
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { getThemeForTenant } from "@/lib/settings";
 import type { CheckoutSession } from "@/lib/stripe/api";
-import { formatEur, splitPrice } from "./model";
+import { expiryFor, formatEur, formatUseByDate, splitPrice } from "./model";
 import { getOffer, getOrder, orderForPaymentIntent, orderForSession, setOrderStatus } from "./store";
 
 /**
@@ -77,7 +77,8 @@ export async function fulfilCheckout(
       db.update(clients).set({ phone, updatedAt: new Date() }).where(eq(clients.id, client.id)).run();
     }
 
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Dublin" });
+    const paidAtMs = Date.now();
+    const today = new Date(paidAtMs).toLocaleDateString("en-CA", { timeZone: "Europe/Dublin" });
     const packageIds: number[] = [];
     if (offer) {
       const shares = splitPrice(order.amountCents, offer.items.map((i) => i.defaultPriceEur * i.sessions));
@@ -93,7 +94,7 @@ export async function fulfilCheckout(
             totalSessions: item.sessions,
             pricePaidEur: shares[idx] / 100,
             purchaseDate: today,
-            expiryDate: offer.useByDate,
+            expiryDate: expiryFor(offer, paidAtMs),
             notes: `Bought online (Stripe ${session.payment_intent ?? session.id}).`,
           })
           .returning({ id: packages.id })
@@ -158,7 +159,7 @@ export async function fulfilCheckout(
     await logActivity("offer_sale", `${fullName || email || "Someone"} bought ${offer?.title ?? "an offer"} online (${formatEur(order.amountCents)})`, { orderId: order.id, clientId: client.id });
 
     if (email && offer) {
-      void sendConfirmation(tenantId, email, firstName || fullName || "", offer.title, offer.items, offer.useByDate, order.amountCents).catch((err) =>
+      void sendConfirmation(tenantId, email, firstName || fullName || "", offer.title, offer.items, expiryFor(offer, paidAtMs), order.amountCents).catch((err) =>
         console.error("[offers] confirmation email failed", err),
       );
     }
@@ -237,12 +238,12 @@ async function sendConfirmation(
   firstName: string,
   title: string,
   items: { sessions: number; name: string }[],
-  useByDate: string,
+  expiry: string,
   amountCents: number,
 ) {
   const business = getBusinessProfileForTenant(tenantId);
   const accent = getThemeForTenant(tenantId).accent;
-  const useBy = new Date(`${useByDate}T12:00:00Z`).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  const useBy = formatUseByDate(expiry);
   const list = items.map((i) => `<li style="margin:0 0 4px;">${i.sessions} x ${escapeHtml(i.name)}</li>`).join("");
   const contact = [business.phone && `call ${escapeHtml(business.phone)}`, business.email && `email ${escapeHtml(business.email)}`].filter(Boolean).join(" or ");
   const bodyHtml = `

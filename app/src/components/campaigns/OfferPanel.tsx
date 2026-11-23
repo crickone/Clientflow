@@ -18,7 +18,7 @@ import {
   setAllOffersOnSaleAction,
   setOfferOnSaleAction,
 } from "@/app/marketing/campaigns/actions";
-import { discountedCents, formatEur, OFFER_STATE_LABEL, type OfferState } from "@/lib/offers/model";
+import { discountedCents, formatEur, OFFER_STATE_LABEL, useByLabel, type OfferState } from "@/lib/offers/model";
 
 export interface OfferPanelOffer {
   id: number;
@@ -31,6 +31,7 @@ export interface OfferPanelOffer {
   saleStartsAt: number | null;
   saleEndsAt: number | null;
   useByDate: string;
+  useWithinDays: number | null;
   terms: string | null;
   isActive: boolean;
   state: OfferState;
@@ -115,7 +116,7 @@ export function OfferPanel({
   const shared = {
     starts: same(offers.map((o) => o.saleStartsAt)),
     ends: same(offers.map((o) => o.saleEndsAt)),
-    useBy: same(offers.map((o) => o.useByDate)),
+    useBy: same(offers.map((o) => useByLabel(o))),
   };
   const first = offers[0];
 
@@ -183,7 +184,7 @@ export function OfferPanel({
                 </div>
                 <div>
                   <dt>Use by</dt>
-                  <dd>{shared.useBy ? longDate(first.useByDate) : "Varies"}</dd>
+                  <dd>{shared.useBy ? (first.useWithinDays ? `${first.useWithinDays} days after buying, by ${longDate(first.useByDate)} at the latest` : longDate(first.useByDate)) : "Varies"}</dd>
                 </div>
               </dl>
               <Button variant="secondary" size="sm" onClick={() => setScheduling(true)}>
@@ -311,7 +312,7 @@ function rowMeta(o: OfferPanelOffer, nameOf: (id: number) => string, shared: { s
   else if (o.sold) parts.push(`${o.sold} sold`);
   if (!shared.starts && o.saleStartsAt) parts.push(`from ${shortDateTime(o.saleStartsAt)}`);
   if (!shared.ends && o.saleEndsAt) parts.push(`until ${shortDateTime(o.saleEndsAt)}`);
-  if (!shared.useBy) parts.push(`use by ${longDate(o.useByDate)}`);
+  if (!shared.useBy) parts.push(useByLabel(o).replace(/^Use/, "use"));
   return parts.join(" · ");
 }
 
@@ -333,18 +334,19 @@ function SaleFields({
   v,
   set,
 }: {
-  v: { quantityLimit: string; saleStartsAt: string; saleEndsAt: string; useByDate: string; terms: string };
-  set: (k: "quantityLimit" | "saleStartsAt" | "saleEndsAt" | "useByDate" | "terms", value: string) => void;
+  v: { quantityLimit: string; saleStartsAt: string; saleEndsAt: string; useByDate: string; useWithinDays: string; terms: string };
+  set: (k: "quantityLimit" | "saleStartsAt" | "saleEndsAt" | "useByDate" | "useWithinDays" | "terms", value: string) => void;
 }) {
   return (
     <>
       <label className="op-field">
-        <span>How many for sale (optional)</span>
-        <input inputMode="numeric" value={v.quantityLimit} onChange={(e) => set("quantityLimit", e.target.value.replace(/\D/g, ""))} placeholder="No limit" />
-      </label>
-      <label className="op-field">
         <span>Sessions must be used by</span>
         <input type="date" value={v.useByDate} onChange={(e) => set("useByDate", e.target.value)} />
+      </label>
+      <label className="op-field">
+        <span>Or use within (days of buying)</span>
+        <input inputMode="numeric" value={v.useWithinDays} onChange={(e) => set("useWithinDays", e.target.value.replace(/\D/g, ""))} placeholder="e.g. 14" />
+        <small>Leave empty to use the date only. The date above is still the latest.</small>
       </label>
       <label className="op-field">
         <span>Sale starts (optional)</span>
@@ -353,6 +355,10 @@ function SaleFields({
       <label className="op-field">
         <span>Sale ends (optional)</span>
         <input type="datetime-local" value={v.saleEndsAt} onChange={(e) => set("saleEndsAt", e.target.value)} />
+      </label>
+      <label className="op-field">
+        <span>How many for sale (optional)</span>
+        <input inputMode="numeric" value={v.quantityLimit} onChange={(e) => set("quantityLimit", e.target.value.replace(/\D/g, ""))} placeholder="No limit" />
       </label>
       <label className="op-field op-wide">
         <span>Terms (shown under the Buy button and on the payment page)</span>
@@ -375,7 +381,7 @@ function DiscountForm({ campaignId, services, onDone }: { campaignId: number; se
   const [pct, setPct] = useState("20");
   const [prefix, setPrefix] = useState("Black Friday");
   const [sessions, setSessions] = useState(1);
-  const [v, setV] = useState({ quantityLimit: "", saleStartsAt: "", saleEndsAt: "", useByDate: "", terms: "" });
+  const [v, setV] = useState({ quantityLimit: "", saleStartsAt: "", saleEndsAt: "", useByDate: "", useWithinDays: "", terms: "" });
   const pctNum = Number(pct);
   const preview = useMemo(
     () =>
@@ -399,6 +405,7 @@ function DiscountForm({ campaignId, services, onDone }: { campaignId: number; se
         saleStartsAt: fromLocalInput(v.saleStartsAt),
         saleEndsAt: fromLocalInput(v.saleEndsAt),
         useByDate: v.useByDate,
+        useWithinDays: v.useWithinDays,
         terms: v.terms,
       });
       if (!r.ok) return void toast.error(r.error);
@@ -485,6 +492,7 @@ function OfferForm({ campaignId, offer, services, onDone }: { campaignId: number
     saleStartsAt: toLocalInput(offer?.saleStartsAt ?? null),
     saleEndsAt: toLocalInput(offer?.saleEndsAt ?? null),
     useByDate: offer?.useByDate ?? "",
+    useWithinDays: offer?.useWithinDays ? String(offer.useWithinDays) : "",
     terms: offer?.terms ?? "",
   }));
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
@@ -503,6 +511,7 @@ function OfferForm({ campaignId, offer, services, onDone }: { campaignId: number
         saleStartsAt: fromLocalInput(f.saleStartsAt),
         saleEndsAt: fromLocalInput(f.saleEndsAt),
         useByDate: f.useByDate,
+        useWithinDays: f.useWithinDays,
         terms: f.terms,
       });
       if (!r.ok) return void toast.error(r.error);

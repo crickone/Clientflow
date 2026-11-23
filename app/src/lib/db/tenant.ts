@@ -1721,6 +1721,17 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] campaigns ad_spend_cents migration failed:", err);
   }
 
+  // Offers can say "use within N days of buying" (lib/offers/model.ts expiryFor).
+  // The offers CREATE only applies to fresh installs, so add the column here.
+  try {
+    const offerCols = sqlite.prepare("PRAGMA table_info(offers)").all() as Array<{ name: string }>;
+    if (offerCols.length > 0 && !offerCols.some((c) => c.name === "use_within_days")) {
+      sqlite.exec("ALTER TABLE offers ADD COLUMN use_within_days INTEGER");
+    }
+  } catch (err) {
+    console.error("[db] offers use_within_days migration failed:", err);
+  }
+
   // Ad-only offers: when set, a campaign's offers show only to visitors who
   // arrive with ?k=<key> (the link used in the ads). See lib/offers/access.ts.
   try {
@@ -2892,6 +2903,7 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       sale_starts_at INTEGER,
       sale_ends_at INTEGER,
       use_by_date TEXT NOT NULL,
+      use_within_days INTEGER,
       terms TEXT,
       is_active INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
