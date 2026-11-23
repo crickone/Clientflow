@@ -324,7 +324,8 @@ export function splitPayment(
     // too: the booking price is never a stand-in for it.
     if (balance <= 0) return { voucherEur: 0, remainderEur: price / 100, redemptionEur: 0 };
     const covers = Math.min(price, cents(treatmentPriceEur));
-    return { voucherEur: covers / 100, remainderEur: (price - covers) / 100, redemptionEur: balance / 100 };
+    // Used up only when it actually pays for something.
+    return { voucherEur: covers / 100, remainderEur: (price - covers) / 100, redemptionEur: covers > 0 ? balance / 100 : 0 };
   }
   const covers = Math.min(price, balance);
   return { voucherEur: covers / 100, remainderEur: (price - covers) / 100, redemptionEur: covers / 100 };

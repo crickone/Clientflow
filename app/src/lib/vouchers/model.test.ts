@@ -120,7 +120,7 @@ assert.deepEqual(splitPayment({ kind: "treatment", balanceEur: 70 }, 110, 80), {
 const zero = { voucherEur: 0, remainderEur: 0, redemptionEur: 0 };
 assert.deepEqual(splitPayment({ kind: "treatment", balanceEur: 0 }, 80, 80), { ...zero, remainderEur: 80 }, "a used-up treatment voucher covers nothing");
 assert.deepEqual(splitPayment({ kind: "treatment", balanceEur: -5 }, 80, 80), { ...zero, remainderEur: 80 }, "a negative balance covers nothing");
-assert.deepEqual(splitPayment({ kind: "treatment", balanceEur: 70 }, 80), { voucherEur: 0, remainderEur: 80, redemptionEur: 70 }, "no treatment price: covers 0, never the booking price");
+assert.deepEqual(splitPayment({ kind: "treatment", balanceEur: 70 }, 80), { voucherEur: 0, remainderEur: 80, redemptionEur: 0 }, "no treatment price: covers 0, never the booking price, and is not used up");
 assert.deepEqual(splitPayment({ kind: "treatment", balanceEur: 70 }, 50, 80), { voucherEur: 50, remainderEur: 0, redemptionEur: 70 }, "never covers more than the booking price");
 assert.deepEqual(splitPayment({ kind: "amount", balanceEur: 0 }, 80), { ...zero, remainderEur: 80 }, "an empty money voucher covers nothing");
 for (const [bal, price] of [[20, 80], [80, 20], [50, 50], [0, 10], [Number.NaN, 30], [30, Number.NaN], [Infinity, 30]] as const) {
