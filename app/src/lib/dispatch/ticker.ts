@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { controlDb } from "@/lib/db/control";
 import { getTenantDbById, runWithTenant } from "@/lib/db/tenant";
+import { fillMissingDmNamesIfStale } from "@/lib/social/dm";
 import { tenants } from "@/lib/db/schema";
 import { getAppBaseUrl } from "@/lib/appUrl";
 import { dispatchDueEmailCampaigns } from "@/lib/marketing/schedule";
@@ -125,6 +126,13 @@ async function runTenant(tenantId: number, baseUrl: string, summary: DispatchSum
       await dispatchDueBroadcasts(tenantId);
     } catch (err) {
       console.error(`[dispatch] tenant ${tenantId} whatsapp broadcasts failed:`, err);
+    }
+    // Messenger leads that arrived without a name: look it up again, at most
+    // every six hours (a no-op once every lead has one).
+    try {
+      await fillMissingDmNamesIfStale(tenantId);
+    } catch (err) {
+      console.error(`[dispatch] tenant ${tenantId} dm names failed:`, err);
     }
     // Lead scores from Jev: new or changed leads, and a daily refresh (a no-op
     // without AI_GATEWAY_API_KEY).

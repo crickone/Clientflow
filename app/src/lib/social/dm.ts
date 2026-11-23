@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { socialContacts } from "@/lib/db/schema";
@@ -11,6 +11,7 @@ import { getPageTokenForTenant } from "@/lib/facebook/pages";
 import type { MessagingEvent } from "@/lib/facebook/webhook";
 import { addMessage, fillLeadContact, findLeadMessageByProviderId, setLeadStatus, upsertLead } from "@/lib/leads";
 import { hasFormDetails, parseFormDetails } from "./formDetails";
+import { participantName } from "./participant";
 import { addClientMessage, findClientMessageByProviderId } from "@/lib/clientMessages";
 import { splitFullName } from "@/lib/humanName";
 import { logActivity } from "@/lib/queries";
@@ -51,14 +52,27 @@ const CHANNEL_LABEL: Record<DmChannel, string> = { messenger: "Messenger", insta
 async function fetchProfile(
   channel: DmChannel,
   customerId: string,
-  pageToken: string,
+  page: { pageId: string; pageAccessToken: string },
 ): Promise<{ firstName?: string; lastName?: string; name?: string; username?: string }> {
   const fields = channel === "messenger" ? "first_name,last_name" : "name,username";
   try {
-    const res = await fetch(`${GRAPH_BASE}/${encodeURIComponent(customerId)}?` + new URLSearchParams({ fields, access_token: pageToken }));
+    const res = await fetch(`${GRAPH_BASE}/${encodeURIComponent(customerId)}?` + new URLSearchParams({ fields, access_token: page.pageAccessToken }));
+    if (res.ok) {
+      const b = (await res.json()) as { first_name?: string; last_name?: string; name?: string; username?: string };
+      if (b.first_name || b.name || b.username) return { firstName: b.first_name, lastName: b.last_name, name: b.name, username: b.username };
+    }
+  } catch {
+    // fall through to the conversation list
+  }
+  if (channel !== "messenger") return {};
+  try {
+    const res = await fetch(
+      `${GRAPH_BASE}/${encodeURIComponent(page.pageId)}/conversations?` +
+        new URLSearchParams({ platform: "messenger", user_id: customerId, fields: "participants", access_token: page.pageAccessToken }),
+    );
     if (!res.ok) return {};
-    const b = (await res.json()) as { first_name?: string; last_name?: string; name?: string; username?: string };
-    return { firstName: b.first_name, lastName: b.last_name, name: b.name, username: b.username };
+    const name = participantName(await res.json(), customerId);
+    return name ? { name } : {};
   } catch {
     return {};
   }
@@ -95,7 +109,7 @@ export async function recordDmEvent(ev: MessagingEvent, page: { pageId: string; 
   let created = false;
   if (!contact) {
     if (ev.isEcho) return null; // the business wrote first to someone we have never seen: nothing to thread under
-    const profile = await fetchProfile(ev.channel, ev.customerId, page.pageAccessToken);
+    const profile = await fetchProfile(ev.channel, ev.customerId, page);
     const display = profile.name || [profile.firstName, profile.lastName].filter(Boolean).join(" ") || profile.username || null;
     const { lead, created: isNew } = upsertLead({
       source: ev.channel,
@@ -141,7 +155,7 @@ export async function recordDmEvent(ev: MessagingEvent, page: { pageId: string; 
     if (hasFormDetails(form)) fillLeadContact(owner.ownerId, form);
     // The first profile lookup can fail (Meta's name access, a slow API): try again while we still have no name.
     if (!contact.name && !created) {
-      const profile = await fetchProfile(ev.channel, ev.customerId, page.pageAccessToken);
+      const profile = await fetchProfile(ev.channel, ev.customerId, page);
       const display = profile.name || [profile.firstName, profile.lastName].filter(Boolean).join(" ") || profile.username || null;
       if (display) {
         db.update(socialContacts).set({ name: display, username: profile.username ?? contact.username ?? null }).where(eq(socialContacts.id, contact.id)).run();
@@ -236,4 +250,37 @@ export async function sendDm(input: SendDmInput): Promise<{ messageId: number; p
   );
   await logActivity(`${target.channel}.sent`, `${label} reply sent`, input.subjectType === "lead" ? { leadId: input.subjectId } : { clientId: input.subjectId });
   return { messageId: stored.id, providerMessageId: json.message_id, channel: target.channel };
+}
+
+const NAME_FILL_EVERY_MS = 6 * 60 * 60 * 1000;
+const NAME_FILL_BATCH = 25;
+const lastNameFill = new Map<number, number>();
+
+/**
+ * Leads that came in from Messenger or Instagram without a name (the lookup
+ * failed when they first wrote): look the name up again and fill it in. Only
+ * empty names are filled; nothing typed by staff is overwritten. At most every
+ * six hours per business, 25 people a pass. Runs inside the tenant (ticker).
+ */
+export async function fillMissingDmNamesIfStale(tenantId: number, now = Date.now()): Promise<number> {
+  if (now - (lastNameFill.get(tenantId) ?? 0) < NAME_FILL_EVERY_MS) return 0;
+  lastNameFill.set(tenantId, now);
+  const nameless = db
+    .select()
+    .from(socialContacts)
+    .where(and(eq(socialContacts.ownerType, "lead"), isNull(socialContacts.name)))
+    .limit(NAME_FILL_BATCH)
+    .all();
+  let filled = 0;
+  for (const c of nameless) {
+    const token = getPageTokenForTenant(tenantId, c.pageId);
+    if (!token) continue;
+    const profile = await fetchProfile(c.channel as DmChannel, c.externalId, { pageId: c.pageId, pageAccessToken: token });
+    const display = profile.name || [profile.firstName, profile.lastName].filter(Boolean).join(" ") || profile.username || null;
+    if (!display) continue;
+    db.update(socialContacts).set({ name: display, username: profile.username ?? c.username ?? null }).where(eq(socialContacts.id, c.id)).run();
+    const split = profile.firstName ? { firstName: profile.firstName, lastName: profile.lastName ?? null } : splitFullName(profile.name);
+    if (fillLeadContact(c.ownerId, split)) filled++;
+  }
+  return filled;
 }
