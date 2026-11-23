@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import { LaunchProgress } from "@/components/ads/LaunchProgress";
 import { ArrowLeft, ArrowRight, Check, Pencil, Plus, Rocket, Save, Search, Trash2, Upload, X } from "lucide-react";
 import { AdPreview } from "./builder/AdPreview";
 import { AgeRange, BudgetStepper, DateChoice, ObjectiveCards, Segmented } from "./builder/controls";
@@ -353,6 +354,18 @@ export function AdCampaignBuilder({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- save reads the latest spec through closure on each run
   }, [spec, adAccountId]);
 
+  const [launching, setLaunching] = useState(false);
+  // What the launch screen counts: every image Meta is sent, every ad set, every ad.
+  const launchSize = useMemo(() => {
+    const ads = spec.adSets.flatMap((x) => x.ads);
+    const images = new Set(
+      ads.flatMap((a) =>
+        a.creative.source === "library" ? (a.creative.imageAssetIds ?? []).map((id) => `l${id}`) : a.creative.designId ? [`d${a.creative.designId}`] : [],
+      ),
+    ).size;
+    return { images, adSets: spec.adSets.length, ads: ads.length };
+  }, [spec]);
+
   async function onLaunch() {
     const total = totalDailyBudget(spec);
     const ok = await confirm({
@@ -361,11 +374,13 @@ export function AdCampaignBuilder({
       confirmLabel: `Launch at ${money(total, currency)} a day`,
     });
     if (!ok) return;
+    setLaunching(true);
     start(async () => {
       const saved = await save();
-      if (!saved) return;
+      if (!saved) return void setLaunching(false);
       const res = await launchAdCampaignAction(saved);
       if (!res.ok) {
+        setLaunching(false);
         toast.error(res.error);
         router.refresh();
         return;
@@ -557,6 +572,7 @@ export function AdCampaignBuilder({
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
+      {launching && <LaunchProgress images={launchSize.images} adSets={launchSize.adSets} ads={launchSize.ads} />}
       <nav aria-label="Campaign steps" className="adb-steps">
         {STEPS.map((label, n) => (
           <span key={label} style={{ display: "contents" }}>
