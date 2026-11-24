@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getCurrentTenant } from "@/lib/db/tenant";
+import { scheduleRedraft } from "@/lib/inbox/redraft";
 
 import { eq } from "drizzle-orm";
 
@@ -129,6 +131,8 @@ export async function saveOfferAction(campaignId: number, input: OfferFormInput)
   if (input.offerId && (!existing || existing.campaignId !== campaign.id)) return { ok: false, error: "That offer isn't on this campaign." };
   const offerId = saveOffer(existing ? existing.id : null, campaign.id, v.value);
   revalidatePath(`/marketing/campaigns/${campaign.id}`);
+  // Waiting AI drafts should know about the offer as it is now.
+  scheduleRedraft(getCurrentTenant().id);
   return { ok: true, offerId };
 }
 

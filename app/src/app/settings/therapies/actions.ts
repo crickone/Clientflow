@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getCurrentTenant } from "@/lib/db/tenant";
+import { scheduleRedraft } from "@/lib/inbox/redraft";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -64,6 +66,8 @@ export async function updateTherapyAction(id: number, formData: FormData) {
     .where(eq(therapies.id, id))
     .run();
   revalidatePath("/settings/therapies");
+  // Waiting AI drafts quote the old price until they are rewritten.
+  scheduleRedraft(getCurrentTenant().id);
 }
 
 export async function toggleTherapyAction(id: number, isActive: boolean) {
@@ -74,6 +78,7 @@ export async function toggleTherapyAction(id: number, isActive: boolean) {
     .run();
   revalidatePath("/settings/therapies");
   revalidatePath("/appointments/new");
+  scheduleRedraft(getCurrentTenant().id);
 }
 
 /**

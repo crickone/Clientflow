@@ -1,7 +1,7 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 
-import { getBusinessContext } from "@/lib/ai/businessContext";
+import { getCustomerReplyContext } from "@/lib/ai/businessContext";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { CUSTOMER_MESSAGE_RULES, signOffRule } from "@/lib/ai/messageStyle";
 import { MODELS } from "@/lib/ai/client";
@@ -50,7 +50,7 @@ export async function draftEmailReply(input: {
     system: [
       {
         type: "text",
-        text: `${getBusinessContext()}\n\n${RULES}\n\n${CUSTOMER_MESSAGE_RULES}\n${signOffRule(getBusinessProfile().businessName)}`,
+        text: `${getCustomerReplyContext()}\n\n${RULES}\n\n${CUSTOMER_MESSAGE_RULES}\n${signOffRule(getBusinessProfile().businessName)}`,
         cache_control: { type: "ephemeral" },
       },
     ],

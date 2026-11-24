@@ -1,7 +1,7 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Lead, LeadMessage } from "@/lib/db/schema";
-import { getBusinessContext } from "@/lib/ai/businessContext";
+import { getCustomerReplyContext } from "@/lib/ai/businessContext";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { CUSTOMER_MESSAGE_RULES, signOffRule } from "@/lib/ai/messageStyle";
 import { MODELS } from "@/lib/ai/client";
@@ -32,7 +32,7 @@ Output:
  * repeat drafts. It changes only when the business profile/services change.
  */
 function buildSystemPrompt(): string {
-  return `${getBusinessContext()}\n\n${FOLLOWUP_RULES}\n\n${CUSTOMER_MESSAGE_RULES}\n${signOffRule(getBusinessProfile().businessName)}`;
+  return `${getCustomerReplyContext()}\n\n${FOLLOWUP_RULES}\n\n${CUSTOMER_MESSAGE_RULES}\n${signOffRule(getBusinessProfile().businessName)}`;
 }
 
 export interface DraftInput {

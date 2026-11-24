@@ -4,6 +4,7 @@ import { availableTypesFor, mapEnabled } from "@/lib/adonisMap/access";
 import { describeMap } from "@/lib/adonisMap/describe";
 import { getAgent } from "@/lib/agents/registry";
 import { getBusinessContext } from "@/lib/ai/businessContext";
+import { formatCatalog } from "@/lib/ai/businessCatalog";
 import { OUTPUT_STYLE } from "@/lib/ai/responseStyle";
 import { SPECIALISTS } from "./specialists";
 
@@ -62,6 +63,12 @@ export function composeAgentSystem(tenantId: number, key: string): string {
   return [
     base,
     "\n\n=== BUSINESS CONTEXT ===\n" + getBusinessContext(),
+    // Offers, packages, memberships and gift vouchers with today's prices, so
+    // Adonis can answer "what's the Black Friday deal" without guessing.
+    (() => {
+      const catalog = formatCatalog();
+      return catalog ? "\n\n=== WHAT THE BUSINESS SELLS ===\n" + catalog : "";
+    })(),
     mapText,
     skillText,
     menuText,

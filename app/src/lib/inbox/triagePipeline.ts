@@ -36,6 +36,9 @@ export interface RunTriageArgs {
   messageId: number;
   messageText: string;
   channel: string;
+  /** Never auto-send, whatever the confidence: a REWRITE of a waiting draft
+   *  (prices changed) must wait for staff, not go out days after the message. */
+  draftOnly?: boolean;
 }
 
 export interface RunTriageOutcome {
@@ -228,11 +231,12 @@ async function runTriageBound(
     claude: triage,
   });
 
-  const decision = decideAutoReply(
+  const decided = decideAutoReply(
     triage,
     getInboxAiSettings(),
     isBriefComplete(),
   );
+  const decision: AutoReplyDecision = args.draftOnly && decided === "auto_send" ? "draft" : decided;
 
   const triageFields = {
     aiCategory: triage.category,
@@ -296,6 +300,7 @@ async function runTriageBound(
 export async function retriageConversation(
   ownerType: OwnerType,
   ownerId: number,
+  opts: { draftOnly?: boolean } = {},
 ): Promise<RunTriageOutcome | null> {
   const msg =
     ownerType === "lead"
@@ -330,5 +335,6 @@ export async function retriageConversation(
     messageId: msg.id,
     messageText: msg.content,
     channel: msg.channel ?? "whatsapp",
+    draftOnly: opts.draftOnly,
   });
 }

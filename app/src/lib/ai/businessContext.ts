@@ -9,6 +9,7 @@ import { getSettings, getVenueType } from "@/lib/settings";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getPlanBriefing } from "@/lib/marketing/calendarNotes";
 import { signoffRule, type CopyFormat } from "@/lib/ai/signoff";
+import { formatCatalog } from "@/lib/ai/businessCatalog";
 import type { VenueType } from "@/lib/vocabulary";
 
 /**
@@ -213,11 +214,33 @@ export function getInboxBusinessFacts(): string {
     "",
     "Services:",
     formatServices(),
-    "",
-    "Opening hours:",
-    formatOpeningHours(),
   ];
+  const catalog = formatCatalog();
+  if (catalog) parts.push("", catalog);
+  parts.push("", "Opening hours:", formatOpeningHours());
   if (p.brief.trim()) parts.push("", "About the business:", p.brief.trim());
+  if (p.policies.trim()) parts.push("", "Policies:", p.policies.trim());
+  const faqs = (p.faqs ?? []).filter((f) => f.q.trim() && f.a.trim());
+  if (faqs.length > 0) {
+    parts.push("", "Key FAQs:");
+    for (const f of faqs) parts.push(`Q: ${f.q.trim()}\nA: ${f.a.trim()}`);
+  }
+  return parts.join("\n");
+}
+
+/**
+ * For anything written TO a customer (email replies, lead follow-ups): the
+ * copywriter context plus every fact a customer might ask about -- offers,
+ * packages, memberships, gift vouchers, opening hours, policies and FAQs --
+ * read live, so a reply quotes today's price. Content generators keep using
+ * getBusinessContext: marketing copy carries no prices by house rule.
+ */
+export function getCustomerReplyContext(): string {
+  const p = getBusinessProfile();
+  const parts = [getBusinessContext()];
+  const catalog = formatCatalog();
+  if (catalog) parts.push("", catalog);
+  parts.push("", "Opening hours:", formatOpeningHours());
   if (p.policies.trim()) parts.push("", "Policies:", p.policies.trim());
   const faqs = (p.faqs ?? []).filter((f) => f.q.trim() && f.a.trim());
   if (faqs.length > 0) {
