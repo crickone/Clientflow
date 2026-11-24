@@ -3479,6 +3479,70 @@ export const pushPrefs = sqliteTable("push_prefs", {
   habits: integer("habits", { mode: "boolean" }).notNull().default(true),
 });
 
+// ---- Staff notifications (lib/notifications) --------------------------------
+// The bell, the in-app pop-up and staff Web Push. user_id is a control-plane
+// users.id (staff live in control.db), so there is no foreign key here.
+
+/** One thing that happened, shown to every staff member who may see it. */
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    kind: text("kind", { enum: ["message", "lead", "sale", "booking"] }).notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    href: text("href").notNull(),
+    /** The same event notifies once: a second insert with this key is ignored. */
+    dedupeKey: text("dedupe_key").notNull().unique(),
+    adminOnly: integer("admin_only", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => ({ created: index("idx_notifications_created").on(t.createdAt) }),
+);
+
+/** A notification one person has opened. */
+export const notificationReads = sqliteTable(
+  "notification_reads",
+  {
+    userId: integer("user_id").notNull(),
+    notificationId: integer("notification_id").notNull().references(() => notifications.id, { onDelete: "cascade" }),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.userId, t.notificationId] }) }),
+);
+
+/** "Mark all as read": everything created up to this time counts as read. */
+export const notificationState = sqliteTable("notification_state", {
+  userId: integer("user_id").primaryKey(),
+  readAllBefore: integer("read_all_before").notNull().default(0),
+});
+
+/** Which kinds one person gets, in the app and as a phone/desktop alert. No row means on. */
+export const notificationPrefs = sqliteTable(
+  "notification_prefs",
+  {
+    userId: integer("user_id").notNull(),
+    kind: text("kind").notNull(),
+    inApp: integer("in_app", { mode: "boolean" }).notNull().default(true),
+    push: integer("push", { mode: "boolean" }).notNull().default(true),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.userId, t.kind] }) }),
+);
+
+/** A staff member's browser or phone that gets alerts (lib/notifications/push.ts). */
+export const staffPushSubscriptions = sqliteTable(
+  "staff_push_subscriptions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").notNull(),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    userAgent: text("user_agent"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => ({ user: index("idx_staff_push_subscriptions_user").on(t.userId) }),
+);
+
 /** Weight, height, age and sex a client typed into the app when they have no InBody scan (lib/goals.ts). */
 export const clientMeasurements = sqliteTable("client_measurements", {
   clientId: integer("client_id").primaryKey().references(() => clients.id, { onDelete: "cascade" }),

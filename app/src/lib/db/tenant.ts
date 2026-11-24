@@ -78,6 +78,15 @@ export function runWithTenant<T>(tenantId: number, fn: () => T): T {
 }
 
 /**
+ * The tenant id bound by runWithTenant, or null outside one. Read straight
+ * from the context (never memoised), so a caller that runs inside a bound job
+ * cannot pick up a cached request-scope answer from before the binding.
+ */
+export function boundTenantId(): number | null {
+  return tenantContext.getStore() ?? null;
+}
+
+/**
  * Resolve a tenant's `db_file` (as stored in the registry) to an absolute path.
  * Renova's file is `clinic.db` at the data root; provisioned tenants use
  * `tenants/<slug>/<slug>.db`. Absolute paths are honoured as-is.
@@ -3316,6 +3325,43 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_voucher_redemptions_voucher ON voucher_redemptions(voucher_id, created_at);
+    CREATE TABLE IF NOT EXISTS notifications (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind        TEXT NOT NULL,
+      title       TEXT NOT NULL,
+      body        TEXT NOT NULL DEFAULT '',
+      href        TEXT NOT NULL,
+      dedupe_key  TEXT NOT NULL UNIQUE,
+      admin_only  INTEGER NOT NULL DEFAULT 0,
+      created_at  INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
+    CREATE TABLE IF NOT EXISTS notification_reads (
+      user_id          INTEGER NOT NULL,
+      notification_id  INTEGER NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+      PRIMARY KEY (user_id, notification_id)
+    );
+    CREATE TABLE IF NOT EXISTS notification_state (
+      user_id          INTEGER PRIMARY KEY,
+      read_all_before  INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS notification_prefs (
+      user_id  INTEGER NOT NULL,
+      kind     TEXT NOT NULL,
+      in_app   INTEGER NOT NULL DEFAULT 1,
+      push     INTEGER NOT NULL DEFAULT 1,
+      PRIMARY KEY (user_id, kind)
+    );
+    CREATE TABLE IF NOT EXISTS staff_push_subscriptions (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL,
+      endpoint    TEXT NOT NULL UNIQUE,
+      p256dh      TEXT NOT NULL,
+      auth        TEXT NOT NULL,
+      user_agent  TEXT,
+      created_at  INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_staff_push_subscriptions_user ON staff_push_subscriptions(user_id);
   `);
   {
     const giftCols = sqlite.prepare("PRAGMA table_info(gift_vouchers)").all() as Array<{ name: string }>;

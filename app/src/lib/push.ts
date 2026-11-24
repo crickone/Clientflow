@@ -23,7 +23,8 @@ export function isPushConfigured(): boolean {
 }
 
 let configured = false;
-function configure() {
+/** Set the VAPID keys on web-push once. Shared with staff alerts (lib/notifications/push.ts). */
+export function configureWebPush() {
   if (configured) return;
   webpush.setVapidDetails(process.env.VAPID_SUBJECT?.trim() || "mailto:privacy@adonisagent.ie", process.env.VAPID_PUBLIC_KEY!.trim(), process.env.VAPID_PRIVATE_KEY!.trim());
   configured = true;
@@ -81,7 +82,7 @@ export async function sendToClient(clientId: number, msg: PushMessage, key?: str
     const claimed = db.insert(pushLog).values({ clientId, key, sentAt: Date.now() }).onConflictDoNothing().run().changes;
     if (claimed === 0) return 0;
   }
-  configure();
+  configureWebPush();
   let reached = 0;
   for (const s of subs) {
     try {
