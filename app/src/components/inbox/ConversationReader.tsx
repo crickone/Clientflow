@@ -158,6 +158,7 @@ export function ConversationReader({
         seedText={seedText}
         channelLabel={channelLabel}
         note={detail.replyNote}
+        noteLink={detail.replyLink ?? null}
         emptyHint={
           detail.canReply
             ? `No messages yet. Send a ${channelLabel} message to start the conversation.`

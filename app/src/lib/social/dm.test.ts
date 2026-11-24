@@ -16,7 +16,7 @@ mod._load = function (this: unknown, request: string, ...rest: unknown[]) {
 };
 const requireLocal = createRequire(import.meta.url);
 
-const { replyWindow } = requireLocal("./dm") as typeof import("./dm");
+const { replyWindow, humanAgentApproved, lateReplyMessage } = requireLocal("./dm") as typeof import("./dm");
 const NOW = Date.parse("2026-10-03T12:00:00Z");
 const H = 60 * 60 * 1000;
 
@@ -26,4 +26,12 @@ assert.equal(replyWindow(NOW - 24 * H, NOW), "open", "exactly 24h -> still open"
 assert.equal(replyWindow(NOW - 24 * H - 1, NOW), "human_only", "just past 24h -> human only");
 assert.equal(replyWindow(NOW - 7 * 24 * H, NOW), "human_only", "exactly 7 days -> human only");
 assert.equal(replyWindow(NOW - 7 * 24 * H - 1, NOW), "closed", "past 7 days -> closed");
-console.log("dm: 6 reply-window checks passed.");
+// Replies after 24h need Meta's Human Agent approval; off unless the env says so.
+const prev = process.env.META_HUMAN_AGENT_APPROVED;
+delete process.env.META_HUMAN_AGENT_APPROVED;
+assert.equal(humanAgentApproved(), false, "no approval by default");
+process.env.META_HUMAN_AGENT_APPROVED = "1";
+assert.equal(humanAgentApproved(), true, "approval switched on by env");
+if (prev === undefined) delete process.env.META_HUMAN_AGENT_APPROVED; else process.env.META_HUMAN_AGENT_APPROVED = prev;
+assert.match(lateReplyMessage("Messenger"), /Meta Business Suite/, "the late-reply message says where to answer");
+console.log("dm: 9 reply-window checks passed.");

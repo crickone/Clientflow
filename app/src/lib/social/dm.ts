@@ -38,6 +38,24 @@ export const HUMAN_AGENT_WINDOW_MS = 7 * DAY;
 
 export type ReplyWindow = "open" | "human_only" | "closed";
 
+/**
+ * Replying between 24 hours and 7 days needs Meta's Human Agent permission,
+ * which an app only gets through App Review. Until the platform's Meta app
+ * has it (set META_HUMAN_AGENT_APPROVED=1), Meta refuses those replies with
+ * "(#100) Cannot tag messages with 'HUMAN_AGENT' without prior approval", so
+ * the reply has to be sent from Meta Business Suite instead.
+ */
+export function humanAgentApproved(): boolean {
+  return process.env.META_HUMAN_AGENT_APPROVED === "1";
+}
+
+/** Meta's own inbox, where a person can still reply for up to 7 days. */
+export const META_INBOX_URL = "https://business.facebook.com/latest/inbox/all";
+
+export function lateReplyMessage(label: string): string {
+  return `It is more than 24 hours since their last ${label} message. Meta only lets Adonis reply within 24 hours, so answer this one in Meta Business Suite, where you can still reply for up to 7 days.`;
+}
+
 /** Which reply Meta allows, given when the customer last wrote. Pure. */
 export function replyWindow(lastInboundAt: number | null, now: number): ReplyWindow {
   if (!lastInboundAt) return "closed";
@@ -221,6 +239,7 @@ export async function sendDm(input: SendDmInput): Promise<{ messageId: number; p
   if (target.window === "human_only" && input.aiGenerated) {
     throw new Error(`It is more than 24 hours since the customer's last ${label} message, so only a reply written by a person can be sent.`);
   }
+  if (target.window === "human_only" && !humanAgentApproved()) throw new Error(lateReplyMessage(label));
   const token = getPageTokenForTenant(getCurrentTenant().id, target.pageId);
   if (!token) throw new Error("The Facebook Page for this conversation is no longer connected.");
 
@@ -237,6 +256,7 @@ export async function sendDm(input: SendDmInput): Promise<{ messageId: number; p
   const json = (await res.json().catch(() => ({}))) as { message_id?: string; error?: { message?: string } };
   if (!res.ok || !json.message_id) {
     const err = metaApiError(json, res.status, `${label} send failed (${res.status}).`);
+    if (/HUMAN_AGENT/.test(err.message)) throw new Error(lateReplyMessage(label));
     // A refused token marks the Page for reconnect and tells the admins.
     if (await notePageRefusal(target.pageId, err).catch(() => false)) {
       throw new Error(`Facebook stopped accepting this Page's connection. Reconnect Facebook in Settings, then send again. (${err.message})`);

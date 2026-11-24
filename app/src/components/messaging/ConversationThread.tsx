@@ -46,6 +46,7 @@ export function ConversationThread({
   seedText,
   channelLabel = "WhatsApp",
   note,
+  noteLink,
   fill = false,
   composerRef,
 }: {
@@ -59,6 +60,8 @@ export function ConversationThread({
   channelLabel?: string;
   /** Shown under the composer: why sending is off, or a channel caveat. */
   note?: string | null;
+  /** A place to reply instead, shown after the note. */
+  noteLink?: { label: string; href: string } | null;
   /** Fill the parent's height (the inbox reading pane) instead of capping at 62vh. */
   fill?: boolean;
   /** Lets the inbox focus the composer from a keyboard shortcut. */
@@ -183,7 +186,19 @@ export function ConversationThread({
             {sending ? "Sending" : "Send"}
           </Button>
         </div>
-        {note && <span style={{ fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.5 }}>{note}</span>}
+        {note && (
+          <span style={{ fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
+            {note}
+            {noteLink ? (
+              <>
+                {" "}
+                <a href={noteLink.href} target="_blank" rel="noreferrer" style={{ color: "var(--text-primary)", textDecoration: "underline" }}>
+                  {noteLink.label}
+                </a>
+              </>
+            ) : null}
+          </span>
+        )}
       </div>
     </Card>
   );

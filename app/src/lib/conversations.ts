@@ -11,7 +11,7 @@ import {
 } from "./db/schema";
 import type { ThreadMessage } from "@/components/messaging/ConversationThread";
 import { lastInboundChannel, type ReplyChannel } from "@/lib/messaging/reply";
-import { getDmTarget } from "@/lib/social/dm";
+import { getDmTarget, humanAgentApproved, lateReplyMessage, META_INBOX_URL } from "@/lib/social/dm";
 
 export interface ConvTag {
   label: string;
@@ -193,7 +193,7 @@ function replyState(
   kind: "lead" | "client",
   contactId: number,
   hasPhone: boolean,
-): Pick<ConversationDetail, "replyChannel" | "canReply" | "replyNote"> {
+): Pick<ConversationDetail, "replyChannel" | "canReply" | "replyNote" | "replyLink"> {
   const channel = lastInboundChannel(kind, contactId);
   if (channel === "messenger" || channel === "instagram") {
     const target = getDmTarget(kind, contactId);
@@ -203,6 +203,14 @@ function replyState(
         replyChannel: channel,
         canReply: false,
         replyNote: `${label} only allows replies within 7 days of the customer's last message. You can reply once they write again.`,
+      };
+    }
+    if (target.window === "human_only" && !humanAgentApproved()) {
+      return {
+        replyChannel: channel,
+        canReply: false,
+        replyNote: lateReplyMessage(label),
+        replyLink: { label: "Open Meta Business Suite inbox", href: META_INBOX_URL },
       };
     }
     return {
@@ -232,6 +240,8 @@ export interface ConversationDetail {
   canReply: boolean;
   /** Why not, or a caveat (e.g. Meta's reply window), shown under the composer. */
   replyNote: string | null;
+  /** Where to reply instead when Adonis can't (e.g. Meta Business Suite). */
+  replyLink?: { label: string; href: string } | null;
   messages: ThreadMessage[];
   /** Triage of the latest inbound message — drives the pane header. */
   aiCategory: string | null;
