@@ -8,6 +8,7 @@ import { getCurrentTenant } from "@/lib/db/tenant";
 import { getGmailConnection, gmailSend, isGmailConnected } from "@/lib/gmail";
 import { getImapConnection, isImapConnected, smtpSend } from "@/lib/imapEmail";
 import { mailgunRouteDomain, sendThroughMailgun } from "@/lib/mailgunRoute";
+import { currentEmailBrand } from "@/lib/emailBrand";
 
 /**
  * Email sending via Resend. Two moving parts:
@@ -310,12 +311,18 @@ export function renderEmailShell(opts: {
   /** Display width in CSS px. Defaults to 190, which suits the 380px-wide lockup. */
   logoWidth?: number;
 }): string {
-  const accent = opts.accent || "#c9a24c";
+  // Every email a business sends wears its own brand: its uploaded logo, its
+  // accent colour and its contact line (lib/emailBrand). An email that brings
+  // its own logo (AdonisAgent's own billing emails) is left as it is.
+  const brand = opts.logoUrl ? null : currentEmailBrand();
+  const accent = brand?.accent || opts.accent || "#c9a24c";
+  const brandLogo = brand?.logoUrl ?? null;
   const heading = opts.heading
     ? `<h1 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#111827;">${escapeHtml(opts.heading)}</h1>`
     : "";
   const footer =
-    opts.footer !== undefined ? escapeHtml(opts.footer) : `You received this email from ${escapeHtml(opts.businessName)}.`;
+    (opts.footer !== undefined ? escapeHtml(opts.footer) : `You received this email from ${escapeHtml(opts.businessName)}.`) +
+    (brand?.contactLine ? `<br/>${escapeHtml(brand.contactLine)}` : "");
   return `<!doctype html><html><body style="margin:0;background:#f3f4f6;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
     <tr><td style="height:4px;background:${accent};"></td></tr>
@@ -323,6 +330,8 @@ export function renderEmailShell(opts: {
       ${
         opts.logoUrl
           ? `<img src="${opts.logoUrl}" width="${opts.logoWidth ?? 190}" alt="${escapeHtml(opts.businessName)}" style="display:block;border:0;outline:none;text-decoration:none;margin:0 0 22px;max-width:100%;height:auto;" />`
+          : brandLogo
+          ? `<img src="${escapeHtml(brandLogo)}" height="44" alt="${escapeHtml(opts.businessName)}" style="display:block;border:0;outline:none;text-decoration:none;margin:0 0 22px;height:44px;width:auto;max-width:240px;" />`
           : `<div style="font-size:13px;font-weight:700;letter-spacing:.02em;color:${accent};text-transform:uppercase;margin-bottom:20px;">${escapeHtml(opts.businessName)}</div>`
       }
       ${heading}
