@@ -93,6 +93,16 @@ export const inter = localFont({
   variable: "--font-inter",
 });
 
+// The app's display headings: a free, shipped stand-in for Helvetica Now
+// Display, which was named in CSS but never shipped, so headings looked
+// different on every computer that didn't have it installed.
+export const interTight = localFont({
+  src: "./fonts/google/inter-tight-400-700-normal.woff2",
+  weight: "400 700",
+  display: "swap",
+  variable: "--font-inter-tight",
+});
+
 export const manrope = localFont({
   src: "./fonts/google/manrope-400-700-normal.woff2",
   weight: "400 700",

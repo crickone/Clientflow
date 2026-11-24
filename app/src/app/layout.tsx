@@ -68,7 +68,7 @@ import {
   clashDisplay,
   familjen,
   heading,
-  inter,
+  inter, interTight,
   manrope,
   mono,
   nebula,
@@ -106,7 +106,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const dynamic = "force-dynamic";
 
-const FONT_VARS = `${body.variable} ${mono.variable} ${heading.variable} ${familjen.variable} ${nebula.variable} ${nebulaHollow.variable} ${clashDisplay.variable} ${inter.variable} ${manrope.variable} ${spaceGrotesk.variable} ${playfairDisplay.variable} ${bebasNeue.variable} ${preon.variable}`;
+const FONT_VARS = `${body.variable} ${mono.variable} ${heading.variable} ${familjen.variable} ${nebula.variable} ${nebulaHollow.variable} ${clashDisplay.variable} ${inter.variable} ${interTight.variable} ${manrope.variable} ${spaceGrotesk.variable} ${playfairDisplay.variable} ${bebasNeue.variable} ${preon.variable}`;
 
 export default async function RootLayout({
   children,

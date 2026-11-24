@@ -16,7 +16,7 @@ export interface ThemeConfig {
  * repoints `--font-heading`, so every heading across the app follows.
  */
 export const HEADING_FONTS: { id: string; label: string; cssVar: string }[] = [
-  { id: "helvetica-now", label: "Helvetica Now", cssVar: "--font-helvetica-now" },
+  { id: "helvetica-now", label: "Inter Tight", cssVar: "--font-helvetica-now" },
   { id: "preon", label: "Preon (Adonis)", cssVar: "--font-preon" },
   { id: "space-grotesk", label: "Space Grotesk", cssVar: "--font-space-grotesk" },
   { id: "familjen", label: "Familjen Grotesk", cssVar: "--font-familjen" },

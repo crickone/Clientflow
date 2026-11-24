@@ -11,8 +11,8 @@
      shipped as a web font; this stack renders it on Apple devices and the
      platform UI font elsewhere). Heading: Helvetica Now where installed or
      once licensed web files are added (app/src/app/fonts), else Helvetica. */
-  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-helvetica-now: "Helvetica Now Display", "Helvetica Now Text", "Helvetica Now", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-body: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-helvetica-now: var(--font-inter-tight), "Inter Tight", var(--font-inter), "Helvetica Neue", Helvetica, Arial, sans-serif;
   /* Dark premium theme — charcoal canvas, elevated glass surfaces, glowing
      orange accent. Token-driven so the whole admin re-skins from here. */
   --bg: #0c0d10;                /* charcoal page canvas */
@@ -169,8 +169,8 @@ a {
      shipped as a web font; this stack renders it on Apple devices and the
      platform UI font elsewhere). Heading: Helvetica Now where installed or
      once licensed web files are added (app/src/app/fonts), else Helvetica. */
-  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-helvetica-now: "Helvetica Now Display", "Helvetica Now Text", "Helvetica Now", "Helvetica Neue", Helvetica, Arial, sans-serif; --app-topbar-h: 56px; }
+  --font-body: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-helvetica-now: var(--font-inter-tight), "Inter Tight", var(--font-inter), "Helvetica Neue", Helvetica, Arial, sans-serif; --app-topbar-h: 56px; }
 .adonis-shell { height: 100dvh; }
 @media (max-width: 900px) {
   .adonis-shell { height: calc(100dvh - var(--app-topbar-h)); }
@@ -1136,8 +1136,8 @@ a {
      shipped as a web font; this stack renders it on Apple devices and the
      platform UI font elsewhere). Heading: Helvetica Now where installed or
      once licensed web files are added (app/src/app/fonts), else Helvetica. */
-  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-helvetica-now: "Helvetica Now Display", "Helvetica Now Text", "Helvetica Now", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-body: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-helvetica-now: var(--font-inter-tight), "Inter Tight", var(--font-inter), "Helvetica Neue", Helvetica, Arial, sans-serif;
   --writing-ink-4: color-mix(in srgb, var(--text-primary) 4%, transparent);
   --writing-ink-7: color-mix(in srgb, var(--text-primary) 7%, transparent);
   --writing-ink-9: color-mix(in srgb, var(--text-primary) 9%, transparent);
@@ -1323,8 +1323,8 @@ a {
      shipped as a web font; this stack renders it on Apple devices and the
      platform UI font elsewhere). Heading: Helvetica Now where installed or
      once licensed web files are added (app/src/app/fonts), else Helvetica. */
-  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-helvetica-now: "Helvetica Now Display", "Helvetica Now Text", "Helvetica Now", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-body: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-helvetica-now: var(--font-inter-tight), "Inter Tight", var(--font-inter), "Helvetica Neue", Helvetica, Arial, sans-serif;
   --holo-a: #a86bff; /* violet */
   --holo-b: #3fd2ff; /* cyan */
   --holo-c: #ff6ad5; /* magenta */
