@@ -17,6 +17,7 @@ import {
   describeSystemForDesign,
   extractDesignPayload,
   logoReserveRule,
+  COVER_PHOTO_RULE,
 } from "./designPost.parse";
 import { OPTIMAL_HEALTH_DESIGN_SYSTEM as SYSTEM } from "@/lib/design/presets";
 
@@ -163,6 +164,16 @@ const clean = `<div style="display:flex;background:#f2f3ed"><span style="color:#
 const good = checkDesigns([{ html: clean, photo: "", photos: [] }], SYSTEM);
 check("a clean design has no problems", good.problems.length === 0);
 check("and is returned", good.designs.length === 1);
+
+// The first slide carries a photograph whenever photography is available.
+const withPhoto = `<div style="display:flex;background:#f2f3ed"><img src="{{PHOTO}}" style="width:1080px;height:600px" /><span style="color:#24231f">x</span></div>`;
+const flatCover = checkDesigns([{ html: clean, photo: "", photos: [] }, { html: withPhoto, photo: "", photos: [] }], SYSTEM, undefined, { coverPhoto: true });
+check("a flat first slide is sent back when photography is available", flatCover.problems.some((p) => p.startsWith("Slide 1:") && p.includes("no photograph")));
+check("only slide 1 is held to it", !flatCover.problems.some((p) => p.startsWith("Slide 2:")));
+const photoCover = checkDesigns([{ html: withPhoto, photo: "", photos: [] }, { html: clean, photo: "", photos: [] }], SYSTEM, undefined, { coverPhoto: true });
+check("a first slide with {{PHOTO}} passes, and a flat slide 2 is fine", !photoCover.problems.some((p) => p.includes("no photograph")));
+check("without photography a flat cover is fine", checkDesigns([{ html: clean, photo: "", photos: [] }], SYSTEM).problems.length === 0);
+check("the rule names the first slide and the token", COVER_PHOTO_RULE.includes("Slide 1") && COVER_PHOTO_RULE.includes("{{PHOTO}}"));
 
 const bad = checkDesigns([{ html: `<div style="display:flex;background:#ff00ff"></div>`, photo: "", photos: [] }], SYSTEM);
 check("an off-palette design is a problem", bad.problems.length > 0);

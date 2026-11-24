@@ -340,6 +340,16 @@ Do not draw a logo, a wordmark or the business name yourself.`;
  * flat ground as a muddy wash. A design that never expected a photograph is
  * coherent; one with the photograph cut out of it is not.
  */
+/**
+ * The first slide is the one people see in the feed, and the designer used to
+ * leave it on a flat ground about half the time -- whole posts went out with
+ * no photograph on the cover, and asking for one afterwards was the only way
+ * to get it. With photography available, slide 1 always carries {{PHOTO}}
+ * (made to its own scene), and checkDesigns sends a set back for repair when
+ * it doesn't.
+ */
+export const COVER_PHOTO_RULE = `THE FIRST SLIDE IS BUILT ON A PHOTOGRAPH. Slide 1 always uses ${PHOTO_TOKEN}, and the photograph takes a large share of the canvas (at least 40 percent): it is what stops someone scrolling. Its scene shows this post's own subject, the person it is for doing the thing the post is about. The other slides use a photograph where it helps.`;
+
 export const NO_PHOTOGRAPHY_RULE = `NO PHOTOGRAPHY IS AVAILABLE for this post. Every slide must work on a flat ground. Do not write ${PHOTO_TOKEN}, do not write an <img>, and do not build a scrim or gradient of the kind that only makes sense over an image. Still fill in "photos" on every slide with a one-entry list holding the scene that would suit it -- that is how the operator gets the picture that is missing -- but design as though it will never arrive.`;
 
 /**
@@ -524,6 +534,8 @@ export function checkDesigns(
    * check rather than another sentence in the prompt.
    */
   facts?: ConfiguredFacts,
+  /** coverPhoto: slide 1 must carry {{PHOTO}} (photography is available). See COVER_PHOTO_RULE. */
+  opts: { coverPhoto?: boolean } = {},
 ): { designs: CheckedDesign[]; problems: string[] } {
   const problems: string[] = [];
   const designs: CheckedDesign[] = [];
@@ -587,6 +599,11 @@ export function checkDesigns(
           "One <img> element carries two photo tokens; an <img> has a single src -- give each photograph its own <img>.",
         );
       }
+    }
+    if (i === 0 && opts.coverPhoto && r.html.trim() && !photoSlotsUsed(r.html).includes(1)) {
+      violations.push(
+        `The first slide has no photograph. Slide 1 always uses ${PHOTO_TOKEN} over a large share of the canvas, with a scene that shows this post's own subject.`,
+      );
     }
     violations.forEach((v) => problems.push(`Slide ${i + 1}: ${v}`));
     designs.push({ ...r, violations });

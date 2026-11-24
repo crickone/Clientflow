@@ -11,6 +11,7 @@ import {
   DESIGN_RULES,
   logoReserveRule,
   photographyRuleFor,
+  COVER_PHOTO_RULE,
   checkDesigns,
   describeSystemForDesign,
   extractDesignPayload,
@@ -338,6 +339,7 @@ export async function designPost(
     // photograph, so a library of one that was invited to design a comparison
     // produced the same picture twice. See photographyRuleFor.
     photographyRuleFor(available),
+    hasPhotography ? COVER_PHOTO_RULE : null,
     getSignoffRule("social"),
   ]
     .filter(Boolean)
@@ -450,7 +452,7 @@ export async function designPost(
    * slow".
    */
   async function attempt(slides: RawDesign[], previous?: DesignedSlide[]) {
-    const checked = checkDesigns(slides, system!, getConfiguredFacts());
+    const checked = checkDesigns(slides, system!, getConfiguredFacts(), { coverPhoto: hasPhotography });
     const problems = [...checked.problems];
     const rendered: DesignedSlide[] = [];
     const unchanged = new Map(
