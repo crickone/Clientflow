@@ -220,4 +220,15 @@ check("lead form asks the chosen fields with the privacy link", form.questions.l
   check("total daily budget is the campaign budget", totalDailyBudget(shared) === 20);
   check("a campaign budget ignores stale ad-set budgets in the total", totalDailyBudget(four({ adSets: four().adSets.map((a) => ({ ...a, dailyBudget: 5 })) })) === 20);
 }
+{
+  type CtaOut = { object_story_spec: { link_data: { call_to_action: { type: string } } } };
+  const ctx = { pageId: "P", instagramUserId: null, imageHashes: ["h"], leadFormId: "F1" };
+  const withCta = (objective: string) => {
+    const sp = { ...base(), objective } as ReturnType<typeof base>;
+    const ad = { ...sp.adSets[0].ads[0], creative: { ...sp.adSets[0].ads[0].creative, cta: "GET_OFFER" as const } };
+    return (buildCreativeParams(sp, ad, ctx) as CtaOut).object_story_spec.link_data.call_to_action.type;
+  };
+  check("Get offer on a website ad goes to Meta as GET_OFFER_VIEW", withCta("sales") === "GET_OFFER_VIEW");
+  check("Get offer on a lead-form ad stays GET_OFFER", withCta("leads") === "GET_OFFER");
+}
 console.log(`ads/spec.test.ts: ${passed} checks passed.`);

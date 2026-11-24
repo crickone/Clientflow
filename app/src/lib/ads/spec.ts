@@ -468,7 +468,9 @@ const MESSENGER_LINK = "https://fb.com/messenger_doc/";
 export function buildCreativeParams(spec: CampaignSpec, ad: AdSpec, ctx: CreativeContext): Record<string, unknown> {
   const c = ad.creative;
   let link = c.linkUrl ?? "";
-  let callToAction: Record<string, unknown> = { type: c.cta, value: { link } };
+  // Meta's own "Get offer" button on a website link is GET_OFFER_VIEW; plain
+  // GET_OFFER shows as "Unknown" in Ads Manager on these ads (lead forms keep it).
+  let callToAction: Record<string, unknown> = { type: c.cta === "GET_OFFER" ? "GET_OFFER_VIEW" : c.cta, value: { link } };
   if (spec.objective === "leads") {
     // Meta needs a link on a lead ad even though the button opens the form;
     // fb.me is Meta's own placeholder for exactly this.

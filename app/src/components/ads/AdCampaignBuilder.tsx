@@ -647,7 +647,7 @@ export function AdCampaignBuilder({
                           onChange={(e) => {
                             const url = e.target.value;
                             if (!url) return;
-                            patch({ adSets: spec.adSets.map((s) => ({ ...s, ads: s.ads.map((a) => ({ ...a, creative: { ...a.creative, linkUrl: url, cta: a.creative.cta === "LEARN_MORE" ? "SHOP_NOW" : a.creative.cta } })) })) });
+                            patch({ adSets: spec.adSets.map((s) => ({ ...s, ads: s.ads.map((a) => ({ ...a, creative: { ...a.creative, linkUrl: url, cta: a.creative.cta === "LEARN_MORE" ? "GET_OFFER" : a.creative.cta } })) })) });
                           }}
                         >
                           <option value="">Choose the offer page</option>
