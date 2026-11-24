@@ -12,6 +12,7 @@ import { authDb } from "@/lib/db/control";
 import { getTenantDbById } from "@/lib/db/tenant";
 import { clients, emailMessages, imapConnections } from "@/lib/db/schema";
 import { decryptToken, encryptToken } from "@/lib/google/tokenCrypto";
+import { notifyInboundEmail } from "@/lib/notifications/notify";
 
 /**
  * A tenant's connected IMAP/SMTP mailbox (generic, non-Gmail) — the
@@ -638,6 +639,18 @@ export async function syncImapInbox(
               })
               .run();
             synced++;
+            // From a client or lead and recent: tell the team. Never throws.
+            notifyInboundEmail(tenantId, {
+              messageKey: m.messageId,
+              threadKey: m.threadKey,
+              fromEmail: m.from.email || null,
+              fromName: m.from.name || null,
+              subject: m.subject,
+              snippet: m.snippet,
+              clientId: m.clientId,
+              isRead: false,
+              at: m.internalDate,
+            });
           } catch (err) {
             // Best-effort: e.g. a UNIQUE race on gmail_message_id must not abort the rest.
             console.error("[imapEmail] syncImapInbox: failed to insert a message, skipping:", err);

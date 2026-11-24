@@ -12,6 +12,7 @@ import { getCurrentTenantDb } from "./db/tenant";
 import { getCallFlow } from "./voice/flow";
 import { enqueueCall } from "./voice/queue";
 import type { StageRole } from "./pipeline/roles";
+import { notifyNewLead } from "./notifications/notify";
 
 export type LeadStatus = "new" | "contacted" | "replied" | "booked" | "lost";
 
@@ -103,6 +104,9 @@ export function upsertLead(input: NormalizedLeadInput): {
   }
   enrolInCallFlow(lead);
   enrolInNurture(lead);
+  // Tell the team (not for a lead that came in on a message, which already
+  // notified, or one a staff member typed in). Never throws.
+  notifyNewLead(lead, input.actor);
   return { lead, created: true };
 }
 

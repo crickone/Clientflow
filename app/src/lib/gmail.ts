@@ -11,6 +11,7 @@ import { decryptToken, encryptToken } from "@/lib/google/tokenCrypto";
 import { refreshAccessToken } from "@/lib/google/oauth";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import { GMAIL_SYNC_MIN_GAP_MS, isMessageRead, shouldSyncNow } from "@/lib/gmailSync";
+import { notifyInboundEmail } from "@/lib/notifications/notify";
 
 // Re-exported so `@/lib/gmail` stays the one import path for anything
 // Gmail-related — callers (e.g. the dashboard brief route) don't need to know
@@ -429,6 +430,21 @@ export async function syncGmailInbox(
         })
         .run();
       synced++;
+      // New mail from a client or lead, unread and recent (never a first
+      // sync of old mail): tell the team. Never throws.
+      if (direction === "in") {
+        notifyInboundEmail(tenantId, {
+          messageKey: msg.id,
+          threadKey: msg.threadId || msg.id,
+          fromEmail: from.email || null,
+          fromName: from.name || null,
+          subject: headerVal(headers, "Subject") || null,
+          snippet: msg.snippet ?? null,
+          clientId,
+          isRead: isMessageRead(msg.labelIds),
+          at: msg.internalDate ? new Date(Number(msg.internalDate)) : null,
+        });
+      }
     }
 
     authDb

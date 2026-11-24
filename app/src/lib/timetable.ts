@@ -262,7 +262,7 @@ export function deleteSession(id: number) {
 export function bookClient(
   sessionId: number,
   clientId: number,
-): { ok: true } | { ok: false; error: string } {
+): { ok: true; newBooking: boolean } | { ok: false; error: string } {
   const session = db
     .select()
     .from(classSessions)
@@ -303,7 +303,7 @@ export function bookClient(
       set: { status: "booked" },
     })
     .run();
-  return { ok: true };
+  return { ok: true, newBooking: !alreadyBooked };
 }
 
 /** Attendance / check-in: flip a booking between booked / attended / no_show. */

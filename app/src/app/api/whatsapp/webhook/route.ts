@@ -26,6 +26,7 @@ import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { recordConsent } from "@/lib/marketingConsent";
 import { isOptedIn } from "@/lib/whatsappBroadcasts";
 import { isStopReply } from "@/lib/whatsappBroadcastModel";
+import { notifyInboundMessage } from "@/lib/notifications/notify";
 
 /**
  * Distinguishes an expected "tenant is over its monthly AI cap" skip from a
@@ -147,6 +148,15 @@ export async function POST(req: NextRequest) {
         } catch (err) {
           console.error("[pipeline] client inbound hook failed:", err);
         }
+        notifyInboundMessage({
+          channel: "whatsapp",
+          owner: "client",
+          contactId: client.id,
+          name: `${client.firstName} ${client.lastName}`.trim(),
+          text: inbound.text,
+          messageId: inboundMsg.id,
+          providerMessageId: inbound.providerMessageId,
+        });
         // Triage in the background — never block the webhook ack.
         void runTriage({
           ownerType: "client",
@@ -183,6 +193,15 @@ export async function POST(req: NextRequest) {
           `WhatsApp reply from ${inbound.fromPhone}`,
           { leadId: lead.id },
         );
+        notifyInboundMessage({
+          channel: "whatsapp",
+          owner: "lead",
+          contactId: lead.id,
+          name: [lead.firstName, lead.lastName].filter(Boolean).join(" ") || inbound.fromPhone,
+          text: inbound.text,
+          messageId: inboundMsg.id,
+          providerMessageId: inbound.providerMessageId,
+        });
         void runTriage({
           ownerType: "lead",
           ownerId: lead.id,

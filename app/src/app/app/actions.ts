@@ -7,6 +7,7 @@ import { z } from "zod";
 import { requireClient } from "@/lib/clientAuth";
 import { assignedWorkoutProgramDetail, clientMembership } from "@/lib/clientApp";
 import { bookClient, removeBooking } from "@/lib/timetable";
+import { notifyClassBooked } from "@/lib/notifications/notify";
 import { setScanConsent } from "@/lib/inbody/scans";
 import { acceptDocs, businessContact, saveWelcome } from "@/lib/agreements";
 import { recordConsent } from "@/lib/marketingConsent";
@@ -58,9 +59,11 @@ export async function bookClassAction(sessionId: number): Promise<BookResult> {
     return { ok: false, error: "You need an active membership to book classes." };
   }
   const res = bookClient(p.data, clientId);
+  // Tell the team about a new booking (not a repeat tap on one already held).
+  if (res.ok && res.newBooking) notifyClassBooked(p.data, clientId, `booking:${p.data}:${clientId}:${Date.now()}`);
   revalidatePath("/app/timetable");
   revalidatePath("/app");
-  return res;
+  return res.ok ? { ok: true } : res;
 }
 
 export async function cancelClassAction(sessionId: number): Promise<BookResult> {

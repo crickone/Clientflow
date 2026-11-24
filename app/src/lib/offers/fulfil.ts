@@ -14,6 +14,7 @@ import { pipelineForCampaign } from "@/lib/pipeline/pipelineRepo";
 import { onPaymentRecorded } from "@/lib/pipeline/stage";
 import { splitFullName } from "@/lib/humanName";
 import { logActivity } from "@/lib/queries";
+import { notifyOfferSale } from "@/lib/notifications/notify";
 import { renderEmailShell, sendEmailForTenant, textToParagraphs } from "@/lib/email";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { getThemeForTenant } from "@/lib/settings";
@@ -157,6 +158,14 @@ export async function fulfilCheckout(
       contentName: offer?.title ?? "Offer",
     });
     await logActivity("offer_sale", `${fullName || email || "Someone"} bought ${offer?.title ?? "an offer"} online (${formatEur(order.amountCents)})`, { orderId: order.id, clientId: client.id });
+    // Only this caller won the claim above, so the admins hear about it once.
+    notifyOfferSale({
+      orderId: order.id,
+      title: offer?.title ?? "Online offer",
+      cents: order.amountCents,
+      buyer: fullName || email || "Online buyer",
+      clientId: client.id,
+    });
 
     if (email && offer) {
       void sendConfirmation(tenantId, email, firstName || fullName || "", offer.title, offer.items, expiryFor(offer, paidAtMs), order.amountCents).catch((err) =>

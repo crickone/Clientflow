@@ -6,6 +6,7 @@ import { runWithTenant } from "@/lib/db/tenant";
 import { giftVouchers, voucherOrders, type Voucher } from "@/lib/db/schema";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { logActivity } from "@/lib/queries";
+import { notifyVoucherSale } from "@/lib/notifications/notify";
 import type { CheckoutSession } from "@/lib/stripe/api";
 import { codePrefix, dublinDate, expiryDate, voucherTitle } from "./model";
 import {
@@ -112,6 +113,14 @@ export async function fulfilVoucherCheckout(
       // A log failure must not stop the receipt and gift emails.
       console.error("[vouchers] sale log failed", err);
     }
+    // Only this caller won the claim above, so the admins hear about it once.
+    notifyVoucherSale({
+      orderId: order.id,
+      title: order.kind === "treatment" ? `Gift voucher for ${therapyName(order.therapyId) || "a treatment"}` : "Gift voucher",
+      cents: order.valueCents,
+      buyer: order.buyerName,
+      code: voucher.code,
+    });
 
     const receipt = await sendReceipt(tenantId, paid, voucher, send);
     if (paid.deliverTo === "buyer") {

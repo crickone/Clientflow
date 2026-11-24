@@ -15,6 +15,7 @@ import { participantName } from "./participant";
 import { addClientMessage, findClientMessageByProviderId } from "@/lib/clientMessages";
 import { splitFullName } from "@/lib/humanName";
 import { logActivity } from "@/lib/queries";
+import { notifyInboundMessage } from "@/lib/notifications/notify";
 
 /**
  * Facebook Messenger + Instagram DMs on the lead/client conversation threads.
@@ -166,6 +167,7 @@ export async function recordDmEvent(ev: MessagingEvent, page: { pageId: string; 
   if (ev.isEcho) return null;
 
   db.update(socialContacts).set({ lastInboundAt: sentAt }).where(eq(socialContacts.id, contact.id)).run();
+  let senderName = contact.name ?? contact.username ?? null;
   if (owner.ownerType === "lead") {
     setLeadStatus(owner.ownerId, "replied");
     // A click-to-Messenger ad form arrives as "Full name: ... / Email: ... / Phone number: ..." in the message itself.
@@ -176,6 +178,7 @@ export async function recordDmEvent(ev: MessagingEvent, page: { pageId: string; 
       const profile = await fetchProfile(ev.channel, ev.customerId, page);
       const display = profile.name || [profile.firstName, profile.lastName].filter(Boolean).join(" ") || profile.username || null;
       if (display) {
+        senderName = display;
         db.update(socialContacts).set({ name: display, username: profile.username ?? contact.username ?? null }).where(eq(socialContacts.id, contact.id)).run();
         const split = profile.firstName ? { firstName: profile.firstName, lastName: profile.lastName ?? null } : splitFullName(profile.name);
         fillLeadContact(owner.ownerId, split);
@@ -187,6 +190,15 @@ export async function recordDmEvent(ev: MessagingEvent, page: { pageId: string; 
     `${CHANNEL_LABEL[ev.channel]} message from ${contact.name ?? contact.username ?? "a new contact"}`,
     owner.ownerType === "lead" ? { leadId: owner.ownerId } : { clientId: owner.ownerId },
   );
+  notifyInboundMessage({
+    channel: ev.channel,
+    owner: owner.ownerType,
+    contactId: owner.ownerId,
+    name: senderName,
+    text: ev.text,
+    messageId: stored.id,
+    providerMessageId: ev.messageId,
+  });
   return { ...owner, messageId: stored.id, created };
 }
 
