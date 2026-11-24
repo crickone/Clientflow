@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useTransition } from "react";
 import { toast } from "sonner";
+import { Check, ExternalLink } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import { Card, CardLabel } from "@/components/ui/Card";
@@ -39,7 +40,7 @@ export function WhatsAppConnectForm({
     startMove(async () => {
       const res = await moveWhatsAppSecretToHeader();
       if (!res.ok) return void toast.error(res.error);
-      toast.success("WhatsApp now sends the secret as a header.");
+      toast.success(headerMode ? "Replies set up again." : "Replies set up. Send a test message to check.");
       window.location.reload();
     });
   }
@@ -79,13 +80,104 @@ export function WhatsAppConnectForm({
     });
   }
 
+  const tokenSaved = Boolean(initial.token) || Boolean(conn?.configured);
+  const linked = Boolean(conn?.connected);
+  const steps: { done: boolean; body: ReactNode }[] = [
+    {
+      done: tokenSaved,
+      body: (
+        <>
+          Create an account at{" "}
+          <a href="https://whapi.cloud" target="_blank" rel="noreferrer" style={{ color: "var(--text-primary)", textDecoration: "underline", display: "inline-flex", alignItems: "center", gap: 3 }}>
+            whapi.cloud<ExternalLink size={12} aria-hidden />
+          </a>{" "}
+          and add a channel. Use a paid plan: the free one stops at 150 messages a day.
+        </>
+      ),
+    },
+    {
+      done: tokenSaved,
+      body: (
+        <>
+          Open the channel in Whapi, copy its <b>API token</b>, paste it under Provider credentials below and press <b>Save &amp; connect</b>. Leave
+          Channel ID and API base URL empty.
+        </>
+      ),
+    },
+    {
+      done: linked,
+      body: (
+        <>
+          A QR code appears under Connection. On the business phone open WhatsApp, go to <b>Settings</b>, <b>Linked devices</b>, <b>Link a
+          device</b>, and scan it.
+        </>
+      ),
+    },
+    {
+      done: headerMode,
+      body: (
+        <>
+          Under Replies, press <b>Set up replies</b> so messages people send you show up in the Inbox.
+        </>
+      ),
+    },
+    {
+      done: false,
+      body: <>Send a message to the number from another phone. It should appear in the Inbox within a few seconds; reply from there to check it arrives.</>,
+    },
+  ];
+  const current = steps.findIndex((st) => !st.done);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <Card>
+        <CardLabel>How to connect</CardLabel>
+        <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 14 }}>
+          {steps.map((st, i) => {
+            const isNow = i === current;
+            return (
+              <li key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <span
+                  aria-hidden
+                  style={{
+                    flex: "none",
+                    width: 24,
+                    height: 24,
+                    borderRadius: 999,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    background: st.done ? "var(--accent)" : "transparent",
+                    color: st.done ? "var(--accent-contrast)" : isNow ? "var(--text-primary)" : "var(--text-tertiary)",
+                    border: st.done ? "1.5px solid var(--accent)" : `1.5px solid ${isNow ? "var(--text-primary)" : "var(--hairline-strong)"}`,
+                  }}
+                >
+                  {st.done ? <Check size={13} strokeWidth={3} /> : i + 1}
+                </span>
+                <span
+                  style={{
+                    fontSize: 14,
+                    lineHeight: 1.55,
+                    paddingTop: 2,
+                    color: st.done ? "var(--text-tertiary)" : isNow ? "var(--text-primary)" : "var(--text-secondary)",
+                  }}
+                >
+                  <span className="sr-only">{st.done ? "Done: " : isNow ? "Next: " : ""}</span>
+                  {st.body}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </Card>
+
       <Card>
         <CardLabel>Connection</CardLabel>
         {!conn || !conn.configured ? (
           <p style={{ color: "var(--text-secondary)", fontSize: 14, margin: 0 }}>
-            Add your provider token below, then scan the QR to link a number.
+            Not connected yet. Save your Whapi token below and a QR code to scan appears here.
           </p>
         ) : conn.connected ? (
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -117,8 +209,8 @@ export function WhatsAppConnectForm({
               </div>
             )}
             <div style={{ color: "var(--text-secondary)", fontSize: 14, maxWidth: 280 }}>
-              On the phone: WhatsApp → <b>Linked devices</b> → <b>Link a device</b>,
-              then scan this code. It refreshes automatically.
+              On the business phone: WhatsApp, <b>Settings</b>, <b>Linked devices</b>, <b>Link a device</b>,
+              then scan this code. It refreshes by itself.
             </div>
           </div>
         )}
@@ -161,10 +253,13 @@ export function WhatsAppConnectForm({
       </Card>
 
       <Card>
-        <CardLabel>Inbound webhook</CardLabel>
+        <CardLabel>Replies</CardLabel>
         <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 0 }}>
-          To receive replies, set this as the webhook URL in your provider
-          dashboard. It only works once the app is hosted at a public URL.
+          {headerMode
+            ? "Replies are set up: Whapi sends every message people send you to this address, and they show up in the Inbox."
+            : canMoveSecret
+              ? "Press Set up replies so Whapi sends messages people send you to the Inbox. This is the address it will use:"
+              : "Save your Whapi token first. Then a Set up replies button appears here. This is the address Whapi will send replies to:"}
         </p>
         <code
           style={{
@@ -183,21 +278,14 @@ export function WhatsAppConnectForm({
         </code>
         {headerMode ? (
           <p style={{ color: "var(--text-secondary)", fontSize: 13, margin: "10px 0 0" }}>
-            The secret is sent as a header WhatsApp adds to each call, not in this address. It was set through WhatsApp&rsquo;s API; if you
-            change the webhook in the WhatsApp dashboard, use the button below again.
+            If you change the webhook in the Whapi dashboard, press the button below to set it back.
           </p>
         ) : null}
         {canMoveSecret && (
           <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
-            {!headerMode && (
-              <p style={{ color: "var(--text-secondary)", fontSize: 13, margin: 0 }}>
-                The secret is part of this address today. Moving it into a header keeps it out of logs. This sets the webhook in WhatsApp for
-                you.
-              </p>
-            )}
             <div>
               <Button variant="outline" size="sm" onClick={moveSecret} disabled={moving}>
-                {moving ? "Updating WhatsApp" : headerMode ? "Set the webhook in WhatsApp again" : "Move the secret into a header"}
+                {moving ? "Setting up replies" : headerMode ? "Set up replies again" : "Set up replies"}
               </Button>
             </div>
           </div>
@@ -214,10 +302,9 @@ export function WhatsAppConnectForm({
           padding: "12px 14px",
         }}
       >
-        <strong>Heads up:</strong> this links your number through an unofficial
-        WhatsApp bridge — convenient (no templates, message anyone), but it's
-        against WhatsApp&rsquo;s Terms and the number can be banned. Use a
-        dedicated business/messaging number, not a personal account.
+        <strong>Heads up:</strong> Whapi links your number the way WhatsApp Web does. It isn&rsquo;t an official WhatsApp service, so
+        WhatsApp can ban a number that looks like spam. Message people who contacted you or opted in, and use the business number, not a
+        personal one.
       </div>
     </div>
   );

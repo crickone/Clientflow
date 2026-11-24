@@ -41,7 +41,7 @@ export async function updateWhatsAppConfig(input: {
 export async function moveWhatsAppSecretToHeader(): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireAdmin();
   const cfg = getWhatsAppConfig();
-  if (!cfg.token || !cfg.webhookSecret) return { ok: false, error: "Save the WhatsApp settings first." };
+  if (!cfg.token || !cfg.webhookSecret) return { ok: false, error: "Save your Whapi token first." };
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
   if (!host || host.startsWith("localhost")) return { ok: false, error: "This only works on the live app address." };
