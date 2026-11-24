@@ -23,10 +23,11 @@ import {
   Workflow,
   Scale,
   Gauge,
+  Bell,
   type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { getCurrentMembership, requireAdminPage } from "@/lib/auth";
+import { getCurrentMembership, requireUserPage } from "@/lib/auth";
 import { getVenueType } from "@/lib/settings";
 import { getVocab } from "@/lib/vocabulary";
 import { getGoogleBusinessConnection } from "@/lib/google/business";
@@ -116,14 +117,22 @@ function buildGroups(vocab: ReturnType<typeof getVocab>, tenantId: number): { ti
   ];
 }
 
+/** Every staff member's own settings. Staff (not admins) see only these. */
+const PERSONAL_GROUP = {
+  title: "You",
+  desc: "Settings for your own login.",
+  items: [{ href: "/settings/notifications", icon: Bell, title: "Notifications", desc: "Which alerts you get, in the app and on your phone or computer." }] as Item[],
+};
+
 export default async function SettingsIndex() {
-  await requireAdminPage();
-  const vocab = getVocab(getVenueType());
-  const tenantId = getCurrentMembership()?.tenant.id ?? 0;
-  const groups = buildGroups(vocab, tenantId);
+  await requireUserPage();
+  const m = getCurrentMembership();
+  const tenantId = m?.tenant.id ?? 0;
+  // Staff only have their own settings; the business's are for admins.
+  const groups = m?.role === "admin" ? [...buildGroups(getVocab(getVenueType()), tenantId), PERSONAL_GROUP] : [PERSONAL_GROUP];
   return (
     <div className="app-page">
-      <PageHeader eyebrow="Configure" title="Settings" subtitle="How your account, bookings, brand and connections are set up." />
+      <PageHeader eyebrow="Configure" title="Settings" subtitle={m?.role === "admin" ? "How your account, bookings, brand and connections are set up." : "Your own settings for this account."} />
       <div className="set-groups">
         {groups.map((g, gi) => (
           <section key={g.title} className="set-group" aria-labelledby={`set-g${gi}`}>

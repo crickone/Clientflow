@@ -114,7 +114,7 @@ function handle(req: NextRequest, scriptPolicy: string | null) {
     pathname.startsWith("/logo") ||
     pathname.startsWith("/sites/") || // per-site static assets (public/sites/<slug>/…)
     pathname === "/favicon.ico" ||
-    /\.(png|jpe?g|svg|ico|webp|gif|mp4|webm|mov|otf|ttf|woff2?|css|js)$/i.test(pathname)
+    /\.(png|jpe?g|svg|ico|webp|gif|mp4|webm|mov|otf|ttf|woff2?|css|js|webmanifest)$/i.test(pathname)
   ) {
     // pass(), not a bare next(): some of these paths reach a route that reads
     // the site host, and the untrusted copy must be gone by then.

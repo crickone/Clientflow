@@ -430,6 +430,15 @@ export default async function RootLayout({
             back so a tab left open while another switched account fails loudly
             instead of writing to the wrong business — see @/lib/api/tenantStamp. */}
         <TenantTabGuard tenantId={activeTenantId} />
+        {/* Staff "Add to Home Screen": iPhone only allows alerts (lib/notifications)
+            for a site opened from the Home Screen. React hoists these into <head>. */}
+        {current ? (
+          <>
+            <link rel="manifest" href="/staff.webmanifest" />
+            <meta name="apple-mobile-web-app-capable" content="yes" />
+            <meta name="mobile-web-app-capable" content="yes" />
+          </>
+        ) : null}
         <div className="grain" aria-hidden />
         <MotionRoot>
           <SpotlightTracker />

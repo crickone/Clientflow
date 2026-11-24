@@ -63,6 +63,7 @@ import { useVocab } from "@/components/providers/VocabProvider";
 import { Logo } from "@/components/ui/Logo";
 import type { Vocab } from "@/lib/vocabulary";
 import { pathAllowed, type FeatureFlags } from "@/lib/features";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 export type SidebarUser = {
   id: number;
@@ -617,6 +618,7 @@ export function Sidebar({
             </div>
           )}
         </div>
+        <NotificationBell placement="sidebar" />
         {onToggleCollapsed && (
           <Tooltip label={collapsed ? "Expand menu" : "Collapse menu"} side="right">
             <button

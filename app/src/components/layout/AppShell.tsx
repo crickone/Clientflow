@@ -17,6 +17,8 @@ import type { ThemeMode } from "@/lib/theme";
 import type { FeatureFlags } from "@/lib/features";
 import { isBarePath } from "@/lib/barePaths";
 import { CommandK } from "./CommandK";
+import { NotificationsProvider } from "@/components/notifications/NotificationsProvider";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 export function AppShell({
   user,
@@ -146,6 +148,8 @@ export function AppShell({
 
   return (
     <VocabProvider value={vocab}>
+      {/* One poller for the bell, shared by the sidebar and top-bar bells. */}
+      <NotificationsProvider>
       {/* Cmd+K and the app-wide keymap. Mounted here AND on the root layout's
           Studio branch, which skips this shell entirely. */}
       <CommandK
@@ -194,6 +198,7 @@ export function AppShell({
               <Menu size={22} strokeWidth={1.9} />
             </button>
             <Logo src={logoSrc} alt={businessName} height={22} oneColour />
+            <NotificationBell placement="topbar" />
           </div>
           {children}
         </main>
@@ -204,6 +209,7 @@ export function AppShell({
             usual case) it holds no timer and makes no requests. */}
         <GenerationWatcher />
       </div>
+      </NotificationsProvider>
     </VocabProvider>
   );
 }
