@@ -55,9 +55,12 @@ const EMPTY_FORM: FormState = {
  */
 export function ImapConnectCard({
   connection,
+  sendsAs = null,
   active,
 }: {
   connection: ImapConnection | null;
+  /** Set when sends go through the verified Mailgun domain (SMTP unreachable): the address they come from. */
+  sendsAs?: string | null;
   active: boolean;
 }) {
   const router = useRouter();
@@ -117,8 +120,8 @@ export function ImapConnectCard({
     startTest(async () => {
       const res = await testImapConnectionAction(input);
       if (res.ok) {
-        setTestResult({ ok: true, message: "Connection works." });
-        toast.success("Connection works");
+        setTestResult({ ok: true, message: res.note ?? "Connection works." });
+        toast.success("Connection works", res.note ? { description: res.note } : undefined);
       } else {
         setTestResult({ ok: false, message: res.error });
         toast.error(res.error);
@@ -136,7 +139,7 @@ export function ImapConnectCard({
         toast.error(res.error);
         return;
       }
-      toast.success(`Connected ${input.email}`);
+      toast.success(`Connected ${input.email}`, res.note ? { description: res.note } : undefined);
       router.refresh();
     });
   }
@@ -189,9 +192,16 @@ export function ImapConnectCard({
       {connection ? (
         <>
           <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>
-            Connected as <strong style={{ color: "var(--text-primary)" }}>{connection.email}</strong>.
-            Emails send from this mailbox over SMTP, and it&apos;s a full two-way
-            inbox — replies are read and sent from Communication.
+            Connected as <strong style={{ color: "var(--text-primary)" }}>{connection.email}</strong>.{" "}
+            {sendsAs ? (
+              <>
+                Incoming email comes in from this mailbox. Emails you send go out as{" "}
+                <strong style={{ color: "var(--text-primary)" }}>{sendsAs}</strong> through your verified sending domain, with
+                replies going to {connection.email}.
+              </>
+            ) : (
+              <>Emails send from this mailbox over SMTP, and it&apos;s a full two-way inbox: replies are read and sent from the Inbox.</>
+            )}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <Button variant="ghost" onClick={disconnect} disabled={disconnecting}>

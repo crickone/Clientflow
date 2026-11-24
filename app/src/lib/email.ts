@@ -6,7 +6,8 @@ import { readKey, readKeyForTenant, setKey } from "@/lib/settings";
 import { getBusinessProfile, getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { getGmailConnection, gmailSend, isGmailConnected } from "@/lib/gmail";
-import { isImapConnected, smtpSend } from "@/lib/imapEmail";
+import { getImapConnection, isImapConnected, smtpSend } from "@/lib/imapEmail";
+import { mailgunRouteDomain, sendThroughMailgun } from "@/lib/mailgunRoute";
 
 /**
  * Email sending via Resend. Two moving parts:
@@ -145,6 +146,23 @@ async function sendVia(tenantId: number | null, sender: EmailSender, opts: SendO
   }
 
   if (tenantId !== null && isImapConnected(tenantId)) {
+    // The mailbox receives over IMAP but its SMTP server is out of reach from
+    // our host: send through the business's verified Mailgun domain instead.
+    const viaDomain = mailgunRouteDomain(tenantId);
+    const mailbox = viaDomain ? getImapConnection(tenantId) : null;
+    if (viaDomain && mailbox) {
+      return sendThroughMailgun(tenantId, viaDomain, {
+        fromName: sanitizeName(sender.fromName),
+        mailboxEmail: mailbox.email,
+        to: Array.isArray(opts.to) ? opts.to.join(", ") : opts.to,
+        subject: opts.subject,
+        html: opts.html,
+        text: opts.text ?? htmlToText(opts.html),
+        replyTo: opts.replyTo || sender.replyTo || undefined,
+        inReplyTo: opts.gmailThread?.inReplyTo,
+        references: opts.gmailThread?.references,
+      });
+    }
     return smtpSend(tenantId, {
       fromName: sanitizeName(sender.fromName),
       to: Array.isArray(opts.to) ? opts.to.join(", ") : opts.to,

@@ -5,6 +5,9 @@ import { z } from "zod";
 
 import { requireAdmin, getCurrentMembership } from "@/lib/auth";
 import { deleteImapConnection, saveImapConnection, testImapConnection } from "@/lib/imapEmail";
+import { getSendingDomain } from "@/lib/marketing/domains";
+import { setMailgunRoute } from "@/lib/mailgunRoute";
+import { mailgunFromAddress } from "@/lib/mailgunRouteModel";
 
 /**
  * Server actions for connecting/testing/disconnecting a tenant's own
@@ -19,7 +22,29 @@ import { deleteImapConnection, saveImapConnection, testImapConnection } from "@/
  * private to this module.
  */
 
-export type ImapActionResult = { ok: true } | { ok: false; error: string };
+export type ImapActionResult = { ok: true; note?: string } | { ok: false; error: string };
+
+/**
+ * Our host can't reach the mailbox's outgoing (SMTP) server, but the mailbox
+ * itself signed in. With a verified sending domain that's fine: email goes
+ * out through it. Returns the note to show, or the error when there's no
+ * verified domain to fall back on.
+ */
+function blockedSmtpOutcome(email: string): { ok: true; note: string; domain: string } | { ok: false; error: string } {
+  const d = getSendingDomain(tenantId());
+  if (d && d.state === "verified") {
+    return {
+      ok: true,
+      domain: d.domain,
+      note: `Your mailbox signed in. Its outgoing server can't be reached from Adonis, so emails will send as ${mailgunFromAddress(email, d.domain)} through your verified domain, with replies going to ${email}.`,
+    };
+  }
+  return {
+    ok: false,
+    error:
+      "Your mailbox signed in, but Adonis can't reach its outgoing server. Verify a sending domain under Messaging > Sending domains, then connect again: Adonis will send through that domain instead.",
+  };
+}
 
 /** Form input for connecting/testing a mailbox. `username` is not collected — it defaults to `email`. */
 export type ImapFormInput = {
@@ -74,7 +99,12 @@ export async function testImapConnectionAction(input: ImapFormInput): Promise<Im
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
   }
-  return testImapConnection(credsFromInput(parsed.data));
+  const res = await testImapConnection(credsFromInput(parsed.data));
+  if (!res.ok && res.smtpUnreachable) {
+    const out = blockedSmtpOutcome(parsed.data.email);
+    return out.ok ? { ok: true, note: out.note } : out;
+  }
+  return res.ok ? { ok: true } : { ok: false, error: res.error };
 }
 
 /**
@@ -92,7 +122,13 @@ export async function connectImapAction(input: ImapFormInput): Promise<ImapActio
   const d = parsed.data;
 
   const test = await testImapConnection(credsFromInput(d));
-  if (!test.ok) return test;
+  let note: string | undefined;
+  if (!test.ok) {
+    if (!test.smtpUnreachable) return { ok: false, error: test.error };
+    const out = blockedSmtpOutcome(d.email);
+    if (!out.ok) return out;
+    note = out.note;
+  }
 
   saveImapConnection({
     tenantId: tenantId(),
@@ -108,9 +144,10 @@ export async function connectImapAction(input: ImapFormInput): Promise<ImapActio
     fromName: d.fromName || undefined,
     connectedByUserId: me.id,
   });
+  setMailgunRoute(Boolean(note));
   revalidatePath("/settings/email");
   revalidatePath("/communication");
-  return { ok: true };
+  return note ? { ok: true, note } : { ok: true };
 }
 
 /** Disconnect the current tenant's IMAP/SMTP mailbox. */

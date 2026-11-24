@@ -7,6 +7,8 @@ import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { getEmailSender, hasEmailApiKey, getEmailProvider } from "@/lib/email";
 import { getGmailConnection, isDriveConnected } from "@/lib/gmail";
 import { getImapConnection } from "@/lib/imapEmail";
+import { mailgunRouteDomain } from "@/lib/mailgunRoute";
+import { mailgunFromAddress } from "@/lib/mailgunRouteModel";
 import { googleConfigured } from "@/lib/google/oauth";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { EmailSettingsForm } from "@/components/settings/EmailSettingsForm";
@@ -30,6 +32,8 @@ export default async function EmailSettingsPage(
   const driveConnected = isDriveConnected(tenantId);
   const imap = getImapConnection(tenantId);
   const provider = getEmailProvider();
+  const routeDomain = imap ? mailgunRouteDomain(tenantId) : null;
+  const sendsAs = imap && routeDomain ? mailgunFromAddress(imap.email, routeDomain) : null;
 
   return (
     <div className="app-page" style={{ maxWidth: 720 }}>
@@ -59,7 +63,7 @@ export default async function EmailSettingsPage(
 
       <div style={{ height: 16 }} />
 
-      <ImapConnectCard connection={imap} active={provider === "imap"} />
+      <ImapConnectCard connection={imap} active={provider === "imap"} sendsAs={sendsAs} />
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { getTenantDbById } from "@/lib/db/tenant";
 import { clients, emailMessages, imapConnections } from "@/lib/db/schema";
 import { decryptToken, encryptToken } from "@/lib/google/tokenCrypto";
 import { notifyInboundEmail } from "@/lib/notifications/notify";
+import { isUnreachableSmtpError } from "@/lib/mailgunRouteModel";
 
 /**
  * A tenant's connected IMAP/SMTP mailbox (generic, non-Gmail) — the
@@ -277,7 +278,7 @@ function errorMessage(err: unknown): string {
  * tenant's database. Logged and swallowed on failure — a bookkeeping miss
  * must never turn an already-sent email into a reported failure.
  */
-function recordSentMessage(
+export function recordSentMessage(
   tenantId: number,
   fromEmail: string,
   opts: {
@@ -397,14 +398,18 @@ export async function testImapConnection(creds: {
   smtpSecure: boolean;
   username: string;
   password: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): Promise<{ ok: true } | { ok: false; error: string; smtpUnreachable?: boolean }> {
   try {
+    // Short timeouts: a blocked port should fail in seconds, not hang the form.
     const client = new ImapFlow({
       host: creds.imapHost,
       port: creds.imapPort,
       secure: creds.imapSecure,
       auth: { user: creds.username, pass: creds.password },
       logger: false,
+      connectionTimeout: 12_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
     });
     let imapError: string | null = null;
     try {
@@ -425,16 +430,23 @@ export async function testImapConnection(creds: {
       port: creds.smtpPort,
       secure: creds.smtpSecure,
       auth: { user: creds.username, pass: creds.password },
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
     });
     let smtpError: string | null = null;
+    let smtpUnreachable = false;
     try {
       await transporter.verify();
     } catch (err) {
-      smtpError = `Couldn't verify SMTP (${creds.smtpHost}:${creds.smtpPort}): ${errorMessage(err)}`;
+      const msg = errorMessage(err);
+      const code = (err as { code?: string } | null)?.code ?? "";
+      smtpUnreachable = isUnreachableSmtpError(`${code} ${msg}`);
+      smtpError = `Couldn't verify SMTP (${creds.smtpHost}:${creds.smtpPort}): ${msg}`;
     } finally {
       transporter.close();
     }
-    if (smtpError) return { ok: false, error: smtpError };
+    if (smtpError) return { ok: false, error: smtpError, smtpUnreachable };
 
     return { ok: true };
   } catch (err) {

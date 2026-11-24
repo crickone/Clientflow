@@ -38,6 +38,8 @@ export interface CampaignMessage {
   /** Extra RFC-5322 headers (e.g. List-Unsubscribe) — sent to Mailgun as `h:<Name>`. Never a `v:` user-variable. */
   headers?: Record<string, string>;
   tags?: string[];
+  /** false = no open/click tracking (one-to-one mail, not a campaign). */
+  tracking?: boolean;
   campaignId?: number;
   contactId?: number;
   tenantId?: number;

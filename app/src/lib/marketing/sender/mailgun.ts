@@ -252,6 +252,7 @@ export class MailgunSender implements CampaignSender {
       if (msg.tenantId !== undefined) form.set("v:tenantId", String(msg.tenantId));
 
       for (const tag of msg.tags ?? []) form.append("o:tag", tag);
+      if (msg.tracking === false) form.set("o:tracking", "no");
       // Caller-supplied headers (List-Unsubscribe etc.) — always `h:`-prefixed, never a `v:` user-variable.
       for (const [name, value] of Object.entries(msg.headers ?? {})) form.set(`h:${name}`, value);
 
