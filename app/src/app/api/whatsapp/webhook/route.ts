@@ -2,8 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { runWithTenant } from "@/lib/db/tenant";
 import { listTenants } from "@/lib/tenants";
-import { readKeyForTenant } from "@/lib/settings";
-import { getWhatsAppConfig } from "@/lib/whatsapp/config";
+import { getWhatsAppConfig, isWhatsAppConfiguredForTenant } from "@/lib/whatsapp/config";
 import { getWhatsAppBridge, isWhatsAppConfigured } from "@/lib/whatsapp";
 import {
   addMessage,
@@ -76,14 +75,11 @@ function whatsAppTenant(slug: string | null) {
   if (slug) {
     const t = listTenants().find((x) => x.slug === slug && x.isActive !== false);
     if (!t) return undefined;
-    const cfg = readKeyForTenant<{ token?: string }>(t.id, "whatsapp_config", {});
-    return typeof cfg.token === "string" && cfg.token.trim() ? t : undefined;
+    // The token is stored sealed (tokenEnc) since 2026-10-22; read it through
+    // the config module, never the raw settings row.
+    return isWhatsAppConfiguredForTenant(t.id) ? t : undefined;
   }
-  return listTenants().find((t) => {
-    if (t.isActive === false) return false;
-    const cfg = readKeyForTenant<{ token?: string }>(t.id, "whatsapp_config", {});
-    return typeof cfg.token === "string" && cfg.token.trim().length > 0;
-  });
+  return listTenants().find((t) => t.isActive !== false && isWhatsAppConfiguredForTenant(t.id));
 }
 
 export async function POST(req: NextRequest) {
