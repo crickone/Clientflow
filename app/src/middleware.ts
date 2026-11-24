@@ -22,6 +22,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/campaigns/signup", // public campaign-landing "Sign up" form → host-scoped lead (rate-limited, no key)
   "/api/site/enquiry", // public bespoke-site enquiry form → token-scoped lead (rate-limited, no key; see lib/cms/enquiryToken)
   "/api/branding/logo",
+  "/api/version", // which deployment is live (not sensitive): open pages notice an update
   "/api/whatsapp/webhook",
   "/api/mailgun/webhook", // Mailgun delivery/engagement webhook — server-to-server, HMAC-signature-verified inside the route handler
   "/api/integrations/facebook/leadgen", // Facebook leadgen webhook — server-to-server, X-Hub-Signature-256-verified inside the route handler

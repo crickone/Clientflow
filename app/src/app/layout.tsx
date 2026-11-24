@@ -46,6 +46,8 @@ import { noteModuleVisit } from "@/lib/analytics/moduleUsage";
 import { pathAllowed, type FeatureFlags } from "@/lib/features";
 import { ImpersonationBanner } from "@/components/layout/ImpersonationBanner";
 import { TenantTabGuard } from "@/components/layout/TenantTabGuard";
+import { UpdateWatcher } from "@/components/system/UpdateWatcher";
+import { BUILD_ID } from "@/lib/buildId";
 // Side-effect import: boots the daily automation scheduler (birthdays etc.) on
 // the server. This is a nodejs-only server component, so better-sqlite3 stays
 // out of the edge bundle. Guarded internally against duplicate timers.
@@ -430,6 +432,7 @@ export default async function RootLayout({
             back so a tab left open while another switched account fails loudly
             instead of writing to the wrong business — see @/lib/api/tenantStamp. */}
         <TenantTabGuard tenantId={activeTenantId} />
+        {user ? <UpdateWatcher build={BUILD_ID} /> : null}
         {/* Staff "Add to Home Screen": iPhone only allows alerts (lib/notifications)
             for a site opened from the Home Screen. React hoists these into <head>. */}
         {current ? (
