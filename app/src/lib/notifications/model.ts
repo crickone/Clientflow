@@ -130,11 +130,17 @@ export function messageTitle(channel: string, name: string | null | undefined): 
  * their own action.
  */
 const MESSAGE_SOURCES = new Set(["whatsapp", "messenger", "instagram"]);
+/** A buyer of an offer: the sale notification already says so. */
+const SALE_SOURCES = new Set(["offer"]);
 
 export function leadNotifies(source: string | null | undefined, actor?: string | null): boolean {
   if (actor === "user" || actor === "agent") return false;
-  return !MESSAGE_SOURCES.has((source ?? "").trim().toLowerCase());
+  const s = (source ?? "").trim().toLowerCase();
+  return !MESSAGE_SOURCES.has(s) && !SALE_SOURCES.has(s);
 }
+
+/** Notifications older than this are deleted as new ones arrive. */
+export const KEEP_NOTIFICATIONS_MS = 90 * 24 * 60 * 60 * 1000;
 
 const LEAD_SOURCE: Record<string, string> = {
   facebook: "From Facebook lead form",

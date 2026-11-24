@@ -88,8 +88,27 @@ const tick = () => new Promise((r) => setTimeout(r, 20));
       ok(JSON.stringify(staffIds) === JSON.stringify([admin, staff].sort()), "an inactive membership gets nothing");
       ok(!staffIds.includes(gone), "the deactivated login is left out");
 
+      // Someone seen for the first time starts with nothing unread.
+      store.createNotification({ kind: "message", title: "Old", href: "/x", key: "k0", now: Date.now() - 120_000 });
+      ok(store.unreadCount(admin, "admin") === 0, "a first-time user starts with no backlog");
+      // From here on count everything (both people have caught up to time 0).
+      store.markAllRead(admin, 0);
+      store.markAllRead(staff, 0);
+      ok(store.unreadCount(admin, "admin") === 1, "after that, older items count again for the test");
+      store.markRead(admin, store.listForUser(admin, "admin")[0].id);
+      store.markRead(staff, store.listForUser(staff, "staff")[0].id);
+
+      // Notifications past 90 days are pruned when a new one arrives.
+      const ancient = store.createNotification({ kind: "message", title: "Ancient", href: "/x", key: "k-old", now: Date.now() - 91 * 24 * 3600e3 });
+      store.createNotification({ kind: "message", title: "Fresh", href: "/x", key: "k-fresh", now: Date.now() - 90_000 });
+      ok(!store.listForUser(admin, "admin", 100).some((i) => i.id === ancient), "notifications older than 90 days are pruned");
+      for (const [u, r] of [[admin, "admin"], [staff, "staff"]] as const) {
+        const fresh = store.listForUser(u, r, 100).find((i) => i.title === "Fresh");
+        if (fresh) store.markRead(u, fresh.id);
+      }
+
       // Dedupe.
-      const t0 = 1_000_000;
+      const t0 = Date.now() - 60_000;
       const a = store.createNotification({ kind: "message", title: "A", href: "/x", key: "k1", now: t0 + 1 });
       const again = store.createNotification({ kind: "message", title: "A again", href: "/x", key: "k1", now: t0 + 2 });
       ok(a != null && again === null, "the same key notifies once");
@@ -160,7 +179,8 @@ const tick = () => new Promise((r) => setTimeout(r, 20));
       const before = store.listForUser(admin, "admin", 100).length;
       upsertLead({ source: "whatsapp", phone: "+353870000001", notes: "Inbound WhatsApp" });
       upsertLead({ source: "manual", actor: "user", firstName: "Typed", lastName: "In" });
-      ok(store.listForUser(admin, "admin", 100).length === before, "message-source and staff-typed leads are silent");
+      upsertLead({ source: "offer", sourceLeadId: "offer:1", firstName: "Ann", lastName: "Buyer" });
+      ok(store.listForUser(admin, "admin", 100).length === before, "message-source, staff-typed and buyer leads are silent");
       const { lead } = upsertLead({ source: "facebook", sourceLeadId: "fb-1", firstName: "Caroline", lastName: "Burke" });
       const top = store.listForUser(admin, "admin", 1)[0];
       ok(top?.title === "New lead: Caroline Burke" && top.body === "From Facebook lead form" && top.href === `/leads/${lead.id}`, "a Facebook lead notifies");

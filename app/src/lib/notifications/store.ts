@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, inArray, lte, notInArray, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, lte, notInArray, sql, type SQL } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { controlSqlite } from "@/lib/db/control";
@@ -12,6 +12,7 @@ import {
   staffPushSubscriptions,
 } from "@/lib/db/schema";
 import {
+  KEEP_NOTIFICATIONS_MS,
   NOTIFICATION_KINDS,
   isAdminOnlyKind,
   mergePrefs,
@@ -65,11 +66,30 @@ export function createNotification(n: NewNotification): number | null {
     .onConflictDoNothing({ target: notifications.dedupeKey })
     .returning({ id: notifications.id })
     .all();
+  if (res[0]) pruneOld(n.now ?? Date.now());
   return res[0]?.id ?? null;
 }
 
+/** Drop notifications past KEEP_NOTIFICATIONS_MS, and their read marks. */
+function pruneOld(now: number): void {
+  const cutoff = now - KEEP_NOTIFICATIONS_MS;
+  const old = db.select({ id: notifications.id }).from(notifications).where(lt(notifications.createdAt, cutoff)).all().map((r) => r.id);
+  if (old.length === 0) return;
+  db.delete(notificationReads).where(inArray(notificationReads.notificationId, old)).run();
+  db.delete(notifications).where(inArray(notifications.id, old)).run();
+}
+
+/**
+ * Everything before this counts as read. Someone seen for the first time
+ * starts now, so a new staff member doesn't open the bell to a backlog of
+ * other people's old notifications.
+ */
 function readAllBefore(userId: number): number {
-  return db.select({ t: notificationState.readAllBefore }).from(notificationState).where(eq(notificationState.userId, userId)).get()?.t ?? 0;
+  const row = db.select({ t: notificationState.readAllBefore }).from(notificationState).where(eq(notificationState.userId, userId)).get();
+  if (row) return row.t;
+  const now = Date.now();
+  db.insert(notificationState).values({ userId, readAllBefore: now }).onConflictDoNothing({ target: notificationState.userId }).run();
+  return now;
 }
 
 /** What this person may see in the bell: their role allows it and the kind is on in the app. */
