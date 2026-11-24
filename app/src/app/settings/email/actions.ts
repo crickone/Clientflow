@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { requireAdmin } from "@/lib/auth";
 import {
+  getEmailProvider,
   getEmailSender,
   hasEmailApiKey,
   sendEmail,
@@ -14,6 +15,9 @@ import {
 } from "@/lib/email";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getTheme } from "@/lib/settings";
+import { getCurrentTenant } from "@/lib/db/tenant";
+import { getImapConnection } from "@/lib/imapEmail";
+import { getGmailConnection } from "@/lib/gmail";
 
 const schema = z.object({
   fromName: z.string().trim().min(1, "Sender name is required").max(120),
@@ -48,18 +52,27 @@ export async function sendTestEmailAction(to: string): Promise<ActionResult> {
   await requireAdmin();
   const addr = z.string().trim().toLowerCase().email().safeParse(to);
   if (!addr.success) return { ok: false, error: "Enter a valid email address" };
-  if (!hasEmailApiKey()) {
-    return { ok: false, error: "Sending from your own domain isn't switched on for this account yet. Contact AdonisAgent support." };
-  }
+  // Test whichever sender is active: Gmail, a connected mailbox (IMAP, or
+  // the verified domain when its SMTP is out of reach), or Resend.
+  const provider = getEmailProvider();
   const sender = getEmailSender();
-  if (!sender.fromEmail) return { ok: false, error: "Save a sender address first." };
+  if (provider === "none") {
+    if (!hasEmailApiKey()) {
+      return { ok: false, error: "Sending from your own domain isn't switched on for this account yet. Contact AdonisAgent support." };
+    }
+    return { ok: false, error: "Connect Gmail or a mailbox, or save a sender address first." };
+  }
+  const tenantId = getCurrentTenant().id;
+  const mailbox = provider === "imap" ? getImapConnection(tenantId) : null;
+  const gmail = provider === "gmail" ? getGmailConnection(tenantId) : null;
+  const replyTo = sender.replyTo || mailbox?.email || gmail?.email || sender.fromEmail;
 
   const business = getBusinessProfile().businessName;
   const html = renderEmailShell({
     businessName: business,
     accent: getTheme().accent,
     heading: "Test email",
-    bodyHtml: `<p style="margin:0 0 14px;">This is a test email from <strong>${business}</strong> to confirm your email sending is set up correctly.</p><p style="margin:0;">If you received this, replies will go to <strong>${sender.replyTo || sender.fromEmail}</strong>.</p>`,
+    bodyHtml: `<p style="margin:0 0 14px;">This is a test email from <strong>${business}</strong> to confirm your email sending is set up correctly.</p><p style="margin:0;">If you received this, replies will go to <strong>${replyTo}</strong>.</p>`,
     footer: "Sent from AdonisAgent to verify your email configuration.",
   });
   const res = await sendEmail({ to: addr.data, subject: `Test email from ${business}`, html });

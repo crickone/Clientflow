@@ -156,8 +156,8 @@ export function EmailSettingsForm({
           </strong>
         </div>
         <Hint>
-          Confirm your domain + key are working. Until the domain is verified,
-          Resend only delivers to your own account email.
+          Sends from whichever email is active on this page: Gmail, your connected
+          mailbox, or the address above.
         </Hint>
         <div style={{ display: "flex", gap: 8 }}>
           <Input
