@@ -18,6 +18,10 @@ export type ConvMessage = {
   tools: string[];
   artifacts: ConvArtifact[];
   pending?: { actions: ConvAction[]; status: "awaiting" | "approving" | "approved" | "cancelled" } | null;
+  /** When the server started writing this reply (ms since epoch). Absent on replies saved before 2026-11-24. */
+  startedAt?: number;
+  /** How long the turn took, once it finished. */
+  durationMs?: number;
 };
 
 export type ConversationSummary = { id: string; title: string; updatedAt: number; running: boolean };

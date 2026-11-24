@@ -87,7 +87,7 @@ export async function POST(req: NextRequest, p: Params) {
       action = Number.isInteger(body.campaignId) ? { type: "buildRest", campaignId: body.campaignId as number } : null;
       break;
     case "stop":
-      action = { type: "stop" };
+      action = { type: "stop", now: body.now === true };
       break;
   }
   if (!action) return Response.json({ ok: false, error: "Unknown action." }, { status: 400 });
