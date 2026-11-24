@@ -1,4 +1,5 @@
 import "server-only";
+import { AiCapError } from "@/lib/ai/usage";
 import type Anthropic from "@anthropic-ai/sdk";
 
 import {
@@ -618,6 +619,14 @@ export async function redesignSlide(
      */
     photoLibrary?: PhotoChoice[];
     logoPath?: string | null;
+    /**
+     * Makes a photograph to the scene the redesign writes. A slot the slide
+     * did not already have a picture for gets one MADE to its brief rather
+     * than the library's first photograph, which is how every "add a
+     * background image" used to land on the same generic shot. The library
+     * stays the fallback when this declines or fails.
+     */
+    makePhoto?: (scene: string) => Promise<PhotoChoice | null>;
   },
   meter: MeterContext,
   model: string = CONTENT_MODEL,
@@ -738,6 +747,23 @@ export async function redesignSlide(
   // change of composition, not of picture -- and a second slot draws a
   // DIFFERENT one from the library. See redesignPhotoSlots.
   const forThisSlide = redesignPhotoSlots(design.html, input.photo ?? null, available);
+  if (input.makePhoto) {
+    const scenes = design.photos ?? [];
+    for (let i = 0; i < forThisSlide.length; i++) {
+      const pick = forThisSlide[i];
+      // Slot 1 keeps the slide's own photograph; every other filled slot was
+      // about to be handed a library picture.
+      if (pick == null || (i === 0 && input.photo != null && pick === input.photo)) continue;
+      const scene = (scenes[i] ?? (i === 0 ? design.photo : "") ?? "").trim() || input.note?.trim() || input.topic;
+      try {
+        const made = await input.makePhoto(scene);
+        if (made) forThisSlide[i] = made;
+      } catch (err) {
+        if (err instanceof AiCapError) throw err;
+        console.warn("[redesignSlide] photograph failed, using the library instead:", err);
+      }
+    }
+  }
   // Derived from the list that was RENDERED, never from "does this markup use
   // a photograph": recording [input.photo.id] for markup using only slot 2
   // claimed slot 1 held that asset while the render carried no photograph --

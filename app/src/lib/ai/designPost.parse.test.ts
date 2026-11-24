@@ -796,4 +796,5 @@ check(
     DESIGN_RULES.indexOf("EXPLAIN THE MECHANISM"),
 );
 
+check("scenes must show the post's own subject, not equipment on its own", DESIGN_RULES.includes("THIS post's own") && DESIGN_RULES.includes("an empty barbell") && DESIGN_RULES.includes("No two slides in the same post share a scene"));
 console.log(`\ndesignPost.parse: ${passed} checks passed`);

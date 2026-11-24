@@ -9,6 +9,7 @@ import { photoChoiceFor, photoChoices } from "@/lib/image/library";
 import { serialisePhotoAssetIds } from "@/lib/image/photoAssetIds";
 import { sceneForSlot, serialisePhotoScenes } from "@/lib/image/photoScenes";
 import { resolveLogoPath } from "@/lib/branding";
+import { scenePhotographer } from "@/lib/image/scenePhotographer";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 
 export const dynamic = "force-dynamic";
@@ -125,6 +126,9 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
         // {{PHOTO:2}} -- so "make this a split screen" could not be answered.
         photoLibrary: photoChoices(),
         logoPath: carousel.showLogo ? resolveLogoPath() : null,
+        // A photo slot the slide didn't already have is made to its scene,
+        // not taken from the top of the library.
+        makePhoto: scenePhotographer(tenantId, "carousel", carousel.name),
       },
       { tenantId, agentKey: "carousel" },
     );
