@@ -1,3 +1,5 @@
+import "server-only";
+
 import { EventEmitter } from "node:events";
 
 import type { LiveEvent } from "@/lib/agents/liveEvents";
