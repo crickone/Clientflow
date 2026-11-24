@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type ReactNode, createContext, useContext } from "react";
+import { type CSSProperties, type ReactNode, createContext, useContext, useState } from "react";
 import { motion } from "motion/react";
 
 import { revealVariants, staggerContainer } from "@/lib/motion";
@@ -71,9 +71,16 @@ export function RevealGroup({
    *  AFTERWARD (a new category group appearing on a filter switch) inherits
    *  only `initial="hidden"` and is stuck at opacity 0 — the list vanishes.
    *  `animate` keeps driving "visible" so newly-mounted children always resolve.
-   *  Default (false) keeps the scroll-reveal-once behaviour for static content. */
+   *  Default (false) waits for the group to scroll into view first, then holds
+   *  "visible" the same way, so late children resolve either way. */
   immediate?: boolean;
 }) {
+  // Once the group has scrolled into view, hold it at "visible" with a
+  // persistent `animate`. `whileInView` + `once` fires a single time, so a
+  // child that mounts later (a filter tab switched back, a search cleared, a
+  // row added by router.refresh) would otherwise inherit only "hidden" and sit
+  // invisible in its grid slot. Holding "visible" makes late children resolve.
+  const [seen, setSeen] = useState(immediate);
   return (
     <InRevealGroup.Provider value={true}>
       <motion.div
@@ -81,9 +88,10 @@ export function RevealGroup({
         style={style}
         variants={staggerContainer(stagger)}
         initial="hidden"
-        animate={immediate ? "visible" : undefined}
-        whileInView={immediate ? undefined : "visible"}
-        viewport={immediate ? undefined : { once: true, margin: "-40px" }}
+        animate={seen ? "visible" : undefined}
+        whileInView={seen ? undefined : "visible"}
+        viewport={seen ? undefined : { once: true, margin: "-40px" }}
+        onViewportEnter={seen ? undefined : () => setSeen(true)}
       >
         {children}
       </motion.div>
