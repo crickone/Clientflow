@@ -29,7 +29,7 @@ export function WhenCard({ strip, date, onDate, startTime, onStartTime, duration
   const [otherDate, setOtherDate] = useState(!inStrip);
   const [otherTime, setOtherTime] = useState(Boolean(startTime) && !onGrid(startTime));
 
-  const day = slots.status === "ready" ? slots.day : null;
+  const day = slots.status === "ready" && slots.day.date === date ? slots.day : null;
   const picked = day?.slots.find((x) => x.time === startTime) ?? null;
   const freeCount = day ? day.slots.filter((x) => x.free).length : 0;
 
@@ -85,6 +85,7 @@ export function WhenCard({ strip, date, onDate, startTime, onStartTime, duration
                     disabled={!slot.free}
                     aria-pressed={slot.time === startTime}
                     title={slot.free ? undefined : slot.reason}
+                    aria-label={slot.free ? undefined : `${chipTime(slot.time)}, taken: ${slot.reason}`}
                     className={`${s.slot} ${slot.time === startTime ? s.slotOn : ""}`}
                     onClick={() => onStartTime(slot.time)}
                   >
@@ -112,7 +113,7 @@ export function WhenCard({ strip, date, onDate, startTime, onStartTime, duration
       )}
 
       <div className={s.inline}>
-        {otherTime ? (
+        {otherTime || slots.status === "error" ? (
           <>
             <Label htmlFor="booking-time" srOnly>
               Start time
