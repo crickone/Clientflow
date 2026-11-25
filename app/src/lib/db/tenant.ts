@@ -2319,6 +2319,8 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
         "auto_reply_status TEXT NOT NULL DEFAULT 'none'",
       );
       addCol("ai_suggested_reply", "ai_suggested_reply TEXT");
+      // Inbox photos/attachments (JSON array, lib/inbox/mediaModel).
+      addCol("media", "media TEXT");
     } catch (err) {
       console.error(`[db] ${table} triage-cols migration failed:`, err);
     }

@@ -518,6 +518,9 @@ export const leadMessages = sqliteTable(
       enum: ["queued", "sent", "delivered", "read", "failed"],
     }),
     sentAt: integer("sent_at", { mode: "timestamp_ms" }),
+    // Photos, videos, voice notes and files that came with the message: a JSON
+    // array of lib/inbox/mediaModel MessageMedia, null when there are none.
+    media: text("media"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -626,6 +629,8 @@ export const clientMessages = sqliteTable(
       enum: ["queued", "sent", "delivered", "read", "failed"],
     }),
     sentAt: integer("sent_at", { mode: "timestamp_ms" }),
+    // Same as lead_messages.media.
+    media: text("media"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
