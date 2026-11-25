@@ -11,7 +11,10 @@ import { KEEP_ON_REPLY } from "@/lib/automationModel";
 import { alertHotLead } from "@/lib/leadFlows/alerts";
 import { applyColumnEntry } from "@/lib/leadFlows/columnEntry";
 import { stopFlows } from "@/lib/leadFlows/runs";
-import { getCurrentTenant } from "@/lib/db/tenant";
+import { getCurrentTenant, runWithTenant } from "@/lib/db/tenant";
+import { EMAIL_MAX_AGE_MS } from "@/lib/notifications/model";
+import { isPositiveReply } from "@/lib/leadFlows/flowPlan";
+import { beginThinkingReplyCheck, queueThinkingNurtureMove, takeReplyCheck } from "@/lib/leadFlows/replies";
 import { queueCrmStage } from "@/lib/facebook/capi";
 import { reopensOnRepeatEnquiry, shouldAdvance, ROLE_TO_LEGACY_KEY, type StageRecord, type StageRole } from "./roles";
 
@@ -209,6 +212,13 @@ export interface LeadReply {
 }
 
 export function onInboundFromLead(leadId: number, reply?: LeadReply): void {
+  // In Thinking about it (flow on), the reply is read by the inbox triage
+  // before anything moves (lib/leadFlows/replies.ts).
+  try {
+    if (beginThinkingReplyCheck(leadId, currentStageRecord(leadId)?.systemKey === "thinking", reply)) return;
+  } catch (err) {
+    console.error(`[pipeline] reply check for lead #${leadId} not started:`, err);
+  }
   // They replied: a person takes it from here, so the automatic nudges stop
   // (a booked call's confirmation and reminder carry on).
   try {
@@ -218,6 +228,48 @@ export function onInboundFromLead(leadId: number, reply?: LeadReply): void {
   }
   // Hot now, and only now: the assignee and the alert number are told.
   if (advanceStage(leadId, "engaged", "replied")) alertHotLead(leadId, reply?.text ?? null);
+}
+
+/** The inbox triage has read a lead's message: settles a waiting Thinking about it reply check. */
+export function onLeadReplyTriaged(leadId: number, messageId: number, triage: { category: string; priority?: string | null }): void {
+  const check = takeReplyCheck(leadId, messageId);
+  if (!check) return;
+  resolveThinkingReply(leadId, check.text, isPositiveReply(triage));
+}
+
+/**
+ * Act on a Thinking about it reply: a yes (wants to book or talk) makes a
+ * hot lead and alerts; anything else moves them to Long-term nurture in 7
+ * days. Nothing happens if they are no longer in the column.
+ */
+export function resolveThinkingReply(leadId: number, text: string, positive: boolean): void {
+  if (currentStageRecord(leadId)?.systemKey !== "thinking") return;
+  if (positive) {
+    stopFlows(leadId, "replied: wants to book or talk", "all");
+    if (advanceStage(leadId, "engaged", "replied")) alertHotLead(leadId, text || null);
+    return;
+  }
+  queueThinkingNurtureMove(leadId);
+}
+
+/**
+ * An email arrived from a lead's address (Gmail or IMAP sync): a reply like
+ * any other, when it is recent (a first sync of old mail changes nothing).
+ * Explicit tenant: the mail sync runs with no request.
+ */
+export function onLeadEmailReply(tenantId: number, fromEmail: string | null, at: Date | null, snippet: string | null): void {
+  const email = (fromEmail ?? "").trim().toLowerCase();
+  if (!email || !at || Date.now() - at.getTime() > EMAIL_MAX_AGE_MS) return;
+  runWithTenant(tenantId, () => {
+    const rows = db.select({ id: schema.leads.id }).from(schema.leads).where(sql`lower(${schema.leads.email}) = ${email}`).all();
+    for (const r of rows) {
+      try {
+        onInboundFromLead(r.id, { text: snippet ?? "", channel: "email" });
+      } catch (err) {
+        console.error(`[pipeline] email reply for lead #${r.id} not handled:`, err);
+      }
+    }
+  });
 }
 export function onInboundFromClient(clientId: number): void {
   const leadId = leadIdForClient(clientId);

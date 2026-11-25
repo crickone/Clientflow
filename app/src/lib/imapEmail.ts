@@ -663,6 +663,10 @@ export async function syncImapInbox(
               isRead: false,
               at: m.internalDate,
             });
+            // A reply from a lead stops their follow-ups (lib/pipeline/stage.ts).
+            void import("@/lib/pipeline/stage")
+              .then((mod) => mod.onLeadEmailReply(tenantId, m.from.email || null, m.internalDate, m.snippet))
+              .catch((err) => console.error("[imapEmail] lead reply hook failed:", err));
           } catch (err) {
             // Best-effort: e.g. a UNIQUE race on gmail_message_id must not abort the rest.
             console.error("[imapEmail] syncImapInbox: failed to insert a message, skipping:", err);

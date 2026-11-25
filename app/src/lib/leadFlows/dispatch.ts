@@ -231,9 +231,19 @@ async function unknownRow(ctx: DispatchContext, item: AutomationQueueRow): Promi
 }
 
 /** What each kind of row does when it is due. */
+/** The triage never answered: treat the reply as wanting to talk, so a person looks. */
+async function runReplyCheckRow(ctx: DispatchContext, item: AutomationQueueRow): Promise<boolean> {
+  markRow(ctx.tdb, item.id, { status: "sent", error: "No triage answer in time: treated as wanting to talk.", sentAt: new Date(ctx.now) });
+  if (item.leadId == null) return false;
+  const { resolveThinkingReply } = await import("@/lib/pipeline/stage");
+  resolveThinkingReply(item.leadId, parsePayload(item.payload).text ?? "", true);
+  return false;
+}
+
 const HANDLERS: Record<string, RowHandler> = {
   message: sendMessageRow,
   move: runMoveRow,
+  reply_check: runReplyCheckRow,
   staff_alert: sendStaffAlertRow,
 };
 

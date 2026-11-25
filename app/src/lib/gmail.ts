@@ -444,6 +444,11 @@ export async function syncGmailInbox(
           isRead: isMessageRead(msg.labelIds),
           at: msg.internalDate ? new Date(Number(msg.internalDate)) : null,
         });
+        // A reply from a lead stops their follow-ups (lib/pipeline/stage.ts). Loaded
+        // here: the stage writer reaches email, which reaches this file.
+        void import("@/lib/pipeline/stage")
+          .then((m) => m.onLeadEmailReply(tenantId, from.email || null, msg.internalDate ? new Date(Number(msg.internalDate)) : null, msg.snippet ?? null))
+          .catch((err) => console.error("[gmail] lead reply hook failed:", err));
       }
     }
 
