@@ -270,6 +270,8 @@ export function act(c: Ctx, action: ConversationAction): ConversationView {
       conv.stopRequested = true;
       if (mem) mem.stopRequested = true;
       write(c, mem ?? conv);
+      // Other open tabs hear about it now, not at the next tool start or the end.
+      publish(liveKey(c), { type: "state", conversation: view(mem ?? conv) });
       if (action.now) aborts.get(liveKey(c))?.abort();
     }
     return view(mem ?? conv);

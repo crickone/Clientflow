@@ -56,7 +56,9 @@ export type LiveConversation = {
  * save. When the stream is missing, refused or keeps failing, the old
  * polling loop takes over (fast while running), so a run is always followed.
  * Idle conversations are not held open: they are polled slowly, which is also
- * how a run started from another device is noticed.
+ * how a run started from another device is noticed. A stalled stream (no
+ * frame, including the ping heartbeat, for about 35 seconds) is closed and
+ * followed by a fresh snapshot.
  */
 export function useConversationLive({ base, id, enabled, tenantId, onSettled }: LiveConversationOptions): LiveConversation {
   const [conv, setConv] = useState<ConversationView | null>(null);

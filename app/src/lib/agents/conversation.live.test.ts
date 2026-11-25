@@ -119,6 +119,28 @@ function waitFor(events: LiveEvent[], pred: (e: LiveEvent) => boolean, ms = 8000
     assert.ok(final.type === "state" && final.conversation.messages[1]?.content === "Part\n\n_Stopped._", "a stopped reply keeps its words and says it stopped");
     assert.ok(final.type === "state" && !final.conversation.running, "a stopped conversation is idle");
 
+    // 2b. Stop without `now` during a streaming turn: other tabs get a state
+    // with stopRequested at once, not at the next tool start or the end.
+    const ctx2b = { ...ctx, convId: crypto.randomUUID() };
+    const events2b: LiveEvent[] = [];
+    const off2b = bus.subscribe(bus.liveKey(tid, ctx2b.convId), (e) => events2b.push(JSON.parse(JSON.stringify(e)) as LiveEvent));
+    convo.setTurnRunnerForTests((async (args: RunAgentTurnArgs): Promise<TurnResult> => {
+      args.onText?.("Working");
+      await new Promise((r) => setTimeout(r, 200));
+      return { text: "Working", pendingWrites: [], artifacts: [] };
+    }) as unknown as Parameters<typeof convo.setTurnRunnerForTests>[0]);
+    convo.act(ctx2b, { type: "message", text: "Do a thing" });
+    await waitFor(events2b, (e) => e.type === "text");
+    const before2b = events2b.length;
+    convo.act(ctx2b, { type: "stop" });
+    const stopStates = events2b.slice(before2b).filter((e) => e.type === "state");
+    assert.ok(
+      stopStates.some((e) => e.type === "state" && e.conversation.stopRequested === true),
+      "a stop without now publishes a state with stopRequested at once",
+    );
+    await waitFor(events2b, (e) => e.type === "end");
+    off2b();
+
     // 3. Stop now, with a model call that IGNORES the signal (the native
     // Claude provider never reads it): it keeps writing after the stop and
     // returns later with a write. The page must get no more words, the reply

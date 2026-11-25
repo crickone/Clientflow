@@ -87,12 +87,12 @@ export function stepsSummary(durationMs: number | null, steps: number): string {
   return "Done";
 }
 
-/** The first sentence of an answer in plain text, for a folded exchange. */
 /** Follow-ups show under the latest finished answer only, and never while an Approve card in it is still open. */
 export function showFollowUps(o: { isLast: boolean; live: boolean; openCards: number }): boolean {
   return o.isLast && !o.live && o.openCards === 0;
 }
 
+/** The first sentence of an answer in plain text, for a folded exchange. */
 export function firstSentence(text: string, max = 140): string {
   const plain = text
     .replace(/```[\s\S]*?(```|$)/g, " ")
