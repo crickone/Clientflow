@@ -12,6 +12,9 @@ import {
   useDraggable,
   useSensor,
   useSensors,
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -52,6 +55,23 @@ const selectStyle: CSSProperties = {
   cursor: "pointer",
   minWidth: 140,
 };
+
+/**
+ * The column under the pointer wins, falling back to overlap when the pointer
+ * is between columns. Overlap alone picked the neighbouring column whenever
+ * most of the 280px card hung over it.
+ */
+const dropUnderPointer: CollisionDetection = (args) => {
+  const under = pointerWithin(args);
+  return under.length > 0 ? under : rectIntersection(args);
+};
+
+/**
+ * Gentler than the library default (acceleration 10, 20% edge zones): it
+ * only scrolls within the outer 8% of the board horizontally, slowly enough
+ * to stop on the right column, and barely scrolls the page vertically.
+ */
+const BOARD_AUTO_SCROLL = { acceleration: 3, threshold: { x: 0.08, y: 0.06 } };
 
 export function PipelineBoard({
   leads: propLeads,
@@ -407,9 +427,25 @@ export function PipelineBoard({
       {view === "list" ? (
         <LeadList leads={filtered} stages={stages} />
       ) : (
-        <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <DndContext
+          sensors={sensors}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          collisionDetection={dropUnderPointer}
+          autoScroll={BOARD_AUTO_SCROLL}
+        >
           <LayoutGroup>
-            <div style={{ display: "flex", gap: 12, overflowX: "auto", scrollSnapType: "x proximity", paddingBottom: 12, alignItems: "stretch" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                overflowX: "auto",
+                // Snapping fights the auto-scroll mid-drag and makes the board jump.
+                scrollSnapType: activeLead ? "none" : "x proximity",
+                paddingBottom: 12,
+                alignItems: "stretch",
+              }}
+            >
               {funnelStages.map((stage) => {
                 const cards = byStage.visible.get(stage.id) ?? [];
                 return (
@@ -477,7 +513,10 @@ function DraggableCard({
   onDraft: (id: number) => void;
   onWhatsApp: (id: number) => void;
 }) {
-  const { setNodeRef, listeners, attributes, transform, isDragging } = useDraggable({ id: lead.id });
+  // The DragOverlay is what follows the pointer. The card itself stays put:
+  // moving it too stretched the board's scroll width as it went, so the
+  // board kept scrolling away from the column being aimed at.
+  const { setNodeRef, listeners, attributes, isDragging } = useDraggable({ id: lead.id });
   return (
     <motion.div layout layoutId={String(lead.id)} transition={{ duration: 0.25 }} style={{ opacity: isDragging ? 0.35 : 1 }}>
       <div
@@ -488,7 +527,6 @@ function DraggableCard({
         style={{
           cursor: "grab",
           touchAction: "none",
-          transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         }}
       >
         <LeadCard lead={lead} now={now} onDraft={onDraft} onWhatsApp={onWhatsApp} />
