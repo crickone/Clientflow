@@ -51,6 +51,41 @@ export const TRIGGER_CATALOG: TriggerDef[] = [
     status: "active",
   },
   {
+    key: "lead_no_answer",
+    label: "No answer",
+    description:
+      "When a lead enters the No answer column, or you log a call they did not answer. Stops when they reply, book, buy or unsubscribe, or a person moves them.",
+    status: "active",
+  },
+  {
+    key: "lead_call_back",
+    label: "Call back later",
+    description:
+      "When a lead enters the Call back later column. When you schedule a call for a day, it starts the morning after that day if they still have not been reached.",
+    status: "active",
+  },
+  {
+    key: "lead_call_booked",
+    label: "Call booked",
+    description:
+      "When you schedule a call at a time: a confirmation straight away and a reminder before the call. [CALL_DAY] and [CALL_TIME] work in these messages; the later messages are counted back from the call.",
+    status: "active",
+  },
+  {
+    key: "lead_thinking",
+    label: "Thinking about it",
+    description:
+      "When a lead enters the Thinking about it column. A reply is read by the inbox AI: wanting to book or talk makes them a hot lead; anything else moves them to Long-term nurture 7 days later.",
+    status: "active",
+  },
+  {
+    key: "lead_nurture",
+    label: "Long-term nurture",
+    description:
+      "When a lead enters the Long-term nurture column. Only for leads who agreed to marketing. Every email carries an unsubscribe link.",
+    status: "active",
+  },
+  {
     key: "lead_booked",
     label: "Lead books in",
     description: "When a lead moves to the booked stage on the leads board: a confirmation and what to bring. Stops if they no-show, buy or are marked lost.",
@@ -105,21 +140,49 @@ export const LIVE_DELAY_VALUE = 0;
  * the automation_queue table and the dispatch ticker. Every other trigger
  * still sends immediately and only its delay-0 messages (see isMessageLive).
  */
-export const DELAYED_TRIGGER_KEYS: ReadonlySet<string> = new Set(["campaign_signup", "new_lead", "lead_booked", "lead_no_show", "checkout_abandoned"]);
+export const DELAYED_TRIGGER_KEYS: ReadonlySet<string> = new Set([
+  "campaign_signup",
+  "new_lead",
+  "lead_no_answer",
+  "lead_call_back",
+  "lead_call_booked",
+  "lead_thinking",
+  "lead_nurture",
+  "lead_booked",
+  "lead_no_show",
+  "checkout_abandoned",
+]);
 
 /**
- * The lead follow-up sequences (lib/automations/nurture.ts): queued per lead,
- * sent by the ticker, by email or WhatsApp. They replaced GoHighLevel's lead
- * workflows for the clinics that used it (2026-11-11).
+ * The lead follow-up flows (lib/leadFlows): queued per lead, sent by the
+ * ticker, by email or WhatsApp. They replaced GoHighLevel's lead workflows
+ * (2026-11-11, extended 2026-11-25). The order is the order a column's flow
+ * is looked for in (lib/leadFlows/definitions.ts flowForStage).
  */
-export const LEAD_SEQUENCE_KEYS = ["new_lead", "lead_booked", "lead_no_show", "campaign_signup", "checkout_abandoned"] as const;
+export const LEAD_SEQUENCE_KEYS = [
+  "new_lead",
+  "lead_no_answer",
+  "lead_call_back",
+  "lead_call_booked",
+  "lead_thinking",
+  "lead_nurture",
+  "lead_booked",
+  "lead_no_show",
+  "campaign_signup",
+  "checkout_abandoned",
+] as const;
+
+/** Flows a reply does NOT stop: "ok thanks" to a booking confirmation must not cancel the reminder. */
+export const KEEP_ON_REPLY: readonly string[] = ["lead_booked", "lead_call_booked"];
+/** Flows a booking does NOT stop: they are about the booking. */
+export const KEEP_ON_BOOKING: readonly string[] = ["lead_booked", "lead_call_booked"];
 
 /** Sequences a lead's reply stops: a person has taken over the conversation. */
-export const STOP_ON_REPLY: readonly string[] = ["new_lead", "campaign_signup", "lead_no_show", "checkout_abandoned"];
+export const STOP_ON_REPLY: readonly string[] = LEAD_SEQUENCE_KEYS.filter((k) => !KEEP_ON_REPLY.includes(k));
 /** Sequences booking in stops: no more "come and book" nudges. */
-export const STOP_ON_BOOKED: readonly string[] = ["new_lead", "campaign_signup", "lead_no_show"];
+export const STOP_ON_BOOKED: readonly string[] = LEAD_SEQUENCE_KEYS.filter((k) => !KEEP_ON_BOOKING.includes(k));
 /** Sequences a no-show stops: the booking they were about is gone. */
-export const STOP_ON_NO_SHOW: readonly string[] = ["lead_booked"];
+export const STOP_ON_NO_SHOW: readonly string[] = KEEP_ON_BOOKING;
 
 /** Channels that actually send for a trigger. The lead sequences add WhatsApp. */
 export function liveChannelsFor(triggerKey: string): Channel[] {
@@ -173,23 +236,38 @@ export function isMessageLive(m: { channel: Channel; delayValue: number }, trigg
 }
 
 /** Personalisation short-codes available in message templates. */
-export const SHORTCODES = ["[FIRST_NAME]", "[LAST_NAME]", "[BUSINESS_NAME]"];
+export const SHORTCODES = ["[FIRST_NAME]", "[LAST_NAME]", "[BUSINESS_NAME]", "[BUSINESS_PHONE]", "[CALL_DAY]", "[CALL_TIME]"];
 
 /**
  * Replace short-codes with real values. Case-insensitive, so [first_name],
- * [FIRST_NAME] and [First_Name] all work. Unknown codes are left as-is.
+ * [FIRST_NAME] and [First_Name] all work. Unknown codes are left as-is, and
+ * so are the call codes outside a scheduled call.
  */
 export function applyShortcodes(
   template: string,
-  vars: { firstName?: string | null; lastName?: string | null; businessName?: string | null; offerName?: string | null; offerLink?: string | null },
+  vars: {
+    firstName?: string | null;
+    lastName?: string | null;
+    businessName?: string | null;
+    businessPhone?: string | null;
+    offerName?: string | null;
+    offerLink?: string | null;
+    callDay?: string | null;
+    callTime?: string | null;
+  },
 ): string {
   const map: Record<string, string> = {
     first_name: (vars.firstName ?? "").trim(),
     last_name: (vars.lastName ?? "").trim(),
     business_name: (vars.businessName ?? "").trim(),
+    // The business phone, from the business profile: never typed into copy.
+    ...(vars.businessPhone != null ? { business_phone: vars.businessPhone.trim() } : {}),
     // Only for the checkout sequence (left as typed elsewhere).
     ...(vars.offerName != null ? { offer_name: vars.offerName.trim() } : {}),
     ...(vars.offerLink != null ? { offer_link: vars.offerLink.trim() } : {}),
+    // Only for a scheduled call (lib/leadFlows/callPlan.ts formats them).
+    ...(vars.callDay != null ? { call_day: vars.callDay.trim() } : {}),
+    ...(vars.callTime != null ? { call_time: vars.callTime.trim() } : {}),
   };
   return template.replace(/\[([a-z_]+)\]/gi, (whole, key: string) => {
     const v = map[key.toLowerCase()];
@@ -206,6 +284,12 @@ export interface MessageInput {
   attachmentOriginal: string | null;
   delayValue: number;
   delayUnit: IntervalUnit;
+  /**
+   * Lead flows only: comma-separated words matched against the lead's
+   * interest ("hbot, hyperbaric"), or "other" for everyone the other
+   * versions at the same time do not match. Null = everyone.
+   */
+  matchInterest?: string | null;
 }
 
 export interface TriggerInput {
@@ -213,6 +297,12 @@ export interface TriggerInput {
   enabled: boolean;
   externalEnabled: boolean;
   messages: MessageInput[];
+  /** Lead flows: the column that starts it, as a column ref; "" = none; undefined/null = the default. */
+  startColumn?: string | null;
+  /** Lead flows: where the card goes when the flow ends with no reply; "" = stays put; undefined/null = the default. */
+  finishColumn?: string | null;
+  finishAfterValue?: number | null;
+  finishAfterUnit?: IntervalUnit | null;
 }
 
 export function blankMessage(): MessageInput {
@@ -291,6 +381,29 @@ export const DEFAULT_MESSAGES: Record<string, MessageInput[]> = {
   lead_no_show: [
     { ...msg("whatsapp", null, "Hi [FIRST_NAME], we missed you today. No problem at all. Would you like to rebook? Reply with a day that suits."), delayValue: 2, delayUnit: "hours" },
     { ...msg("email", "Shall we find another time, [FIRST_NAME]?", "Hi [FIRST_NAME],\n\nWe missed you at your appointment. Things come up. If you'd like to rebook, reply to this email and we'll find a time that works.\n\n[BUSINESS_NAME]"), delayValue: 3, delayUnit: "days" },
+  ],
+  // The column-started lead flows (2026-11-25). Neutral wording for every
+  // business; Optimal Health's agreed copy is in lib/leadFlows/presets.ts.
+  lead_no_answer: [
+    msg("whatsapp", null, "Hi [FIRST_NAME], we tried to ring you about your enquiry with [BUSINESS_NAME] but couldn't get through. When's a good time to call you back?"),
+    { ...msg("whatsapp", null, "Hi [FIRST_NAME], happy to talk whenever suits you. Tell us a day and time and we'll ring you then. [BUSINESS_NAME]"), delayValue: 2, delayUnit: "days" },
+  ],
+  lead_call_back: [
+    { ...msg("whatsapp", null, "Hi [FIRST_NAME], following up from our chat the other day. Would you be free for a call today?"), delayValue: 2, delayUnit: "days" },
+    { ...msg("whatsapp", null, "Hi [FIRST_NAME], happy to talk whenever suits you. Tell us a day and time and we'll ring you then. [BUSINESS_NAME]"), delayValue: 4, delayUnit: "days" },
+  ],
+  lead_call_booked: [
+    msg("whatsapp", null, "Hi [FIRST_NAME], you're booked for a call with [BUSINESS_NAME] on [CALL_DAY] at [CALL_TIME]. We'll ring you on this number. If you need to change it, reply here."),
+    { ...msg("whatsapp", null, "Hi [FIRST_NAME], a reminder that we'll ring you at [CALL_TIME] today. [BUSINESS_NAME]"), delayValue: 1, delayUnit: "hours" },
+  ],
+  lead_thinking: [
+    { ...msg("whatsapp", null, "Hi [FIRST_NAME], following up from our chat. No rush. Have you any questions, or would you like to book in?"), delayValue: 5, delayUnit: "days" },
+    { ...msg("whatsapp", null, "Hi [FIRST_NAME], one last check: would you like to book in? If now isn't the time, message us whenever suits. [BUSINESS_NAME]"), delayValue: 10, delayUnit: "days" },
+  ],
+  lead_nurture: [
+    msg("email", "Thanks again from [BUSINESS_NAME]", "Hi [FIRST_NAME],\n\nThanks again for getting in touch with [BUSINESS_NAME]. If you have a question, reply to this email and we'll answer it.\n\n[BUSINESS_NAME]"),
+    { ...msg("whatsapp", null, "Hi [FIRST_NAME], any questions? Ask here and we'll answer. [BUSINESS_NAME]"), delayValue: 14, delayUnit: "days" },
+    { ...msg("email", "Still thinking about it?", "Hi [FIRST_NAME],\n\nThis is the last email in this series. When you'd like to book, reply here and we'll find a time.\n\n[BUSINESS_NAME]"), delayValue: 42, delayUnit: "days" },
   ],
   checkout_abandoned: [
     { ...msg("whatsapp", null, "Hi [FIRST_NAME], it looks like your booking for [OFFER_NAME] didn't go through. If you'd still like it, you can finish here: [OFFER_LINK]. Any questions, just reply."), delayValue: 1, delayUnit: "hours" },

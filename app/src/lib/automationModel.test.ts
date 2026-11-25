@@ -32,12 +32,12 @@ function check(name: string, cond: boolean) {
 // in the UI but nothing ever calls fireTrigger() for it.
 // Plus the lead follow-up sequences (new_lead, lead_booked, lead_no_show), started
 // from upsertLead and the pipeline stage writer (lib/automations/nurture.ts).
-const EXPECTED_ACTIVE = ["new_client_created", "client_check_in", "nutrition_plan_added", "workout_plan_added", "client_birthday", "campaign_signup", "new_lead", "lead_booked", "lead_no_show", "checkout_abandoned"];
+const EXPECTED_ACTIVE = ["new_client_created", "client_check_in", "nutrition_plan_added", "workout_plan_added", "client_birthday", "campaign_signup", "new_lead", "lead_booked", "lead_no_show", "checkout_abandoned", "lead_no_answer", "lead_call_back", "lead_call_booked", "lead_thinking", "lead_nurture"];
 
-check("TRIGGER_CATALOG has exactly 17 entries (the fixed Kahunas trigger list, the campaign sign-up sequence, three lead sequences and the unfinished-checkout sequence)", TRIGGER_CATALOG.length === 17);
+check("TRIGGER_CATALOG has exactly 22 entries (the fixed Kahunas trigger list, the campaign sign-up sequence, eight lead flows and the unfinished-checkout sequence)", TRIGGER_CATALOG.length === 22);
 
 check(
-  "ACTIVE_TRIGGER_KEYS is exactly the 10 verified-active triggers, no more, no fewer",
+  "ACTIVE_TRIGGER_KEYS is exactly the 15 verified-active triggers, no more, no fewer",
   ACTIVE_TRIGGER_KEYS.size === EXPECTED_ACTIVE.length && EXPECTED_ACTIVE.every((k) => ACTIVE_TRIGGER_KEYS.has(k)),
 );
 

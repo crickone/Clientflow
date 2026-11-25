@@ -18,6 +18,7 @@ import { getBusinessProfile, getBusinessProfileForTenant } from "@/lib/businessP
 import { getThemeForTenant } from "@/lib/settings";
 import { renderEmailShell, sendEmailForTenant, textToParagraphs } from "@/lib/email";
 import { isStopped } from "@/lib/platform/killSwitch";
+import { isTriggerEnabled } from "@/lib/leadFlows/flowModel";
 
 /**
  * The campaign nurture sequence: one follow-up series, every campaign.
@@ -42,13 +43,8 @@ import { isStopped } from "@/lib/platform/killSwitch";
  */
 export const NURTURE_TRIGGER_KEY = "campaign_signup";
 
-/** Triggers that are on by default (no automation_triggers row yet). */
-export const DEFAULT_ENABLED_TRIGGERS: ReadonlySet<string> = new Set([NURTURE_TRIGGER_KEY]);
-
-export function isTriggerEnabled(key: string, state: { enabled: boolean } | undefined | null): boolean {
-  if (state) return state.enabled;
-  return DEFAULT_ENABLED_TRIGGERS.has(key);
-}
+// Which triggers are on with no saved row lives with the flow vocabulary now.
+export { DEFAULT_ENABLED_TRIGGERS, isTriggerEnabled } from "@/lib/leadFlows/flowModel";
 
 interface QueuedMessage {
   channel: Channel;
