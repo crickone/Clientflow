@@ -25,6 +25,7 @@ import {
   Gauge,
   Bell,
   Clock,
+  Upload,
   type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -69,6 +70,7 @@ function buildGroups(vocab: ReturnType<typeof getVocab>, tenantId: number): { ti
         { href: "/setup", icon: Rocket, title: "Set-up guide", desc: "Everything you need to get the account fully up and running." },
         { href: "/settings/business", icon: Store, title: "Business profile", desc: "Name, contact details and the brief Adonis writes from." },
         { href: "/settings/venue", icon: Building2, title: "Venue type", desc: "Clinic or gym wording across the app, and how you schedule." },
+        { href: "/settings/import", icon: Upload, title: "Import", desc: "Bring in leads and clients from GoHighLevel or a spreadsheet." },
       ],
     },
     {
