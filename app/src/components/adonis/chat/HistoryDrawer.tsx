@@ -6,7 +6,6 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Plus, Search, Trash2, X } from "lucide-react";
 
-import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { EASE } from "@/lib/motion";
 import type { ConversationSummary } from "@/lib/agents/conversationModel";
 import { filterHistory, groupHistory, historyTimeLabel } from "./history";
@@ -18,7 +17,7 @@ export type HistoryDrawerProps = {
   activeId: string;
   onOpen: (id: string) => void;
   onNew: () => void;
-  /** Called after the operator confirms; the drawer asks first. */
+  /** Called when the delete button is pressed; the page confirms first. */
   onDelete: (id: string) => void;
   /** For screenshots with fixed data; defaults to the current time. */
   now?: number;
@@ -35,7 +34,6 @@ export type HistoryDrawerProps = {
  */
 export function HistoryDrawer({ open, onClose, items, activeId, onOpen, onNew, onDelete, now }: HistoryDrawerProps) {
   const reduced = useReducedMotion() ?? false;
-  const confirm = useConfirm();
   const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -59,16 +57,6 @@ export function HistoryDrawer({ open, onClose, items, activeId, onOpen, onNew, o
       window.removeEventListener("keydown", onKey);
     };
   }, [open]);
-
-  async function askDelete(c: ConversationSummary) {
-    const ok = await confirm({
-      title: "Delete conversation?",
-      body: `Delete "${c.title || "this chat"}"? This can't be undone.`,
-      confirmLabel: "Delete",
-      destructive: true,
-    });
-    if (ok) onDelete(c.id);
-  }
 
   if (!mounted) return null;
   const at = now ?? Date.now();
@@ -122,7 +110,7 @@ export function HistoryDrawer({ open, onClose, items, activeId, onOpen, onNew, o
                             {c.running ? <span className="ax-live">Working</span> : <span className="ax-hi-time">{historyTimeLabel(c.updatedAt, at)}</span>}
                           </button>
                           {!c.running && (
-                            <button type="button" className="ax-hi-del" onClick={() => askDelete(c)} aria-label={`Delete ${c.title || "this chat"}`}>
+                            <button type="button" className="ax-hi-del" onClick={() => onDelete(c.id)} aria-label={`Delete ${c.title || "this chat"}`}>
                               <Trash2 size={14} strokeWidth={1.9} />
                             </button>
                           )}
