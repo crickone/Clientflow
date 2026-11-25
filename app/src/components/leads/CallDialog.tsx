@@ -167,12 +167,12 @@ export function CallDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title={tab === "log" ? "Log a call" : "Schedule a call"} description={leadName} width={540}>
         <div role="tablist" aria-label="Call" style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-          <button type="button" role="tab" aria-selected={tab === "log"} style={pill(tab === "log")} onClick={() => setTab("log")}>
-            <PhoneCall size={14} style={{ verticalAlign: "-2px", marginRight: 6 }} aria-hidden />
+          <button type="button" role="tab" aria-selected={tab === "log"} style={{ ...pill(tab === "log"), display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setTab("log")}>
+            <PhoneCall size={14} aria-hidden />
             Log a call
           </button>
-          <button type="button" role="tab" aria-selected={tab === "schedule"} style={pill(tab === "schedule")} onClick={() => setTab("schedule")}>
-            <CalendarClock size={14} style={{ verticalAlign: "-2px", marginRight: 6 }} aria-hidden />
+          <button type="button" role="tab" aria-selected={tab === "schedule"} style={{ ...pill(tab === "schedule"), display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setTab("schedule")}>
+            <CalendarClock size={14} aria-hidden />
             Schedule a call
           </button>
         </div>

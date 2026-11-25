@@ -149,7 +149,7 @@ export function TriggerEditor({ initial, businessName }: { initial: Detail; busi
                   value={finishAfterValue}
                   disabled={!finishColumn}
                   onChange={(e) => setFinishAfterValue(Math.max(0, Number(e.target.value) || 0))}
-                  style={{ flex: "0 0 96px", width: 96 }}
+                  style={{ flex: "0 0 96px", width: 96, height: 40 }}
                 />
                 <select aria-label="Unit" value={finishAfterUnit} disabled={!finishColumn} onChange={(e) => setFinishAfterUnit(e.target.value as IntervalUnit)} style={{ ...flowSelect, flex: "0 0 130px", width: 130 }}>
                   <option value="hours">Hours</option>
@@ -163,7 +163,7 @@ export function TriggerEditor({ initial, businessName }: { initial: Detail; busi
             <div style={flowHint}>The first message goes when the call is booked. Every later message is counted back from the call: 1 hour means an hour before it.</div>
           )}
           <div style={flowHint}>
-            Messages only go out in your sending hours. Set them in <Link href="/settings/lead-follow-ups">Settings, Lead follow-ups</Link>.
+            Messages only go out in your sending hours. Set them in <Link href="/settings/lead-follow-ups" style={{ color: "var(--text-secondary)", textDecoration: "underline" }}>Settings, Lead follow-ups</Link>.
           </div>
         </div>
       )}
