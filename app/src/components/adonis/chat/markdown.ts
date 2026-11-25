@@ -106,7 +106,7 @@ export function parseBlocks(text: string): Block[] {
 // Italic needs a non-space just inside each marker, and underscores only at
 // word edges, so "2 * 3" and snake_case tool names stay as written.
 const TOKEN =
-  /\*\*([^*\n]+)\*\*|`([^`\n]+)`|\[([^\]\n]+)\]\(((?:https?:\/\/|\/(?!\/))[^\s)]*)\)|(https?:\/\/[^\s<>()]+)|(?<![\w*])\*(?=\S)([^*\n]*?\S)\*(?![\w*])|(?<!\w)_(?=\S)([^_\n]*?\S)_(?!\w)/g;
+  /\*\*([^*\n]+)\*\*|`([^`\n]+)`|\[([^\]\n]+)\]\(((?:https?:\/\/[^\s)]*|\/(?![\/\\])[^\s)\\]*))\)|(https?:\/\/[^\s<>()]+)|(?<![\w*])\*(?=\S)([^*\n]*?\S)\*(?![\w*])|(?<!\w)_(?=\S)([^_\n]*?\S)_(?!\w)/g;
 
 export function parseInline(text: string): Inline[] {
   const out: Inline[] = [];

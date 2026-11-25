@@ -52,7 +52,7 @@ assert.deepEqual(parseInline("Visit https://adonisagent.ie/pricing."), [
   { kind: "text", text: "." },
 ], "a bare link drops the full stop after it");
 assert.deepEqual(parseInline("[Open the ads](/marketing/ads/12)"), [{ kind: "link", text: "Open the ads", href: "/marketing/ads/12" }], "a link inside the app");
-for (const bad of ["[x](javascript:alert(1))", "[x](//evil.example)", "[x](data:text/html,hi)"]) {
+for (const bad of ["[x](javascript:alert(1))", "[x](//evil.example)", "[x](/\\evil.example)", "[x](data:text/html,hi)"]) {
   const out = parseInline(bad);
   assert.ok(out.every((n) => n.kind === "text"), `${bad} is never a link`);
   assert.equal(out.map((n) => n.text).join(""), bad, "and its text is kept as written");
