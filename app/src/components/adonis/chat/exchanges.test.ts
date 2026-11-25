@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 
 import type { ConvMessage } from "@/lib/agents/conversationModel";
-import { firstSentence, formatDuration, groupExchanges, stepRows, stepsSummary } from "./exchanges";
+import { firstSentence, formatDuration, groupExchanges, showFollowUps, stepRows, stepsSummary } from "./exchanges";
 import { toolLabel } from "./toolLabels";
 
 const msgs: ConvMessage[] = [
@@ -92,5 +92,13 @@ assert.equal(stepsSummary(null, 0), "Done");
 assert.equal(toolLabel("list_leads"), "Checking the pipeline");
 assert.equal(toolLabel("some_new_tool"), "Some new tool", "unknown tools are shown in words");
 assert.equal(toolLabel("Reading business overview"), "Reading business overview", "old chats saved the label itself");
+assert.equal(toolLabel("constructor"), "constructor", "a name that is also an Object.prototype key comes back as a string");
+assert.equal(toolLabel("__proto__"), "Proto", "and so does __proto__");
+assert.equal(typeof toolLabel("toString"), "string");
+
+assert.equal(showFollowUps({ isLast: true, live: false, openCards: 0 }), true, "follow-ups show under the latest finished answer");
+assert.equal(showFollowUps({ isLast: true, live: false, openCards: 1 }), false, "not while an Approve card is open in it");
+assert.equal(showFollowUps({ isLast: true, live: true, openCards: 0 }), false, "not while it is still being written");
+assert.equal(showFollowUps({ isLast: false, live: false, openCards: 0 }), false, "not under older answers");
 
 console.log("exchanges: all checks passed");

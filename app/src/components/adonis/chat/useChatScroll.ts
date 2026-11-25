@@ -111,8 +111,16 @@ export function useChatScroll(active: boolean): ChatScroll {
       pointerDown = true;
       intent();
     };
-    const pointerMove = () => {
-      if (pointerDown) intent();
+    const pointerMove = (e: PointerEvent) => {
+      if (!pointerDown) return;
+      // No button held: the pointerup was missed (released outside the
+      // window). Drop the latch, or every later mouse move would count as
+      // the operator scrolling.
+      if (e.buttons === 0) {
+        pointerDown = false;
+        return;
+      }
+      intent();
     };
     const pointerEnd = () => {
       if (!pointerDown) return;

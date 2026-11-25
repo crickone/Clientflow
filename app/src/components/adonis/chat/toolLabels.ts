@@ -77,8 +77,8 @@ export const TOOL_LABEL: Record<string, string> = {
 };
 
 export function toolLabel(name: string): string {
-  const known = TOOL_LABEL[name];
-  if (known) return known;
+  // Own keys only: "constructor" or "toString" must not read Object.prototype.
+  if (Object.hasOwn(TOOL_LABEL, name)) return TOOL_LABEL[name];
   if (!name.includes("_")) return name;
   const words = name.replace(/_+/g, " ").trim();
   return words.charAt(0).toUpperCase() + words.slice(1);

@@ -31,4 +31,22 @@ assert.deepEqual(splitFollowups("A\n<followups>\n\n  \n- \n</followups>").follow
 assert.deepEqual(splitFollowups(`A\n<followups>\n${"x".repeat(200)}\n</followups>`).followups, [], "a runaway line is dropped");
 assert.equal(stripFollowups(full), "Massage is ahead.");
 
+const two = "First part.\n<followups>\nOld one\n</followups>\nMore text.\n<followups>\nNew one\nNew two\n</followups>";
+assert.deepEqual(
+  splitFollowups(two),
+  { body: "First part.\n\nMore text.", followups: ["New one", "New two"], complete: true },
+  "two blocks: both are hidden, the suggestions come from the last",
+);
+const mixed = "Ünïcode İs here.\n<FollowUps>\nAsk this\n</followUPS>\n\nTail.";
+assert.deepEqual(
+  splitFollowups(mixed),
+  { body: "Ünïcode İs here.\n\nTail.", followups: ["Ask this"], complete: true },
+  "a mixed-case tag is found on the original text, so text whose lower case changes length is sliced right",
+);
+assert.deepEqual(
+  splitFollowups("A.\n<followups>\nOld\n</followups>\nB.\n<followups>\nNew so f"),
+  { body: "A.\n\nB.", followups: ["New so f"], complete: false },
+  "a second block still streaming is hidden, and the earlier one stays hidden",
+);
+
 console.log("followups: all checks passed");

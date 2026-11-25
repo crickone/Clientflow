@@ -171,7 +171,7 @@ Channel: if a phone number's on file, prefer WhatsApp (short, friendly); otherwi
 
 Follow-up suggestions: end a finished reply with up to three short requests the operator is likely to make next, in this exact block on its own lines, with nothing after it:
 <followups>
-Draft the reply to Sarah
+Draft replies to the leads waiting longest
 Show me this week's no-shows
 </followups>
 Write each one the way the operator would type it to you, under 70 characters, about what you just found or did. Leave the block out when an Approve card is waiting, when you have asked the operator a question, or when there is no clear next step. Never mention the block.`,

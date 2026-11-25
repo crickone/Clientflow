@@ -38,9 +38,9 @@ function cleanLines(inner: string): string[] {
 
 /** The end of `content` with a half-written opening tag removed (streaming). Only at the start of a line or after a space. */
 function stripPartialOpen(content: string): string {
-  const lower = content.toLowerCase();
-  for (let k = Math.min(OPEN.length - 1, lower.length); k >= 1; k--) {
-    const tail = lower.slice(lower.length - k);
+  for (let k = Math.min(OPEN.length - 1, content.length); k >= 1; k--) {
+    // Lower-case the slice, not the whole string: lower-casing can change length.
+    const tail = content.slice(content.length - k).toLowerCase();
     if (!OPEN.startsWith(tail)) continue;
     const before = content.slice(0, content.length - k);
     if (before === "" || /\s$/.test(before)) return before.trimEnd();
@@ -48,15 +48,41 @@ function stripPartialOpen(content: string): string {
   return content;
 }
 
+/** Every complete block, any case. Matched on the original string, so indexes and slices agree. */
+const BLOCK = new RegExp(`${OPEN}([\\s\\S]*?)${CLOSE}`, "gi");
+const OPEN_TAG = new RegExp(OPEN, "i");
+
+/**
+ * Every complete block is hidden; the suggestions come from the last one. A
+ * block still open at the end (streaming) is hidden too, and its lines so
+ * far are the suggestions. Text between or after blocks stays in the answer.
+ */
 export function splitFollowups(content: string): SplitReply {
-  const lower = content.toLowerCase();
-  const at = lower.lastIndexOf(OPEN);
-  if (at === -1) return { body: stripPartialOpen(content), followups: [], complete: false };
-  const end = lower.indexOf(CLOSE, at + OPEN.length);
-  const inner = content.slice(at + OPEN.length, end === -1 ? undefined : end);
-  const after = end === -1 ? "" : content.slice(end + CLOSE.length).trim();
-  const body = [content.slice(0, at).trimEnd(), after].filter(Boolean).join("\n\n");
-  return { body, followups: cleanLines(inner), complete: end !== -1 };
+  const pieces: string[] = [];
+  let lastInner: string | null = null;
+  let from = 0;
+  for (const m of content.matchAll(BLOCK)) {
+    pieces.push(content.slice(from, m.index));
+    lastInner = m[1];
+    from = m.index + m[0].length;
+  }
+  let rest = content.slice(from);
+  const openAt = rest.search(OPEN_TAG);
+  if (lastInner === null && openAt === -1) return { body: stripPartialOpen(content), followups: [], complete: false };
+  let openInner: string | null = null;
+  if (openAt !== -1) {
+    openInner = rest.slice(openAt + OPEN.length);
+    rest = rest.slice(0, openAt);
+  } else {
+    rest = stripPartialOpen(rest);
+  }
+  pieces.push(rest);
+  const body = pieces
+    .map((p, i) => (i === 0 ? p.trimEnd() : p.trim()))
+    .filter(Boolean)
+    .join("\n\n");
+  const inner = openInner ?? lastInner ?? "";
+  return { body, followups: cleanLines(inner), complete: openInner === null };
 }
 
 export function stripFollowups(content: string): string {

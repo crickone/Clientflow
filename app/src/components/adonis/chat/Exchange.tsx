@@ -10,7 +10,7 @@ import { ApprovalCard } from "./ApprovalCard";
 import { FollowUps } from "./FollowUpList";
 import { ResultCards } from "./ResultCards";
 import { StepsPanel } from "./StepsPanel";
-import { firstSentence, type ChatExchange, type ExchangeReply } from "./exchanges";
+import { firstSentence, showFollowUps, type ChatExchange, type ExchangeReply } from "./exchanges";
 
 export type ExchangeActions = {
   onApprove: (index: number) => void;
@@ -139,7 +139,7 @@ export function Exchange({ exchange: x, live, phases, isLast, folded, onToggleFo
               </Fragment>
             ))}
             <ResultCards artifacts={x.artifacts} campaign={campaign} />
-            {isLast && !live && <FollowUps items={x.followups} disabled={busy} onPick={actions.onFollowUp} />}
+            {showFollowUps({ isLast, live, openCards: cards.length }) && <FollowUps items={x.followups} disabled={busy} onPick={actions.onFollowUp} />}
           </>
         )}
         {shownTab === "steps" && (
