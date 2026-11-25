@@ -27,6 +27,7 @@ import { recordConsent } from "@/lib/marketingConsent";
 import { isOptedIn } from "@/lib/whatsappBroadcasts";
 import { isStopReply } from "@/lib/whatsappBroadcastModel";
 import { notifyInboundMessage } from "@/lib/notifications/notify";
+import { onWhatsAppDeliveryFailed } from "@/lib/leadFlows/undelivered";
 
 /**
  * Distinguishes an expected "tenant is over its monthly AI cap" skip from a
@@ -221,6 +222,14 @@ export async function POST(req: NextRequest) {
       } else {
         const leadMsg = findLeadMessageByProviderId(status.providerMessageId);
         if (leadMsg) setLeadMessageStatus(leadMsg.id, status.status);
+      }
+      // A follow-up flow's first WhatsApp that never arrived: Message undelivered, the rest by email.
+      if (status.status === "failed") {
+        try {
+          await onWhatsAppDeliveryFailed(tenant.id, status.providerMessageId);
+        } catch (err) {
+          console.error("[lead flows] undelivered handling failed:", err);
+        }
       }
     }
 

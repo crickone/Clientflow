@@ -19,6 +19,7 @@ import { fitToWindow } from "./sendingWindow";
 import { getLeadFlowSettingsForTenant } from "./settings";
 import type { LeadFlowSettings } from "./settingsModel";
 import { getFlowTransport } from "./transport";
+import { handleUndelivered } from "./undelivered";
 
 /**
  * Send what is due in the lead flows, for one tenant. Called by the minute
@@ -77,6 +78,7 @@ async function sendWhatsAppRow(ctx: DispatchContext, item: AutomationQueueRow): 
   const transport = getFlowTransport();
   let error: string | null = null;
   let providerMessageId: string | null = null;
+  let undeliverable = false;
   if (item.leadId == null) error = "No lead to send to.";
   else if (!transport.whatsAppConnected()) error = WHATSAPP_NOT_CONNECTED;
   else {
@@ -84,11 +86,14 @@ async function sendWhatsAppRow(ctx: DispatchContext, item: AutomationQueueRow): 
       providerMessageId = (await transport.sendWhatsAppToLead(item.leadId, item.body)).providerMessageId;
     } catch (err) {
       error = err instanceof Error ? err.message : "WhatsApp send failed.";
+      undeliverable = true;
     }
   }
   markRow(ctx.tdb, item.id, { status: error ? "failed" : "sent", error, sentAt: new Date(ctx.now), providerMessageId });
   logSend(ctx, item, "whatsapp", null, item.sendTo, error);
   if (error) console.error(`[lead flows] tenant ${ctx.tenantId} WhatsApp ${item.id} failed: ${error}`);
+  // A provider failure on the run's first WhatsApp: Message undelivered, the rest by email.
+  if (undeliverable && error) await handleUndelivered(ctx.tenantId, { ...item, status: "failed", error }, error);
   return !error;
 }
 
