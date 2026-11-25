@@ -124,17 +124,30 @@ export async function runAgentTurn(
   const artifacts: ToolArtifact[] = [];
 
   for (let turn = 0; turn < maxTurns; turn++) {
-    if (signal?.aborted) break; // caller disconnected — stop burning tokens
+    if (signal?.aborted) break; // caller disconnected or stopped — start no new model call
 
-    const r = await provider.streamTurn({ model, system, tools, messages: convo, maxTokens, signal, onText });
+    // `signal` is deliberately NOT given to the provider: a model call that
+    // has started runs to the end so `meterAndCharge` below always records
+    // it (every paid AI call is metered). The signal only stops the NEXT
+    // call from starting. A caller that must stop showing words at once
+    // (the chat's Stop) stops listening instead; see conversation.ts `drive`.
+    const r = await provider.streamTurn({ model, system, tools, messages: convo, maxTokens, onText });
     meterAndCharge(tenantId, agentKey, model, r.usage);
     convo.push({ role: "assistant", content: r.text, toolCalls: r.toolCalls, providerRaw: r.assistantRaw });
     fullText += r.text;
 
+    // Stopped while that call ran: run none of its tools. Any writes it
+    // asked for are dropped with it.
+    if (signal?.aborted) break;
+
     // A tool call that got cut off by the token limit is malformed — don't
     // feed it back (that just loops). Tell the caller and stop cleanly.
     if (r.stopReason === "max_tokens") {
-      onText?.("\n\n_(That response was longer than expected — please ask me to continue or narrow it down.)_");
+      // Part of the reply too, or it shows while streaming and then vanishes
+      // when the caller replaces the streamed words with `text`.
+      const note = "\n\n_(That response was longer than expected — please ask me to continue or narrow it down.)_";
+      fullText += note;
+      onText?.(note);
       break;
     }
 

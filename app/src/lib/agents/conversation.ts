@@ -80,7 +80,11 @@ const live = new Set<string>();
  * after it apply to exactly that text.
  */
 const memory = new Map<string, Conv>();
-/** One per running turn: "Stop" in the compose box aborts the model call. */
+/**
+ * One per running turn: "Stop" in the compose box ends the turn at once (see
+ * `drive`). A model call already running is left to finish in the background
+ * so it is metered; its words and writes are dropped.
+ */
 const aborts = new Map<string, AbortController>();
 const liveKey = (c: Ctx) => busKey(c.tenantId, c.convId);
 
@@ -401,11 +405,23 @@ async function drive(c: Ctx, kick: Kick): Promise<void> {
   memory.set(key, conv);
   const abort = new AbortController();
   aborts.set(key, abort);
+  // Settles when the compose box's Stop fires. The turn in flight is raced
+  // against it: on Stop the loop stops waiting for that turn at once instead
+  // of letting a model call that ignores the signal keep writing words.
+  const stoppedNow = new Promise<"stopped">((resolve) => {
+    abort.signal.addEventListener("abort", () => resolve("stopped"), { once: true });
+  });
   let lastSave = 0;
+  /** Save, and send every tab the whole conversation. */
   const save = () => {
     lastSave = Date.now();
     write(c, conv);
     publish(key, { type: "state", conversation: view(conv) });
+  };
+  /** Save only: the throttled save while words stream. The `text` deltas already carry them. */
+  const saveQuietly = () => {
+    lastSave = Date.now();
+    write(c, conv);
   };
   const stopAsked = () => conv.stopRequested || row(c)?.stopRequested === true;
   // File every AI cost under the campaign being worked on, else this chat,
@@ -484,7 +500,7 @@ async function drive(c: Ctx, kick: Kick): Promise<void> {
       const replyIndex = conv.messages.length - 1;
       save();
 
-      const out = await withUsageContext(usageTag(), () => turnRunner({
+      const turnDone = withUsageContext(usageTag(), () => turnRunner({
         tenantId: c.tenantId,
         agentKey: c.agentKey,
         userId: c.userId,
@@ -492,21 +508,38 @@ async function drive(c: Ctx, kick: Kick): Promise<void> {
         system,
         tools: resolved.tools,
         messages: history,
+        // runAgentTurn reads this only between model calls, so a call already
+        // running finishes and is metered; it never reaches the provider.
         signal: abort.signal,
         onText: (t) => {
+          // Stopped: the turn may still be streaming in the background (it is
+          // left to finish so it is metered), but nothing more reaches the
+          // reply or the page.
+          if (abort.signal.aborted) return;
           reply.content += t;
           // The words go to the page at once; the database save stays
-          // throttled. Publish BEFORE save: a state must never arrive ahead
-          // of a delta it already contains.
+          // throttled and sends no state (the delta carries the words).
           publish(key, { type: "text", index: replyIndex, delta: t });
-          if (Date.now() - lastSave > SAVE_EVERY_MS) save();
+          if (Date.now() - lastSave > SAVE_EVERY_MS) saveQuietly();
         },
         onTool: (n) => {
+          if (abort.signal.aborted) return;
           reply.tools.push(n);
           publish(key, { type: "tool", index: replyIndex, name: n });
           save();
         },
       }));
+      const out = await Promise.race([turnDone, stoppedNow]);
+      if (out === "stopped") {
+        // The turn carries on detached until its model call ends (and is
+        // metered). Whatever it returns, pending writes included, is dropped.
+        turnDone.catch(() => {
+          /* a stopped turn's failure has nobody left to tell */
+        });
+        reply.durationMs = Date.now() - (reply.startedAt ?? Date.now());
+        reply.content = [reply.content, STOPPED_NOTE].filter(Boolean).join("\n\n");
+        break;
+      }
       reply.content = out.text;
       reply.durationMs = Date.now() - (reply.startedAt ?? Date.now());
       for (const a of out.artifacts) {
@@ -559,7 +592,13 @@ async function drive(c: Ctx, kick: Kick): Promise<void> {
     conv.status = "idle";
     conv.building = false;
     conv.stopRequested = false;
-    write(c, conv);
+    // A failed save must not skip the cleanup and the final publishes below,
+    // or the chat would look busy for good in this process.
+    try {
+      write(c, conv);
+    } catch (err) {
+      console.error(`[adonis ${c.convId}] final save failed`, err);
+    }
     live.delete(key);
     memory.delete(key);
     aborts.delete(key);

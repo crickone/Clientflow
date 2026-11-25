@@ -136,12 +136,14 @@ const requireLocal = createRequire(import.meta.url);
     toolCalls?: { id: string; name: string; input: Record<string, unknown> }[];
     usage?: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheCreateTokens?: number };
     stopReason: "tool_use" | "end" | "max_tokens";
+    /** Runs while the call is "streaming", after its deltas (e.g. the operator presses Stop). */
+    during?: () => void;
   };
   function makeFakeProvider(turns: FakeTurn[]) {
-    const calls: { messages: unknown[] }[] = [];
+    const calls: { messages: unknown[]; signal: AbortSignal | undefined }[] = [];
     let i = 0;
     const provider = {
-      async streamTurn(args: { messages: unknown[]; onText?: (delta: string) => void }) {
+      async streamTurn(args: { messages: unknown[]; signal?: AbortSignal; onText?: (delta: string) => void }) {
         // Snapshot, not a reference: runAgentTurn keeps ONE `convo` array
         // and mutates it in place (`.push(...)`) across turns, then passes
         // that same array to every `streamTurn()` call. Storing the
@@ -149,10 +151,11 @@ const requireLocal = createRequire(import.meta.url);
         // the array's FINAL state once the whole loop finished — copy the
         // array now so each call's snapshot reflects what the model
         // actually saw at that point in the loop.
-        calls.push({ messages: [...args.messages] });
+        calls.push({ messages: [...args.messages], signal: args.signal });
         const turn = turns[i++];
         if (!turn) throw new Error(`fake provider: no scripted turn for call #${calls.length} — the loop asked the model again when it shouldn't have`);
         for (const d of turn.textDeltas ?? []) args.onText?.(d);
+        turn.during?.();
         return {
           text: (turn.textDeltas ?? []).join(""),
           toolCalls: turn.toolCalls ?? [],
@@ -382,6 +385,70 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(textResult.pendingWrites.length, 0);
     assert.deepEqual(textResult.artifacts, [], "artifacts is an empty array — no tool ran at all this turn");
     assert.deepEqual(receivedDeltas, ["Hello", ", world!"], "onText receives every delta, in order, as they streamed");
+
+    // ════════════════════════════════════════════════════════════════════
+    // 3b. Stopped mid-call: the call that started finishes and is metered,
+    //     the provider never sees the signal, no tool from that call runs
+    //     (its write is dropped) and no further model call starts
+    // ════════════════════════════════════════════════════════════════════
+    const stop = new AbortController();
+    const { provider: stopProvider, calls: stopCalls } = makeFakeProvider([
+      {
+        textDeltas: ["Looking"],
+        toolCalls: [
+          { id: "tu_read_stop", name: "business_overview", input: {} },
+          { id: "tu_write_stop", name: "set_lead_stage", input: writeInput },
+        ],
+        stopReason: "tool_use",
+        usage: { inputTokens: 11, outputTokens: 7 },
+        during: () => stop.abort(),
+      },
+    ]);
+    const usageRows = () =>
+      (controlSqlite.prepare("SELECT COUNT(*) n FROM ai_usage WHERE tenant_id = ?").get(tid) as { n: number }).n;
+    const rowsBefore = usageRows();
+    const toolsSeenAfterStop: string[] = [];
+    const stopResult = await runWithTenant(tid, () =>
+      runAgentTurn({
+        provider: stopProvider,
+        tenantId: tid,
+        agentKey: "sales",
+        model: MODELS.sonnet,
+        system: "You are a test sales agent.",
+        tools: [],
+        messages: [{ role: "user", content: "Look, then move Ada." }],
+        signal: stop.signal,
+        onTool: (n) => toolsSeenAfterStop.push(n),
+      }),
+    );
+    assert.equal(stopCalls.length, 1, "no model call starts after the stop");
+    assert.equal(stopCalls[0].signal, undefined, "the provider is never given the signal, so a started call is never cut off unmetered");
+    assert.equal(usageRows(), rowsBefore + 1, "the call that was running when Stop came is still metered");
+    assert.deepEqual(toolsSeenAfterStop, [], "no read tool from the stopped call runs");
+    assert.equal(stopResult.pendingWrites.length, 0, "the stopped call's write is dropped, never handed on for approval");
+    assert.equal(stopResult.text, "Looking", "the words written before the stop are returned");
+
+    // ════════════════════════════════════════════════════════════════════
+    // 3c. Cut off by the token limit: the note is part of the returned text
+    // ════════════════════════════════════════════════════════════════════
+    const { provider: longProvider } = makeFakeProvider([
+      { textDeltas: ["Part one"], stopReason: "max_tokens", usage: { inputTokens: 1, outputTokens: 1 } },
+    ]);
+    const longDeltas: string[] = [];
+    const longResult = await runWithTenant(tid, () =>
+      runAgentTurn({
+        provider: longProvider,
+        tenantId: tid,
+        agentKey: "sales",
+        model: MODELS.sonnet,
+        system: "You are a test sales agent.",
+        tools: [],
+        messages: [{ role: "user", content: "Write a lot." }],
+        onText: (d) => longDeltas.push(d),
+      }),
+    );
+    assert.ok(longResult.text.startsWith("Part one\n\n_(That response was longer than expected"), "the note is kept in the reply text");
+    assert.equal(longDeltas.join(""), longResult.text, "what streamed equals what is returned, so nothing vanishes at the end");
 
     // ════════════════════════════════════════════════════════════════════
     // 4. assertUnderCap gates BEFORE the first model call; AiCapError
