@@ -86,8 +86,12 @@ const requireLocal = createRequire(import.meta.url);
       runs.startFlow(noSecret.id, "lead_nurture");
       const saved = process.env.EMAIL_TOKEN_SECRET;
       delete process.env.EMAIL_TOKEN_SECRET;
-      await dispatchDueAutomationQueue(s.tid, WED_10 + 1, "http://app.test");
-      process.env.EMAIL_TOKEN_SECRET = saved;
+      try {
+        await dispatchDueAutomationQueue(s.tid, WED_10 + 1, "http://app.test");
+      } finally {
+        if (saved === undefined) delete process.env.EMAIL_TOKEN_SECRET;
+        else process.env.EMAIL_TOKEN_SECRET = saved;
+      }
       const blocked = tdb.select().from(schema.automationQueue).where(and(eq(schema.automationQueue.leadId, noSecret.id), eq(schema.automationQueue.status, "failed"))).get();
       ok(!!blocked && /unsubscribe link/i.test(blocked.error ?? ""), "without the unsubscribe secret a nurture email is never sent");
 
@@ -98,6 +102,24 @@ const requireLocal = createRequire(import.meta.url);
       // Posted in with consent.
       const { lead: posted } = upsertLead({ source: "website", sourceLeadId: "website:posted@example.com", fullName: "Posted In", email: "posted@example.com", marketingConsent: "api" });
       ok(getLead(posted.id)!.marketingConsentSource === "api", "a lead posted in with consent has it");
+
+      // A replayed post (same source and sourceLeadId) never lifts the person's own unsubscribe.
+      const replay = { source: "website", sourceLeadId: "website:replay@example.com", fullName: "Re Play", email: "replay@example.com" };
+      const { lead: first } = upsertLead(replay);
+      ok(getLead(first.id)!.marketingConsentAt === null, "no consent on the first post");
+      suppress(s.tid, "replay@example.com", "unsubscribe");
+      const again = upsertLead({ ...replay, marketingConsent: "api" });
+      ok(!again.created && again.lead.id === first.id, "the re-post is the same lead");
+      ok(getLead(first.id)!.marketingConsentAt === null, "a re-post with a yes leaves consent empty after an unsubscribe");
+      ok(!!tdb.select().from(schema.suppressions).where(sql`lower(${schema.suppressions.email}) = 'replay@example.com'`).get(), "and the unsubscribe stays");
+
+      // An operator's do-not-email is never lifted by a yes.
+      const { lead: manual } = upsertLead({ source: "manual", fullName: "Do Notmail", email: "manual@example.com" });
+      suppress(s.tid, "manual@example.com", "manual");
+      ok(!consent.setLeadMarketingConsent(manual.id, true, "api").ok, "an api yes cannot lift a manual suppression");
+      ok(!consent.setLeadMarketingConsent(manual.id, true, "form").ok, "nor a form yes");
+      ok(getLead(manual.id)!.marketingConsentAt === null, "no consent recorded");
+      ok(!!tdb.select().from(schema.suppressions).where(sql`lower(${schema.suppressions.email}) = 'manual@example.com'`).get(), "the manual suppression stays");
     });
     console.log(`consent: ${n} checks passed.`);
   } finally {

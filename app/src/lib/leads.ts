@@ -73,7 +73,7 @@ export function upsertLead(input: NormalizedLeadInput): {
       .where(and(eq(leads.source, source), eq(leads.sourceLeadId, sourceLeadId)))
       .get();
     if (existing) {
-      if (input.marketingConsent && existing.marketingConsentAt == null) recordIntakeConsent(existing.id, input.marketingConsent);
+      if (input.marketingConsent && existing.marketingConsentAt == null) recordIntakeConsent(existing.id, input.marketingConsent, { liftUnsubscribe: false });
       return { lead: existing, created: false };
     }
   }
@@ -175,9 +175,9 @@ function enrolInCallFlow(lead: Lead): void {
 }
 
 /** Fail-soft: a consent problem never costs the lead. */
-function recordIntakeConsent(leadId: number, source: ConsentSource): void {
+function recordIntakeConsent(leadId: number, source: ConsentSource, options?: { liftUnsubscribe?: boolean }): void {
   try {
-    setLeadMarketingConsent(leadId, true, source);
+    setLeadMarketingConsent(leadId, true, source, options);
   } catch (err) {
     console.error(`[leads] marketing consent not recorded for lead #${leadId}:`, err);
   }

@@ -56,8 +56,19 @@ export function unsubscribeUrl(conn: TenantDb, tenantId: number, baseUrl: string
   return `${baseUrl}/u/${createUnsubscribeToken(tenantId, contactId)}`;
 }
 
-/** Record a yes or a no, for the ambient tenant. A staff tick never overrides the person's own unsubscribe. */
-export function setLeadMarketingConsent(leadId: number, granted: boolean, source: ConsentSource): { ok: true } | { ok: false; error: string } {
+/**
+ * Record a yes or a no, for the ambient tenant. A staff tick never overrides the
+ * person's own unsubscribe. A fresh yes on a form or the API lifts an earlier
+ * "unsubscribe" suppression unless `liftUnsubscribe` is false (a replayed post
+ * of an existing lead must not undo the person's unsubscribe). A "manual"
+ * suppression (an operator's do-not-email) is never lifted by any source.
+ */
+export function setLeadMarketingConsent(
+  leadId: number,
+  granted: boolean,
+  source: ConsentSource,
+  options: { liftUnsubscribe?: boolean } = {},
+): { ok: true } | { ok: false; error: string } {
   const lead = db.select().from(schema.leads).where(eq(schema.leads.id, leadId)).get();
   if (!lead) return { ok: false, error: "Lead not found." };
   if (!granted) {
@@ -67,9 +78,15 @@ export function setLeadMarketingConsent(leadId: number, granted: boolean, source
   }
   if (lead.email) {
     const reason = suppressionReason(db, lead.email);
-    if (reason === "unsubscribe" || reason === "manual") {
+    if (reason === "manual") {
+      return { ok: false, error: "This address is on your do-not-email list. Remove it there first." };
+    }
+    if (reason === "unsubscribe") {
       if (source === "staff") {
         return { ok: false, error: "This address unsubscribed from emails. They need to agree again themselves, on a form or in a message." };
+      }
+      if (options.liftUnsubscribe === false) {
+        return { ok: false, error: "This address unsubscribed from emails. A repeated submission does not undo that." };
       }
       // A fresh yes from the person lifts their earlier unsubscribe (never a bounce or a complaint).
       db.delete(schema.suppressions).where(sql`lower(${schema.suppressions.email}) = ${clean(lead.email)}`).run();
