@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { bookedByPackage } from "@/lib/packageBalance";
+import { sessionsLeft } from "@/lib/packageBalanceModel";
 import { TrainingModeSwitch } from "@/components/clients/TrainingModeSwitch";
 import { programsOn } from "@/lib/programs/access";
 import { notFound } from "next/navigation";
@@ -104,6 +106,8 @@ export default async function ClientProfile(
       listClientPayments(id),
       getTherapyMap(),
     ]);
+  // Sessions booked on each package but not done yet: held, so "left" is what can still be booked.
+  const bookedOn = bookedByPackage(packages.map((p) => p.id));
   const messages = getClientMessages(id);
   const clientEmailHistory = listClientEmails(id);
   const emailReady = isEmailConfigured();
@@ -474,9 +478,19 @@ export default async function ClientProfile(
                     >
                       <span>
                         {p.sessionsUsed} / {p.totalSessions} used
+                        {(bookedOn.get(p.id) ?? 0) > 0 ? `, ${bookedOn.get(p.id)} booked` : ""}
                       </span>
-                      <span>Expires {formatDate(p.expiryDate)}</span>
+                      <span>Use by {formatDate(p.expiryDate)}</span>
                     </div>
+                    {!expired && p.isActive && sessionsLeft(p, bookedOn.get(p.id) ?? 0) > 0 && (
+                      <div style={{ marginTop: 12 }}>
+                        <Link href={`/appointments/new?client=${p.clientId}&therapy=${p.therapyId}`}>
+                          <Button size="sm" variant="secondary">
+                            Book a session ({sessionsLeft(p, bookedOn.get(p.id) ?? 0)} left)
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
                   </Card>
                 );
               })}

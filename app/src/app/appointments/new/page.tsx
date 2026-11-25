@@ -12,7 +12,7 @@ import { getVocab } from "@/lib/vocabulary";
 export const dynamic = "force-dynamic";
 
 interface Props {
-  searchParams: Promise<{ client?: string; date?: string; time?: string; voucher?: string }>;
+  searchParams: Promise<{ client?: string; date?: string; time?: string; voucher?: string; therapy?: string }>;
 }
 
 export default async function NewAppointmentPage(props: Props) {
@@ -144,7 +144,9 @@ export default async function NewAppointmentPage(props: Props) {
           voucher.therapyId &&
           (voucher.balanceEur ?? voucher.valueEur) > 0
             ? voucher.therapyId
-            : undefined
+            : searchParams.therapy && Number(searchParams.therapy) > 0
+              ? Number(searchParams.therapy)
+              : undefined
         }
         defaultWalkInName={
           voucher &&

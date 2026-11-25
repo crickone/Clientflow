@@ -80,6 +80,9 @@ export function BookingForm({
     "cash" | "card" | "bank_transfer"
   >("card");
   const [packageId, setPackageId] = useState<number | "">("");
+  // Controlled so the prepaid sessions on offer follow the booking's date: a
+  // package has to be used by its expiry date, not just be unexpired today.
+  const [bookDate, setBookDate] = useState(defaultDate ?? new Date().toISOString().slice(0, 10));
   // "Sign up for a new package" at booking.
   const [packageMode, setPackageMode] = useState<"existing" | "new">("existing");
   const [newTemplateId, setNewTemplateId] = useState<number | "">("");
@@ -135,11 +138,13 @@ export function BookingForm({
       setActivePackages([]);
       return;
     }
-    fetch(`/api/packages?clientId=${clientId}&therapyId=${therapyId}`)
+    fetch(`/api/packages?clientId=${clientId}&therapyId=${therapyId}&date=${encodeURIComponent(bookDate)}`)
       .then((r) => r.json())
-      .then((d: Package[]) => {
-        const usable = (Array.isArray(d) ? d : []).filter((p) => p.totalSessions - p.sessionsUsed > 0);
+      .then((d: (Package & { available?: number })[]) => {
+        const usable = (Array.isArray(d) ? d : []).filter((p) => (p.available ?? p.totalSessions - p.sessionsUsed) > 0);
         setActivePackages(usable);
+        // A date change can rule out the package picked before it.
+        setPackageId((cur) => (cur !== "" && usable.some((p) => p.id === cur) ? cur : usable[0]?.id ?? ""));
         if (usable.length && !methodChosen.current) {
           setPaymentMethod("package");
           setPackageMode("existing");
@@ -147,8 +152,11 @@ export function BookingForm({
         }
       })
       .catch(() => setActivePackages([]));
-  }, [clientId, therapyId]);
-  const prepaidLeft = activePackages.reduce((n, p) => n + (p.totalSessions - p.sessionsUsed), 0);
+  }, [clientId, therapyId, bookDate]);
+  const prepaidLeft = activePackages.reduce(
+    (n, p) => n + ((p as Package & { available?: number }).available ?? p.totalSessions - p.sessionsUsed),
+    0,
+  );
 
   // Validate voucher code
   useEffect(() => {
@@ -501,7 +509,8 @@ export function BookingForm({
               id="date"
               type="date"
               name="date"
-              defaultValue={defaultDate ?? new Date().toISOString().slice(0, 10)}
+              value={bookDate}
+              onChange={(e) => setBookDate(e.target.value)}
               required
             />
           </div>

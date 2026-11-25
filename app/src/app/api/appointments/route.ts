@@ -1,4 +1,6 @@
 import { guard } from "@/lib/api/guard";
+import { packageRefusal } from "@/lib/packageBalanceModel";
+import { bookedByPackage } from "@/lib/packageBalance";
 import { NextResponse, type NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -18,6 +20,7 @@ import { appointmentStatusDates } from "@/lib/statusDates";
 import { checkBookingSlot } from "@/lib/schedule";
 import { onAppointmentBooked, onPaymentRecorded } from "@/lib/pipeline/stage";
 import { createPackage, expiryFromMonths } from "@/lib/packages";
+import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -111,6 +114,18 @@ export async function POST(req: NextRequest) {
     );
     if (!check.ok) {
       return NextResponse.json({ ok: false, error: check.reason }, { status: 409 });
+    }
+
+    // Paying with an existing prepaid package (e.g. a Black Friday bundle):
+    // it must be this client's, still active, usable on the booking's date,
+    // and have a session left once the sessions already booked on it are held.
+    if (parsed.paymentMethod === "package" && packageId && packageMode !== "new") {
+      const pkg = db.select().from(packages).where(eq(packages.id, packageId)).get();
+      if (!pkg || (parsed.clientId && pkg.clientId !== parsed.clientId)) {
+        return NextResponse.json({ ok: false, error: "That package doesn't belong to this client." }, { status: 400 });
+      }
+      const refusal = packageRefusal(pkg, bookedByPackage([pkg.id]).get(pkg.id) ?? 0, parsed.date, formatDate);
+      if (refusal) return NextResponse.json({ ok: false, error: refusal }, { status: 409 });
     }
 
     // Resolve client (existing or walk-in) only after the slot is valid.
