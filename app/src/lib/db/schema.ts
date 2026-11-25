@@ -368,6 +368,12 @@ export const leads = sqliteTable("leads", {
   // move off. Separate from the email `suppressions` table on purpose: an
   // email unsubscribe is not a phone opt-out, and vice versa.
   doNotCall: integer("do_not_call", { mode: "boolean" }).notNull().default(false),
+  /**
+   * Do not contact (from an import: GoHighLevel's DND, or a "not interested"
+   * tag). No follow-up flow starts for the lead (lib/leadFlows/runs.ts
+   * startFlow, importedRuns.ts) until a person clears it on the lead page.
+   */
+  doNotContact: integer("do_not_contact", { mode: "boolean" }).notNull().default(false),
   // Lead score (lib/leadScore.ts): readiness to buy out of 100 and the next
   // step, from Jev. Null until first scored. Writing them never touches updatedAt.
   leadScore: integer("lead_score"),
@@ -2779,7 +2785,8 @@ export const automationQueue = sqliteTable(
     body: text("body").notNull(),
     sendTo: text("send_to"),
     dueAt: integer("due_at", { mode: "timestamp_ms" }).notNull(),
-    status: text("status", { enum: ["queued", "sent", "failed", "cancelled"] }).notNull().default("queued"),
+    /** "held": an imported run's row waiting for its flow to be switched on (lib/leadFlows/importedRuns.ts). */
+    status: text("status", { enum: ["queued", "sent", "failed", "cancelled", "held"] }).notNull().default("queued"),
     error: text("error"),
     sentAt: integer("sent_at", { mode: "timestamp_ms" }),
     /** The lead_flow_runs row this belongs to; null for rows queued before runs existed. */
@@ -2819,10 +2826,51 @@ export const leadFlowRuns = sqliteTable(
     stopReason: text("stop_reason"),
     startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
     endedAt: integer("ended_at", { mode: "timestamp_ms" }),
+    /** Who placed the run: null = Adonis (startFlow); "gohighlevel" = the GoHighLevel import, part-way through. */
+    source: text("source"),
   },
   (t) => ({ byLead: index("idx_lead_flow_runs_lead").on(t.leadId, t.status) }),
 );
 export type LeadFlowRun = typeof leadFlowRuns.$inferSelect;
+
+/**
+ * One person from a GoHighLevel import (lib/ghlImport), whatever happened to
+ * them, so a re-run of the same files changes nothing. Keeps what has no
+ * column on the lead or client: GoHighLevel's stage, source, tags and
+ * custom fields, and the staff-only medical note, which is shown to staff
+ * on the lead and client pages and nowhere else: never to the AI, never in
+ * a message, never in an export (guarded by lib/ghlImport/medicalNote.guard.test.ts).
+ */
+export const ghlImportPeople = sqliteTable(
+  "ghl_import_people",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    ghlContactId: text("ghl_contact_id").notNull(),
+    ghlOpportunityId: text("ghl_opportunity_id"),
+    leadId: integer("lead_id"),
+    clientId: integer("client_id"),
+    contactId: integer("contact_id"),
+    /** "create" | "update" | "unchanged" | "skip" (lib/ghlImport/plan Outcome). */
+    outcome: text("outcome").notNull(),
+    ghlStage: text("ghl_stage"),
+    daysInStage: integer("days_in_stage"),
+    ghlSource: text("ghl_source"),
+    /** JSON string[]. */
+    tags: text("tags"),
+    treatment: text("treatment"),
+    usedBefore: text("used_before"),
+    town: text("town"),
+    staffMedicalNote: text("staff_medical_note"),
+    doNotContact: integer("do_not_contact", { mode: "boolean" }).notNull().default(false),
+    importedAt: integer("imported_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => ({
+    byContact: uniqueIndex("idx_ghl_import_people_contact").on(t.ghlContactId),
+    byLead: index("idx_ghl_import_people_lead").on(t.leadId),
+    byClient: index("idx_ghl_import_people_client").on(t.clientId),
+  }),
+);
+export type GhlImportPerson = typeof ghlImportPeople.$inferSelect;
 
 /**
  * Calls with a lead: logged after the fact (Log a call), or booked ahead

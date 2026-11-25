@@ -24,6 +24,7 @@ import { renderEmailShell, sendEmail, textToParagraphs } from "@/lib/email";
 import { flowFinish, flowStartColumn } from "@/lib/leadFlows/definitions";
 import { CALL_BOOKED_FLOW, LEAD_FLOW_KEY_SET, columnRefFor, flowDefaults, hasFinishStep, isColumnRef, isColumnStartedFlow } from "@/lib/leadFlows/flowModel";
 import { defaultMessagesFor } from "@/lib/leadFlows/presets";
+import { releaseHeldImportRows } from "@/lib/leadFlows/importedRuns";
 import { flowTenant } from "@/lib/leadFlows/tenant";
 import { listStages } from "@/lib/pipeline/stageRepo";
 
@@ -153,6 +154,8 @@ export function setTriggerEnabled(key: string, enabled: boolean) {
   // DB (Theme D1). Turning one off is always allowed.
   const persisted = enabled && ACTIVE_TRIGGER_KEYS.has(key);
   upsertTriggerState(key, { enabled: persisted });
+  // An imported run waiting for this flow carries on, past steps skipped.
+  if (persisted && LEAD_FLOW_KEY_SET.has(key)) releaseHeldImportRows(key);
 }
 
 /** A column reference to store: "" = none, a valid ref, else null (the default). */
@@ -208,6 +211,7 @@ export function saveTrigger(input: TriggerInput) {
         .run();
     });
   });
+  if (enabled && LEAD_FLOW_KEY_SET.has(input.key)) releaseHeldImportRows(input.key);
 }
 
 export interface SentRow {

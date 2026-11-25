@@ -100,7 +100,7 @@ export interface TimelineStep {
   subject: string | null;
   body: string;
   sendTo: string | null;
-  status: "queued" | "sent" | "failed" | "cancelled";
+  status: "queued" | "sent" | "failed" | "cancelled" | "held";
   dueAt: number;
   sentAt: number | null;
   error: string | null;

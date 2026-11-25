@@ -4,13 +4,13 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import type { LeadFlowRun } from "@/lib/db/schema";
-import { applyShortcodes, TRIGGER_LABELS } from "@/lib/automationModel";
+import { applyShortcodes, TRIGGER_LABELS, type Channel } from "@/lib/automationModel";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 
 import { formatCallDay, formatCallTime, scheduleCallMessages } from "./callPlan";
 import { flowNow } from "./clock";
 import { getFlowDefinition } from "./definitions";
-import { CALL_ALERT_KEY, CALL_BOOKED_FLOW, LEAD_FLOW_KEYS, LEAD_FLOW_KEY_SET, NURTURE_FLOW } from "./flowModel";
+import { CALL_ALERT_KEY, CALL_BOOKED_FLOW, LEAD_FLOW_KEYS, LEAD_FLOW_KEY_SET, NURTURE_FLOW, PENDING_STATUSES } from "./flowModel";
 import { cascadeDueTimes, finishDueAt, pickForInterest, type FlowScope } from "./flowPlan";
 import { fitToWindow } from "./sendingWindow";
 import { getLeadFlowSettings } from "./settings";
@@ -72,7 +72,7 @@ export function stopFlows(leadId: number, reason: string, scope: FlowScope = "al
   // The runs' rows, and rows queued before runs existed (no run id), for the same flows.
   db.update(schema.automationQueue)
     .set({ status: "cancelled", error: `Stopped: ${reason}`.slice(0, 300) })
-    .where(and(eq(schema.automationQueue.leadId, leadId), eq(schema.automationQueue.status, "queued"), inArray(schema.automationQueue.triggerKey, keys)))
+    .where(and(eq(schema.automationQueue.leadId, leadId), inArray(schema.automationQueue.status, [...PENDING_STATUSES]), inArray(schema.automationQueue.triggerKey, keys)))
     .run();
   return runs.length;
 }
@@ -102,8 +102,55 @@ function alreadyRunning(leadId: number, triggerKey: string): boolean {
   return !!db
     .select({ id: schema.automationQueue.id })
     .from(schema.automationQueue)
-    .where(and(eq(schema.automationQueue.leadId, leadId), eq(schema.automationQueue.triggerKey, triggerKey), eq(schema.automationQueue.status, "queued")))
+    .where(and(eq(schema.automationQueue.leadId, leadId), eq(schema.automationQueue.triggerKey, triggerKey), inArray(schema.automationQueue.status, [...PENDING_STATUSES])))
     .get();
+}
+
+export type ShortcodeVars = Parameters<typeof applyShortcodes>[1];
+
+/** The shortcode values for one lead's messages. */
+export function messageVars(
+  lead: { firstName: string | null; lastName: string | null },
+  profile: { businessName: string; phone?: string | null },
+  extra?: StartFlowOptions["extra"],
+  callAt?: number,
+): ShortcodeVars {
+  return {
+    firstName: lead.firstName,
+    lastName: lead.lastName,
+    businessName: profile.businessName,
+    businessPhone: profile.phone ?? "",
+    ...extra,
+    ...(callAt != null ? { callDay: formatCallDay(callAt), callTime: formatCallTime(callAt) } : {}),
+  };
+}
+
+/** One message of a flow, rendered for one lead, ready for automation_queue. */
+export function messageRow(input: {
+  triggerKey: string;
+  leadId: number;
+  step: number;
+  channel: Channel;
+  sendTo: string;
+  subject: string | null;
+  template: string;
+  dueAt: number;
+  vars: ShortcodeVars;
+  businessName: string;
+  payload?: string | null;
+}): typeof schema.automationQueue.$inferInsert {
+  return {
+    triggerKey: input.triggerKey,
+    leadId: input.leadId,
+    kind: "message",
+    step: input.step,
+    channel: input.channel,
+    sendTo: input.sendTo,
+    subject: input.channel === "email" ? applyShortcodes((input.subject ?? "").trim() || `A message from ${input.businessName}`, input.vars) : null,
+    body: applyShortcodes(input.template, input.vars),
+    dueAt: new Date(input.dueAt),
+    payload: input.payload ?? null,
+  };
 }
 
 /** Put a lead on a flow. Nothing is sent here; the dispatch ticker sends what is due. */
@@ -113,6 +160,8 @@ export function startFlow(leadId: number, triggerKey: string, opts: StartFlowOpt
   if (!LEAD_FLOW_KEY_SET.has(triggerKey)) return skip("not a lead flow");
   const lead = db.select().from(schema.leads).where(eq(schema.leads.id, leadId)).get();
   if (!lead) return skip("no such lead");
+  // Do not contact (an import's DND or "not interested"): no flow until a person clears it.
+  if (lead.doNotContact) return skip("do not contact");
   const def = getFlowDefinition(triggerKey);
   if (!def.enabled) return skip("switched off");
   if (opts.ifNotActive && alreadyRunning(leadId, triggerKey)) return skip("already running");
@@ -133,14 +182,7 @@ export function startFlow(leadId: number, triggerKey: string, opts: StartFlowOpt
       ? scheduleCallMessages({ now, callAt: opts.callAt!, delaysMs: delays, fit })
       : cascadeDueTimes(now, delays, fit, opts.firstAt);
 
-  const vars = {
-    firstName: lead.firstName,
-    lastName: lead.lastName,
-    businessName: profile.businessName,
-    businessPhone: profile.phone ?? "",
-    ...opts.extra,
-    ...(opts.callAt != null ? { callDay: formatCallDay(opts.callAt), callTime: formatCallTime(opts.callAt) } : {}),
-  };
+  const vars = messageVars(lead, profile, opts.extra, opts.callAt);
 
   const rows: (typeof schema.automationQueue.$inferInsert)[] = [];
   picked.forEach((m, i) => {
@@ -157,18 +199,21 @@ export function startFlow(leadId: number, triggerKey: string, opts: StartFlowOpt
     }
     // A message the lead has no address for is skipped; the rest still go.
     if (!sendTo) return;
-    rows.push({
-      triggerKey,
-      leadId,
-      kind: "message",
-      step: i,
-      channel,
-      sendTo,
-      subject: channel === "email" ? applyShortcodes((subject ?? "").trim() || `A message from ${profile.businessName}`, vars) : null,
-      body: applyShortcodes(m.template, vars),
-      dueAt: new Date(due),
-      payload: triggerKey === CALL_BOOKED_FLOW && i > 0 ? JSON.stringify({ notAfter: opts.callAt }) : null,
-    });
+    rows.push(
+      messageRow({
+        triggerKey,
+        leadId,
+        step: i,
+        channel,
+        sendTo,
+        subject,
+        template: m.template,
+        dueAt: due,
+        vars,
+        businessName: profile.businessName,
+        payload: triggerKey === CALL_BOOKED_FLOW && i > 0 ? JSON.stringify({ notAfter: opts.callAt }) : null,
+      }),
+    );
   });
   const finishAt = def.finish && triggerKey !== CALL_BOOKED_FLOW ? finishDueAt(opts.firstAt ?? now, dues, delays, def.finish.afterMs) : null;
   if (rows.length === 0 && finishAt == null) return skip("nothing this lead can receive");
@@ -213,7 +258,7 @@ export function leadFlowStatus(leadId: number): { flow: string | null; next: { c
   const next = db
     .select({ channel: schema.automationQueue.channel, dueAt: schema.automationQueue.dueAt })
     .from(schema.automationQueue)
-    .where(and(eq(schema.automationQueue.leadId, leadId), eq(schema.automationQueue.status, "queued"), eq(schema.automationQueue.kind, "message")))
+    .where(and(eq(schema.automationQueue.leadId, leadId), inArray(schema.automationQueue.status, [...PENDING_STATUSES]), eq(schema.automationQueue.kind, "message")))
     .orderBy(asc(schema.automationQueue.dueAt))
     .limit(3)
     .all()

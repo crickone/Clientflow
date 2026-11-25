@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import { runWithTenant, type TenantDb } from "@/lib/db/tenant";
@@ -11,7 +11,7 @@ import { isStopReply } from "@/lib/whatsappBroadcastModel";
 
 import { flowNow } from "./clock";
 import type { ConsentSource } from "./consentModel";
-import { NURTURE_FLOW } from "./flowModel";
+import { NURTURE_FLOW, PENDING_STATUSES } from "./flowModel";
 import { stopFlows } from "./runs";
 
 /**
@@ -129,7 +129,7 @@ export function onEmailSuppressed(tenantId: number, email: string, reason: Suppr
   runWithTenant(tenantId, () => {
     db.update(schema.automationQueue)
       .set({ status: "cancelled", error: reason === "bounce" ? "Not sent: emails to this address bounced." : "Not sent: this address unsubscribed." })
-      .where(and(eq(schema.automationQueue.status, "queued"), eq(schema.automationQueue.channel, "email"), sql`lower(${schema.automationQueue.sendTo}) = ${address}`))
+      .where(and(inArray(schema.automationQueue.status, [...PENDING_STATUSES]), eq(schema.automationQueue.channel, "email"), sql`lower(${schema.automationQueue.sendTo}) = ${address}`))
       .run();
     if (reason === "bounce") return;
     const leads = db.select({ id: schema.leads.id }).from(schema.leads).where(sql`lower(${schema.leads.email}) = ${address}`).all();

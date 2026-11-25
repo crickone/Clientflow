@@ -8,7 +8,7 @@ export type RunStatus = "active" | "finished" | "stopped";
 export interface ActivityStep {
   kind: string;
   channel: string;
-  status: "queued" | "sent" | "failed" | "cancelled";
+  status: "queued" | "sent" | "failed" | "cancelled" | "held";
   dueAt: number;
   sentAt: number | null;
 }
@@ -25,7 +25,7 @@ export interface RunProgress {
 export function runProgress(steps: ActivityStep[]): RunProgress {
   const msgs = steps.filter((s) => s.kind === "message");
   const sent = msgs.filter((s) => s.status === "sent");
-  const queued = steps.filter((s) => s.status === "queued").sort((a, b) => a.dueAt - b.dueAt);
+  const queued = steps.filter((s) => s.status === "queued" || s.status === "held").sort((a, b) => a.dueAt - b.dueAt);
   return {
     messages: msgs.length,
     sent: sent.length,
