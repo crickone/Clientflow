@@ -37,7 +37,10 @@ export function callbackDay(pick: CallbackPick, today: string): string {
 }
 
 export function isIsoDate(s: unknown): s is string {
-  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00Z`));
+  if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const t = Date.parse(`${s}T00:00:00Z`);
+  // Date.parse rolls 2026-02-30 over to 2 March, so the date must round-trip.
+  return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === s;
 }
 
 export function callbackDayError(day: string, today: string): string | null {

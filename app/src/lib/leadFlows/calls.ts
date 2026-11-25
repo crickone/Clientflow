@@ -75,6 +75,7 @@ export function logCall(leadId: number, input: LogCallInput, userId: number | nu
   const label = CALL_OUTCOMES.find((o) => o.key === input.outcome)!.label;
   const moved = moveTo(lead, outcomeColumn(input.outcome), true);
   if (!moved.ok) return moved;
+  clearUpcomingCall(leadId, flowNow());
   db.insert(schema.leadCalls).values({ leadId, kind: "logged", outcome: input.outcome, note, userId, createdAt: flowNow() }).run();
   addMessage({ leadId, direction: "note", channel: "call", content: `Call logged: ${label}.${note ? ` ${note}` : ""}` });
   return { ok: true, message: `Logged. Moved to ${moved.name}.` };
@@ -103,9 +104,9 @@ export function scheduleCall(leadId: number, input: ScheduleCallInput, userId: n
   if (input.at != null) {
     const err = callTimeError(input.at, now);
     if (err) return { ok: false, error: err };
-    clearUpcomingCall(leadId, now);
     const moved = moveTo(lead, "role:booked", false);
     if (!moved.ok) return moved;
+    clearUpcomingCall(leadId, now);
     startFlow(leadId, CALL_BOOKED_FLOW, { callAt: input.at });
     const start = formatCallTime(input.at);
     const eventId = createEvent(
@@ -138,9 +139,9 @@ export function scheduleCall(leadId: number, input: ScheduleCallInput, userId: n
   if (input.day) {
     const err = callbackDayError(input.day, todayIn(now));
     if (err) return { ok: false, error: err };
-    clearUpcomingCall(leadId, now);
     const moved = moveTo(lead, "key:call_back", false);
     if (!moved.ok) return moved;
+    clearUpcomingCall(leadId, now);
     const morning = Math.max(now, morningOf(input.day, settings.window));
     queueStaffAlert({
       leadId,
@@ -173,6 +174,7 @@ export function scheduleCall(leadId: number, input: ScheduleCallInput, userId: n
   // No day: the Call back later flow starts after its own first delay.
   const moved = moveTo(lead, "key:call_back", true);
   if (!moved.ok) return moved;
+  clearUpcomingCall(leadId, now);
   record({});
   addMessage({ leadId, direction: "note", channel: "call", content: "Call back later, no day set." });
   return { ok: true, message: `Moved to ${moved.name}.` };

@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { requireUser } from "@/lib/auth";
 import { assignLead } from "@/lib/leadFlows/assignment";
+import { isIsoDate } from "@/lib/leadFlows/callPlan";
 import { logCall, scheduleCall } from "@/lib/leadFlows/calls";
 import { setLeadMarketingConsent } from "@/lib/leadFlows/consent";
 import { zonedTimeToUtc } from "@/lib/leadFlows/sendingWindow";
@@ -71,6 +72,9 @@ export async function scheduleCallAction(leadId: number, input: unknown): Promis
   if (!id.success) return { ok: false, error: "Lead not found." };
   if (!parsed.success) return { ok: false, error: "Pick a day, or a day and a time." };
   const { date, time, day } = parsed.data;
+  if (Boolean(date) !== Boolean(time)) return { ok: false, error: "Pick a day and a time, or switch to a day without a time." };
+  if (date && !isIsoDate(date)) return { ok: false, error: "Pick a day." };
+  if (day && !isIsoDate(day)) return { ok: false, error: "Pick a day." };
   const at = date && time ? zonedTimeToUtc(date, time) : null;
   const res = scheduleCall(id.data, { at, day: at ? null : (day ?? null) }, user.id);
   revalidatePath(`/leads/${id.data}`);

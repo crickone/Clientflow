@@ -118,6 +118,19 @@ const requireLocal = createRequire(import.meta.url);
       const eFirst = queued(e.id).filter((q) => q.kind === "message").map((q) => q.dueAt.getTime()).sort((x, y) => x - y)[0];
       ok(getLead(e.id)!.stageId === col("call_back") && eFirst === WED_10 + 2 * DAY, "no day: the flow starts after 2 days");
       ok(!calls.scheduleCall(e.id, { day: "2030-01-01" }, STAFF).ok, "a past day is refused");
+
+      // A later Log a call or Schedule a call replaces a call still to come: its diary entry goes.
+      const diary = (tag: string) => tdb.select().from(schema.calendarEvents).all().filter((x) => x.title === `Call: Call ${tag}`).length;
+      const f = newLead("planthink");
+      calls.scheduleCall(f.id, { at: callAt }, STAFF);
+      ok(diary("planthink") === 1, "a future call is in the diary");
+      calls.logCall(f.id, { outcome: "thinking" }, STAFF);
+      ok(diary("planthink") === 0, "logging Thinking about it before the call removes its diary entry");
+      const g = newLead("plannoday");
+      calls.scheduleCall(g.id, { at: callAt }, STAFF);
+      ok(diary("plannoday") === 1, "another future call is in the diary");
+      calls.scheduleCall(g.id, {}, STAFF);
+      ok(diary("plannoday") === 0, "Call back later with no day removes the old diary entry");
     });
     console.log(`calls: ${n} checks passed.`);
   } finally {

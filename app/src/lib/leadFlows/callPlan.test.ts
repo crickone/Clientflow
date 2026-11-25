@@ -12,6 +12,7 @@ import {
   formatCallDay,
   formatCallTime,
   isCallOutcome,
+  isIsoDate,
   outcomeColumn,
   scheduleCallMessages,
   staffCallAlertAt,
@@ -34,6 +35,10 @@ ok(callbackDay("in_2_days", "2026-11-30") === "2026-12-02", "In 2 days");
 ok(callbackDay("next_week", "2026-11-30") === "2026-12-07", "Next week is seven days on");
 ok(callbackDayError("2026-11-29", "2026-11-30") === "Pick today or a later day.", "a past day refused");
 ok(callbackDayError("2026-11-30", "2026-11-30") === null && callbackDayError("nope", "2026-11-30") === "Pick a day.", "today is fine, garbage is not");
+
+ok(isIsoDate("2026-02-28") && isIsoDate("2028-02-29"), "real dates are accepted");
+ok(!isIsoDate("2026-02-30") && !isIsoDate("2026-13-01") && !isIsoDate("2026-04-31") && !isIsoDate("nope"), "impossible dates are refused");
+ok(callbackDayError("2026-02-30", "2026-02-01") === "Pick a day.", "an impossible call-back day is refused");
 
 const now = Date.parse("2026-12-01T10:00:00Z");
 const callAt = Date.parse("2026-12-02T10:30:00Z");
