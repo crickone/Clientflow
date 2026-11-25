@@ -135,9 +135,14 @@ export function advanceStage(leadId: number, role: StageRole, reason?: string): 
  */
 export const HOT_SCORE = 70;
 
-export function hotReasonFromScore(score: number, nextStep: string | null | undefined): string | null {
+export function hotReasonFromScore(score: number, nextStep: string | null | undefined, source?: string | null): string | null {
   if (score < HOT_SCORE) return null;
-  return nextStep === "book" ? "asked to book" : nextStep === "call" ? "keen to talk" : "showing intent";
+  // A lead made from an unfinished checkout didn't ask for anything: it
+  // started paying for an offer and stopped. Say that, not "asked to book".
+  if (source === "checkout") return "didn't finish paying";
+  // The score's "book" bucket is "asked to book, start or pay", so the label
+  // claims no more than that.
+  return nextStep === "book" ? "ready to book or pay" : nextStep === "call" ? "keen to talk" : "showing intent";
 }
 
 /**
@@ -221,7 +226,8 @@ export function onInboundFromClient(clientId: number): void {
 }
 /** A fresh lead score: 70 or more moves the lead to Hot lead (forward-only). */
 export function onLeadScored(leadId: number, score: number, nextStep: string | null | undefined): void {
-  const reason = hotReasonFromScore(score, nextStep);
+  const source = db.select({ source: schema.leads.source }).from(schema.leads).where(eq(schema.leads.id, leadId)).get()?.source ?? null;
+  const reason = hotReasonFromScore(score, nextStep, source);
   if (reason) advanceStage(leadId, "engaged", reason);
 }
 export function onAppointmentBooked(clientId: number, status: string): void {

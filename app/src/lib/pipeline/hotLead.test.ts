@@ -51,7 +51,8 @@ const requireLocal = createRequire(import.meta.url);
     const { hotReasonFromScore, HOT_SCORE } = requireLocal("./stage") as typeof import("./stage");
     assert.equal(HOT_SCORE, 70);
     assert.equal(hotReasonFromScore(69, "book"), null);
-    assert.equal(hotReasonFromScore(70, "book"), "asked to book");
+    assert.equal(hotReasonFromScore(70, "book"), "ready to book or pay");
+    assert.equal(hotReasonFromScore(91, "book", "checkout"), "didn't finish paying", "an unfinished checkout says so");
     assert.equal(hotReasonFromScore(85, "call"), "keen to talk");
     assert.equal(hotReasonFromScore(90, "nurture"), "showing intent");
     assert.equal(hotReasonFromScore(90, null), "showing intent");
@@ -77,7 +78,7 @@ const requireLocal = createRequire(import.meta.url);
       // 2. a hot score moves it, with the reason kept for the card.
       onLeadScored(lead.id, 82, "book");
       assert.equal(row(lead.id).stageId, hot.id);
-      assert.equal(row(lead.id).hotReason, "asked to book");
+      assert.equal(row(lead.id).hotReason, "ready to book or pay");
 
       // 3. a lead further on (Booked) is never pulled back to Hot lead.
       setStageToId(lead.id, booked.id, "user");

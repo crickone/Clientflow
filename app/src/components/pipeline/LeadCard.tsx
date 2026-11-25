@@ -35,6 +35,14 @@ export function LeadCard({ lead, now, onDraft, onWhatsApp }: LeadCardProps) {
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "Anonymous";
   const initials = initialsOf(lead.firstName ?? "?", lead.lastName ?? "") || "??";
   const role = lead.stage?.role ?? null;
+  // Cards scored before the wording changed stored "asked to book" for an
+  // unfinished checkout, which never asked for anything. Relabel on display.
+  const hotLabel =
+    lead.source === "checkout" && lead.hotReason === "asked to book"
+      ? "didn't finish paying"
+      : lead.hotReason === "asked to book"
+        ? "ready to book or pay"
+        : lead.hotReason;
 
   const waitingMs = lead.firstOutboundAt == null ? now - lead.createdAt.getTime() : null;
   const tone = waitingMs != null ? slaTone(waitingMs) : null;
@@ -117,9 +125,9 @@ export function LeadCard({ lead, now, onDraft, onWhatsApp }: LeadCardProps) {
 
       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
         {/* Why it is in Hot lead: they replied, or what their score picked up (lib/pipeline/stage.ts). */}
-        {role === "engaged" && lead.hotReason && (
+        {role === "engaged" && hotLabel && (
           <Badge tone="warning" dot>
-            {lead.hotReason.charAt(0).toUpperCase() + lead.hotReason.slice(1)}
+            {hotLabel.charAt(0).toUpperCase() + hotLabel.slice(1)}
           </Badge>
         )}
         {lead.therapyInterest && <Badge>{lead.therapyInterest}</Badge>}
