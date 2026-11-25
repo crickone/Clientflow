@@ -1,7 +1,7 @@
 "use client";
 
 import "./chat.css";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, History, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -194,7 +194,8 @@ export function AdonisChat({
   }, [loaded, initialInput]);
 
   // Opening a chat lands on its latest exchange, once; polling and streaming never move the view after that.
-  useEffect(() => {
+  // A layout effect, so the first paint is already at the latest exchange and not at the top.
+  useLayoutEffect(() => {
     if (!conv || conv.messages.length === 0 || openedAt.current === conv.id) return;
     openedAt.current = conv.id;
     toLatest("auto");
@@ -339,7 +340,8 @@ export function AdonisChat({
     }));
   }
 
-  function send(text: string) {
+  /** `fromComposer`: the words were typed in the box, so a failed send puts them back there (and only then). */
+  function send(text: string, fromComposer = false) {
     // The id is the useful part: it is what every tool that touches a picture or a document takes.
     const attachLine = attachments.map((a) => `[Attached to the library: "${a.name}" — ${a.kind} #${a.id}]`).join("\n");
     const q = [text.trim(), attachLine].filter(Boolean).join("\n\n");
@@ -350,7 +352,7 @@ export function AdonisChat({
     void ask(q).then((ok) => {
       if (ok) return;
       // Nothing was sent: give the words and files back.
-      setInput((cur) => cur || text);
+      if (fromComposer) setInput((cur) => cur || text);
       setAttachments((prev) => (prev.length ? prev : sentAttachments));
     });
   }
@@ -394,6 +396,7 @@ export function AdonisChat({
     setHistoryOpen(false);
     if (empty) return; // already a fresh chat
     const id = newId();
+    openedAt.current = null; // the next chat opened (this one included, later) lands on its latest exchange
     setConv(null);
     setExpanded(new Set());
     setFreshId(id);
@@ -402,6 +405,7 @@ export function AdonisChat({
   function openChat(id: string) {
     setHistoryOpen(false);
     if (id === activeId) return;
+    openedAt.current = null;
     setConv(null);
     setExpanded(new Set());
     setActiveId(id);
@@ -424,6 +428,7 @@ export function AdonisChat({
     }
     const next = await fetchList();
     if (id === activeIdRef.current) {
+      openedAt.current = null;
       setConv(null);
       setExpanded(new Set());
       const pick = next[0]?.id;
@@ -461,14 +466,14 @@ export function AdonisChat({
     onApproveAll: (i) => approve(i, true),
     onCancel: cancelCard,
     onChange: (i, tweak) => void changeCard(i, tweak),
-    onFollowUp: send,
+    onFollowUp: (text) => send(text),
   };
 
   const composer = (variant: "hero" | "dock") => (
     <Composer
       value={input}
       onChange={setInput}
-      onSend={() => send(input)}
+      onSend={() => send(input, true)}
       // Shown once the server has the run; while a send is still on its way the button is the spinner.
       onStop={sending ? undefined : stopNow}
       busy={busy}
@@ -522,7 +527,7 @@ export function AdonisChat({
             firstName={firstName}
             businessName={businessName}
             suggestions={suggestions}
-            onPick={send}
+            onPick={(text) => send(text)}
             disabled={busy}
             composer={composer("hero")}
             today={today}
