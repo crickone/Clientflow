@@ -7,11 +7,11 @@ import { logActivity } from "@/lib/queries";
 import { listStages, resolveStageIdByRole, resolveEntryStageId } from "./stageRepo";
 import { leadPipelineId } from "./pipelineRepo";
 import { recordStageEvent, type StageActor } from "./stageEvents";
-import { cancelNurtureForLead, cancelSequences, enrolLeadInSequence } from "@/lib/automations/nurture";
-import { STOP_ON_BOOKED, STOP_ON_NO_SHOW, STOP_ON_REPLY } from "@/lib/automationModel";
+import { KEEP_ON_REPLY } from "@/lib/automationModel";
+import { applyColumnEntry } from "@/lib/leadFlows/columnEntry";
+import { stopFlows } from "@/lib/leadFlows/runs";
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { queueCrmStage } from "@/lib/facebook/capi";
-import { INACTIVE_ROLES } from "./roles";
 import { reopensOnRepeatEnquiry, shouldAdvance, ROLE_TO_LEGACY_KEY, type StageRecord, type StageRole } from "./roles";
 
 export type { StageRole } from "./roles";
@@ -42,12 +42,19 @@ export function currentStageRecord(leadId: number): StageRecord | null {
   return stages.find((s) => s.id === row.stageId) ?? null;
 }
 
+export interface StageWriteOptions {
+  /** false: enter the column without starting its flow (Schedule a call starts its own). */
+  startFlow?: boolean;
+  /** Treat a write to the column the lead is already in as entering it again (Log a call). */
+  reenter?: boolean;
+}
+
 /**
  * Canonical writer: set a lead's stage_id + dual-write the frozen pipeline_stage
  * text (from the stage's role → legacy key) so not-yet-migrated readers/tests keep
  * working during the transition. Logs an activity row.
  */
-export function writeStageId(leadId: number, stageId: number, note: string, actor: StageActor = "system"): void {
+export function writeStageId(leadId: number, stageId: number, note: string, actor: StageActor = "system", opts: StageWriteOptions = {}): void {
   const before = db
     .select({ stageId: schema.leads.stageId, pipelineId: schema.leads.pipelineId })
     .from(schema.leads)
@@ -56,15 +63,6 @@ export function writeStageId(leadId: number, stageId: number, note: string, acto
   const pipelineId = leadPipelineId(leadId);
   const stage = pipelineId == null ? undefined : listStages(pipelineId).find((s) => s.id === stageId);
   const legacy = stage?.role ? ROLE_TO_LEGACY_KEY[stage.role] : undefined;
-  // A customer, or a no, is out of the nurture sequence: whatever is still
-  // queued for them is dropped here, at the one place a stage is written.
-  if (stage?.role && INACTIVE_ROLES.has(stage.role)) {
-    try {
-      cancelNurtureForLead(leadId);
-    } catch (err) {
-      console.error(`[pipeline] could not cancel nurture for lead #${leadId}:`, err);
-    }
-  }
   db.update(schema.leads)
     .set({ stageId, ...(legacy ? { pipelineStage: legacy as typeof schema.leads.$inferInsert.pipelineStage } : {}), updatedAt: new Date() })
     .where(eq(schema.leads.id, leadId))
@@ -72,23 +70,14 @@ export function writeStageId(leadId: number, stageId: number, note: string, acto
   if (before) {
     recordStageEvent(db, { leadId, pipelineId: before.pipelineId, fromStageId: before.stageId ?? null, toStageId: stageId, actor });
   }
-  // Lead follow-up sequences (lib/automations/nurture.ts): booking in stops
-  // the "come and book" nudges and starts the booked messages; a no-show
-  // stops those and starts the rebooking ones. Fail-soft: the move stands.
-  if (stage?.role === "booked" || stage?.role === "no_show") {
+  // Lead follow-up flows (lib/leadFlows/columnEntry.ts): entering a column
+  // can stop the flows a lead is in and start that column's own. A sale or a
+  // write-off stops them all. Fail-soft: the move stands.
+  if (stage && (before?.stageId !== stageId || opts.reenter)) {
     try {
-      const lead = db.select().from(schema.leads).where(eq(schema.leads.id, leadId)).get();
-      if (lead && before?.stageId !== stageId) {
-        if (stage.role === "booked") {
-          cancelSequences(leadId, STOP_ON_BOOKED);
-          enrolLeadInSequence(lead, "lead_booked");
-        } else {
-          cancelSequences(leadId, STOP_ON_NO_SHOW);
-          enrolLeadInSequence(lead, "lead_no_show");
-        }
-      }
+      applyColumnEntry(leadId, stage, actor, { startFlow: opts.startFlow });
     } catch (err) {
-      console.error(`[pipeline] follow-up sequence for lead #${leadId} not updated:`, err);
+      console.error(`[pipeline] follow-up flows for lead #${leadId} not updated:`, err);
     }
   }
   // A Facebook lead-ads lead that books, attends or buys: Meta is told, by
@@ -195,14 +184,14 @@ export function reopenLostLead(leadId: number, note: string): boolean {
 }
 
 /** Operator override — set ANY stage by id (drag / picker / agent), bypassing forward-only. */
-export function setStageToId(leadId: number, stageId: number, actor: StageActor = "user"): void {
+export function setStageToId(leadId: number, stageId: number, actor: StageActor = "user", opts: StageWriteOptions = {}): void {
   const exists = db.select({ id: schema.leads.id, pipelineId: schema.leads.pipelineId }).from(schema.leads).where(eq(schema.leads.id, leadId)).get();
   if (!exists) return;
   // A stage from another board is refused, not silently applied: the lead
   // would then show in no column of the board it is on.
   const stage = listStages(exists.pipelineId).find((s) => s.id === stageId);
   if (!stage) return;
-  writeStageId(leadId, stageId, `Lead set to ${stage.name} (manual)`, actor);
+  writeStageId(leadId, stageId, `Lead set to ${stage.name} (manual)`, actor, opts);
 }
 
 export function leadIdForClient(clientId: number): number | null {
@@ -212,9 +201,10 @@ export function leadIdForClient(clientId: number): number | null {
 
 // ── Event hooks (signatures UNCHANGED — call sites in appointments/packages/whatsapp untouched) ──
 export function onInboundFromLead(leadId: number): void {
-  // They replied: a person takes it from here, so the automatic nudges stop.
+  // They replied: a person takes it from here, so the automatic nudges stop
+  // (a booked call's confirmation and reminder carry on).
   try {
-    cancelSequences(leadId, STOP_ON_REPLY);
+    stopFlows(leadId, "replied", { except: KEEP_ON_REPLY });
   } catch (err) {
     console.error(`[pipeline] could not stop follow-ups for lead #${leadId}:`, err);
   }
