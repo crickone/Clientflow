@@ -55,6 +55,16 @@ check("empty replies are left out of the history", h.length === 2);
 check("hidden hand-backs are part of what Adonis reads", h[1].content === "[carry on]");
 check("history is capped at 24", modelHistory(Array.from({ length: 30 }, () => msgs[0])).length === 24);
 
+const withBlock = modelHistory([
+  { role: "user", content: "hi", tools: [], artifacts: [] },
+  { role: "assistant", content: "Done.\n<followups>\nNext thing\n</followups>", tools: [], artifacts: [] },
+]);
+check("follow-up suggestions are not fed back to Adonis", withBlock[1].content === "Done.");
+check(
+  "a reply that is only a follow-up block counts as empty",
+  modelHistory([{ role: "assistant", content: "<followups>\nX\n</followups>", tools: [], artifacts: [] }]).length === 0,
+);
+
 const credit = Object.assign(new Error('400 {"error":{"message":"Your credit balance is too low to access the Anthropic API."}}'), { status: 400 });
 check("out of credit says so", agentErrorText(credit).includes("out of credit"));
 check("overloaded says busy", agentErrorText(Object.assign(new Error("Overloaded"), { status: 529 })).includes("busy"));

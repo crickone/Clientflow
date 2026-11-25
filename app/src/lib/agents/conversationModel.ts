@@ -1,10 +1,11 @@
 /**
  * An Adonis conversation as the server holds it (lib/agents/conversation.ts)
- * and the chat shows it (AssistantChat). Pure, so both sides share one copy
+ * and the chat shows it (components/adonis/chat). Pure, so both sides share one copy
  * and the import of old browser-saved chats can be tested.
  */
 
 import type { CampaignProgressEvent } from "@/components/messaging/campaignProgress";
+import { stripFollowups } from "@/components/adonis/chat/followups";
 
 export type ConvAction = { name: string; input: Record<string, unknown>; summary: string };
 export type ConvArtifact = { url: string; filename: string; label: string };
@@ -34,11 +35,15 @@ export type ConversationView = ConversationSummary & {
   stopRequested: boolean;
 };
 
-/** The messages Adonis is given for its next turn: the last 24 with something in them. */
+/**
+ * The messages Adonis is given for its next turn: the last 24 with something
+ * in them. Its old follow-up suggestions are left out: they were for the
+ * operator, and feeding them back only invites repeats.
+ */
 export function modelHistory(messages: ConvMessage[]): { role: "user" | "assistant"; content: string }[] {
   return messages
+    .map((m) => ({ role: m.role, content: m.role === "assistant" ? stripFollowups(m.content) : m.content }))
     .filter((m) => m.content.trim())
-    .map((m) => ({ role: m.role, content: m.content }))
     .slice(-24);
 }
 
