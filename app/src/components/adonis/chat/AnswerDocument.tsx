@@ -40,7 +40,7 @@ export function AnswerDocument({ text, streaming = false }: { text: string; stre
           return <code key={k}>{n.text}</code>;
         case "link": {
           if (!safeHref(n.href)) return <Fragment key={k}>{words(n.text, k)}</Fragment>;
-          const external = /^https?:\/\//.test(n.href);
+          const external = /^https?:\/\//i.test(n.href);
           return (
             <a key={k} href={n.href} {...(external ? { target: "_blank", rel: "noreferrer" } : {})}>
               {n.text}

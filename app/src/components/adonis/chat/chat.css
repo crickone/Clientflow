@@ -53,7 +53,7 @@
 /* Tabs: Answer / Steps / Results. */
 .ax-tabs { display: flex; align-items: flex-end; gap: 20px; margin-bottom: 18px; border-bottom: 1px solid var(--ax-line); font-size: 13.5px; }
 .ax-tab {
-  display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 0 0 10px;
+  display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 0 10px;
   border: 0; background: none; color: var(--text-tertiary); font: inherit; cursor: pointer;
   box-shadow: inset 0 -2px 0 transparent; transition: color 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
@@ -248,7 +248,7 @@
 .ax-sg:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
 .ax-today { margin-top: 18px; padding: 12px 14px; border: 1px solid var(--ax-line); border-radius: 14px; background: var(--surface-1); }
 .ax-today-k { margin-bottom: 6px; font: 500 10.5px/1.4 var(--font-mono), ui-monospace, monospace; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
-.ax-ti { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; padding: 6px 0; border-top: 1px solid var(--ax-line); font-size: 13.5px; color: var(--text-secondary); text-decoration: none; }
+.ax-ti { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding: 6px 0; border-top: 1px solid var(--ax-line); font-size: 13.5px; color: var(--text-secondary); text-decoration: none; }
 .ax-today-k + .ax-ti { border-top: 0; }
 .ax-ti b { font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 a.ax-ti:hover { color: var(--text-primary); }
@@ -266,7 +266,7 @@ a.ax-ti:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 
 .ax-drawer-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .ax-drawer-top b { font: 600 15px/1 var(--font-heading), sans-serif; }
 .ax-drawer-actions { display: flex; align-items: center; gap: 4px; }
-.ax-new { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--accent); color: var(--accent-contrast); font: 600 12.5px/1 var(--font-body), sans-serif; cursor: pointer; }
+.ax-new { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--accent); color: var(--accent-contrast); font: 600 12.5px/1 var(--font-body), sans-serif; cursor: pointer; }
 .ax-search { display: flex; align-items: center; gap: 8px; height: 38px; margin-bottom: 12px; padding: 0 11px; border: 1px solid var(--ax-line-2); border-radius: 10px; color: var(--text-tertiary); }
 .ax-search:focus-within { border-color: var(--text-primary); }
 .ax-search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: var(--text-primary); font: 13px/1 var(--font-body), sans-serif; }
