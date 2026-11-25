@@ -5,6 +5,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getTenantDbById, runWithTenant } from "@/lib/db/tenant";
 import { onLeadScored } from "@/lib/pipeline/stage";
 import { leadMessages, leads, pipelineStages } from "@/lib/db/schema";
+import { GHL_LEAD_SOURCE } from "@/lib/ghlImport/mapping";
 import { jevConfigured, jevDecide } from "@/lib/ai/jev";
 import { LEAD_SCORE_QUESTIONS, leadScoreState, readLeadScore, scoreDue, type LeadFacts, type LeadScore } from "@/lib/leadScoreModel";
 
@@ -86,14 +87,14 @@ export async function scoreLeadsIfDue(tenantId: number): Promise<number> {
     .groupBy(leadMessages.leadId)
     .as("last_msg");
   const rows = tdb
-    .select({ id: leads.id, scoredAt: leads.leadScoredAt, updatedAt: leads.updatedAt, clientId: leads.clientId, role: pipelineStages.role, lastMsgAt: lastMsg.at })
+    .select({ id: leads.id, source: leads.source, scoredAt: leads.leadScoredAt, updatedAt: leads.updatedAt, clientId: leads.clientId, role: pipelineStages.role, lastMsgAt: lastMsg.at })
     .from(leads)
     .leftJoin(pipelineStages, eq(pipelineStages.id, leads.stageId))
     .leftJoin(lastMsg, eq(lastMsg.leadId, leads.id))
     .all();
   const now = Date.now();
   const due = rows
-    .filter((r) => scoreDue({ scoredAt: r.scoredAt, lastActivity: Math.max(r.updatedAt.getTime(), Number(r.lastMsgAt) || 0), stageRole: r.role ?? null, isClient: r.clientId !== null }, now))
+    .filter((r) => scoreDue({ scoredAt: r.scoredAt, lastActivity: Math.max(r.updatedAt.getTime(), Number(r.lastMsgAt) || 0), stageRole: r.role ?? null, isClient: r.clientId !== null, importedUntouched: r.source === GHL_LEAD_SOURCE && !r.lastMsgAt }, now))
     // Never-scored and most recently active first.
     .sort((a, b) => (a.scoredAt === null ? -1 : 0) - (b.scoredAt === null ? -1 : 0) || Math.max(b.updatedAt.getTime(), Number(b.lastMsgAt) || 0) - Math.max(a.updatedAt.getTime(), Number(a.lastMsgAt) || 0))
     .slice(0, PER_RUN);
