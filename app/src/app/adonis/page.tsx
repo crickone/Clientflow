@@ -35,10 +35,10 @@ export default async function AdonisPage(
   const firstName = membership?.user.name?.trim().split(/\s+/)[0] || null;
   const businessName = getBusinessProfile().businessName || membership?.tenant.name || "";
   // Voice T2: computed here (server component — process.env is safe to
-  // read) and passed down as a plain boolean — AdonisView/AssistantChat are
+  // read) and passed down as a plain boolean — AdonisView/AdonisChat are
   // client components and must never read process.env themselves.
   const voiceEnabled = transcribeConfigured();
-  // The model chip under the compose box (ModelPicker). Same source the chat
+  // The model chip inside the composer (ModelPicker). Same source the chat
   // route reads (`agents.model`), so the label is what the next turn runs on.
   const model = getAgent(tenantId, "orchestrator")?.model ?? MODEL_CATALOG[0].id;
   const openRouterConfigured = !!process.env.OPENROUTER_API_KEY;
