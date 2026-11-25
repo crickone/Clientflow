@@ -16,6 +16,8 @@ import {
 } from "@/lib/leads";
 import { logActivity } from "@/lib/queries";
 import { sendWhatsApp } from "@/lib/whatsapp/send";
+import { isEmailConfigured, renderEmailShell, sendEmail, textToParagraphs } from "@/lib/email";
+import { getBusinessProfile } from "@/lib/businessProfile";
 import { setStageToId } from "@/lib/pipeline/stage";
 import { dialLead } from "@/lib/voice/dial";
 import { cancelForLead } from "@/lib/voice/queue";
@@ -150,6 +152,53 @@ export async function markMessageSentAction(
     revalidatePath(`/leads/${row.leadId}`);
     revalidatePath("/leads");
   }
+}
+
+/**
+ * Email a lead from the business's connected email (branded layout), and
+ * record it on the lead as a sent email. When an existing draft is sent, that
+ * draft row becomes the sent message. Returns an error string instead of
+ * throwing so the UI keeps the operator's text.
+ */
+export async function sendLeadEmailAction(
+  leadId: number,
+  input: { subject: string; text: string; draftMessageId?: number },
+): Promise<{ ok: true; messageId: number } | { ok: false; error: string }> {
+  await requireUser();
+  const text = input.text.trim();
+  const subject = input.subject.trim();
+  if (!text) return { ok: false, error: "Write the email first." };
+  if (!subject) return { ok: false, error: "Add a subject." };
+  const lead = db.select().from(leads).where(eq(leads.id, leadId)).get();
+  if (!lead?.email) return { ok: false, error: "This lead has no email address." };
+  if (!isEmailConfigured()) return { ok: false, error: "Connect an email in Settings > Email first." };
+  const business = getBusinessProfile().businessName;
+  const res = await sendEmail({
+    to: lead.email,
+    subject,
+    html: renderEmailShell({ businessName: business, bodyHtml: textToParagraphs(text), footer: `Sent by ${business}.` }),
+    text,
+  });
+  if (!res.ok) return { ok: false, error: res.error };
+
+  let messageId = input.draftMessageId ?? 0;
+  const draft = messageId
+    ? db.select().from(leadMessages).where(eq(leadMessages.id, messageId)).get()
+    : undefined;
+  if (draft && draft.leadId === leadId) {
+    db.update(leadMessages).set({ content: text, channel: "email", sentAt: new Date() }).where(eq(leadMessages.id, messageId)).run();
+  } else {
+    messageId = db
+      .insert(leadMessages)
+      .values({ leadId, direction: "outbound", channel: "email", content: text, sentAt: new Date() })
+      .returning({ id: leadMessages.id })
+      .get().id;
+  }
+  setLeadStatus(leadId, "contacted");
+  await rescore(leadId);
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/leads");
+  return { ok: true, messageId };
 }
 
 /**

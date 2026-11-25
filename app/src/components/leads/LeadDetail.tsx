@@ -27,7 +27,7 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/DropdownMenu";
-import { Textarea } from "@/components/ui/Input";
+import { Input, Textarea } from "@/components/ui/Input";
 import type { StageRecord } from "@/lib/pipeline/roles";
 import {
   callLeadAction,
@@ -35,6 +35,7 @@ import {
   logInboundReplyAction,
   markMessageSentAction,
   sendLeadWhatsAppAction,
+  sendLeadEmailAction,
   setLeadDoNotCallAction,
   setLeadStageAction,
 } from "@/app/leads/actions";
@@ -62,6 +63,8 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
   const confirm = useConfirm();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
+  // The subject an emailed draft goes out with; editable before sending.
+  const [emailSubject, setEmailSubject] = useState(() => (lead.campaign ? `About ${lead.campaign}` : "Following up"));
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [replyChannel, setReplyChannel] = useState<
@@ -199,6 +202,29 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
     });
   }
 
+  function sendViaEmail(messageId: number, text: string) {
+    const t = text.trim();
+    if (!t) {
+      toast.error("Message can't be empty.");
+      return;
+    }
+    start(async () => {
+      const res = await sendLeadEmailAction(lead.id, { subject: emailSubject, text: t, draftMessageId: messageId });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId ? { ...m, id: res.messageId, content: t, channel: "email", status: "sent", sentAt: new Date() } : m,
+        ),
+      );
+      if (lead.status === "new") setLead({ ...lead, status: "contacted" });
+      setEditingId(null);
+      toast.success(`Email sent to ${lead.email}.`);
+    });
+  }
+
   function sendViaWhatsApp(messageId: number, text: string) {
     const t = text.trim();
     if (!t) {
@@ -286,6 +312,20 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
 
   function draftActions(m: LeadMessage, text: string) {
     return (
+      <>
+      {lead.email && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end", margin: "0 0 8px" }}>
+          <label htmlFor={`subject-${m.id}`} style={{ fontSize: 12.5, color: "var(--text-tertiary)", flex: "none" }}>
+            Email subject
+          </label>
+          <Input
+            id={`subject-${m.id}`}
+            value={emailSubject}
+            onChange={(e) => setEmailSubject(e.target.value)}
+            style={{ maxWidth: 360 }}
+          />
+        </div>
+      )}
       <div className="ld-draft-actions">
         <Button variant="ghost" size="sm" onClick={() => copyToClipboard(text)}>
           <Copy size={13} /> Copy
@@ -314,12 +354,18 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
         >
           <Check size={13} /> Mark sent
         </Button>
+        {lead.email && (
+          <Button size="sm" loading={pending} onClick={() => sendViaEmail(m.id, text)}>
+            <Mail size={13} /> Send email
+          </Button>
+        )}
         {lead.phone && (
-          <Button size="sm" loading={pending} onClick={() => sendViaWhatsApp(m.id, text)}>
+          <Button size="sm" loading={pending} variant={lead.email ? "secondary" : undefined} onClick={() => sendViaWhatsApp(m.id, text)}>
             <Send size={13} /> Send WhatsApp
           </Button>
         )}
       </div>
+      </>
     );
   }
 
