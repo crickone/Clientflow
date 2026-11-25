@@ -1,5 +1,6 @@
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { getCurrentMembership } from "@/lib/auth";
+import { getBusinessProfile } from "@/lib/businessProfile";
 import { getAgent } from "@/lib/agents/registry";
 import { MODEL_CATALOG } from "@/lib/ai/modelCatalog";
 import { AdonisView } from "@/components/adonis/AdonisView";
@@ -28,7 +29,11 @@ export default async function AdonisPage(
 ) {
   const searchParams = await props.searchParams;
   const tenantId = getCurrentTenant().id;
-  const isAdmin = getCurrentMembership()?.role === "admin";
+  const membership = getCurrentMembership();
+  const isAdmin = membership?.role === "admin";
+  // The opening screen greets by first name and names the business.
+  const firstName = membership?.user.name?.trim().split(/\s+/)[0] || null;
+  const businessName = getBusinessProfile().businessName || membership?.tenant.name || "";
   // Voice T2: computed here (server component — process.env is safe to
   // read) and passed down as a plain boolean — AdonisView/AssistantChat are
   // client components and must never read process.env themselves.
@@ -51,7 +56,7 @@ export default async function AdonisPage(
       : (campaignSeedStarterMessage(searchParams) ?? undefined);
   return (
     // Key on the seed so a second "Build campaign" click with a DIFFERENT seed
-    // (client-side nav, same route) remounts AdonisView — AssistantChat applies
+    // (client-side nav, same route) remounts AdonisView — AdonisChat applies
     // `initialInput` only once per mount (its initialInputApplied ref), so
     // without a fresh mount the second seed would be silently dropped. A
     // seedless visit uses a constant key, so normal use never remounts.
@@ -63,6 +68,8 @@ export default async function AdonisPage(
       initialInput={initialInput}
       model={model}
       openRouterConfigured={openRouterConfigured}
+      firstName={firstName}
+      businessName={businessName}
     />
   );
 }

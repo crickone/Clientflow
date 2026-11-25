@@ -1,34 +1,24 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { Settings } from "lucide-react";
 
-import { AssistantChat } from "@/components/messaging/AssistantChat";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { ADONIS_LOGO_ASPECT, ADONIS_LOGO_PATH, ADONIS_LOGO_VIEWBOX } from "@/components/ui/adonisLogoPath";
+import { AdonisChat } from "./chat/AdonisChat";
 import { ModelPicker } from "./ModelPicker";
 
+const SUGGESTIONS = [
+  "How are my ads doing this week?",
+  "Reply to today's leads",
+  "Plan next week's posts",
+  "Who hasn't booked in 30 days?",
+];
+
 /**
- * The Hermes-template flagship view (`/adonis`): a full-height, minimal home
- * for Adonis's chat — the same `AssistantChat` component + `/api/agents/
- * orchestrator/chat` endpoint already embedded on the dashboard. Adonis (the
- * "orchestrator" agent key) now does the work directly — leads, marketing,
- * operations, and general/admin — with no specialist-routing hop (Adonis
- * merge task); the write-approval gate is completely unchanged either way. A
- * settings gear top-right opens the existing `/agents` page (org chart, model
- * pickers, spend cap — unchanged, just relocated out of the navbar per the
- * sidebar redesign).
- *
- * `bare` (default-off elsewhere) strips AssistantChat's own header + card
- * chrome so the chat blends into a clean full-page background like the Hermes
- * reference. The hero (the Adonis window mark + tagline) is passed as
- * `heroSlot`, so it renders INSIDE the chat's scroll area: centered mid-window
- * while empty, then scrolling up with the conversation once it starts (it's
- * part of the scroll content, not pinned chrome). The window mark is a
- * theme-specific asset (`Logo.tsx`-independent, /adonis only) — see the
- * `.adonis-hero-*` swap in globals.css: the white variant shows on dark, the
- * ink variant on light.
+ * The /adonis page: Adonis's chat, full height (components/adonis/chat).
+ * The settings gear, admin-only because its target (/agents) is
+ * requireAdminPage()-gated, sits at the right of the chat's top bar. The
+ * model chip lives in the composer.
  */
 export function AdonisView({
   tenantId,
@@ -37,149 +27,48 @@ export function AdonisView({
   initialInput,
   model,
   openRouterConfigured,
+  firstName,
+  businessName,
 }: {
   tenantId: number;
   isAdmin: boolean;
-  /** Adonis's current `agents.model`, shown (and, for an admin, switchable) under the compose box. */
-  model: string;
-  /** Server-computed: whether the open (non-Claude) models can run. Locks them in the picker otherwise. */
-  openRouterConfigured: boolean;
-  /** Voice T2: see AssistantChat's `voiceEnabled` doc — computed server-side (page.tsx) via `transcribeConfigured()` and threaded straight through. */
+  /** Server-computed via transcribeConfigured(); the client never reads process.env. */
   voiceEnabled: boolean;
-  /** Campaign Engine "Build campaign" seed → a pre-filled compose starter (see app/adonis/page.tsx). Undefined for a normal visit. Threaded to AssistantChat's `initialInput`. */
+  /** A "Build campaign" seed for the compose box (see app/adonis/page.tsx). */
   initialInput?: string;
+  /** Adonis's current agents.model, shown (and for an admin switchable) in the composer. */
+  model: string;
+  /** Whether the open (non-Claude) models can run. */
+  openRouterConfigured: boolean;
+  firstName: string | null;
+  businessName: string;
 }) {
-  // The ADONIS wordmark at the top of the chat's scroll area (see
-  // AssistantChat `heroSlot`). No tagline — the mark owns the centre; the prompt + chips
-  // live down by the input (AssistantChat renders them in `bare` mode).
-  // /adonis renders AssistantChat's History + New-chat controls in the top bar
-  // (top-left) instead of inside the chat: AssistantChat PORTALS them into this
-  // container via its `controlsContainer` prop, so all the chat/history state
-  // stays inside that one component. A callback ref into state so the portal
-  // target is available on the render right after this div mounts.
-  const [controlsEl, setControlsEl] = useState<HTMLDivElement | null>(null);
-
-  // The ADONIS wordmark in the theme's text colour, so one drawing serves
-  // light and dark (the old "Adonis Agent" window art needed a file per theme).
-  const hero = (
-    <div
-      style={{
-        flexShrink: 0,
-        display: "flex",
-        justifyContent: "center",
-        padding: "8px 16px 0",
-      }}
-    >
-      <svg
-        role="img"
-        aria-label="Adonis"
-        viewBox={ADONIS_LOGO_VIEWBOX}
-        style={{ width: "min(560px, 78vw)", aspectRatio: String(ADONIS_LOGO_ASPECT), height: "auto", color: "var(--text-primary)", display: "block" }}
-      >
-        <path d={ADONIS_LOGO_PATH} fill="currentColor" />
-      </svg>
-    </div>
-  );
-
   return (
+    // `.adonis-shell` owns the height (100dvh, less the mobile top bar; see globals.css).
     <div
-      // `.adonis-shell` owns the height: 100dvh on desktop, but on mobile it
-      // subtracts the sticky `.app-topbar` (hamburger row, display:none on
-      // desktop) via calc(100dvh - var(--app-topbar-h)) — otherwise topbar +
-      // 100dvh overflows the screen and the compose box lands below the fold
-      // (see globals.css). Height stays in CSS so the media query can apply.
       className="adonis-shell"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        padding: "18px clamp(14px, 4vw, 24px) 20px",
-        boxSizing: "border-box",
-      }}
+      style={{ display: "flex", flexDirection: "column", padding: "12px clamp(8px, 3vw, 20px) 0", boxSizing: "border-box" }}
     >
-      {/* Top bar: New chat + History on the LEFT (AssistantChat portals its
-          controls into the ref'd container below — see its controlsContainer
-          prop), the settings gear on the RIGHT. The gear is admin-only: its
-          target (/agents) is requireAdminPage()-gated, so we never render one
-          that would silently bounce a non-admin. Fixed height so the layout is
-          stable whether or not the gear renders. */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexShrink: 0,
-          minHeight: 36,
-        }}
-      >
-        {/* Portal target for AssistantChat's History + New-chat controls. */}
-        <div ref={setControlsEl} style={{ display: "flex", alignItems: "center", gap: 4 }} />
-        {isAdmin && (
-          <Tooltip label="Agent settings">
-            <Link
-              href="/agents"
-              aria-label="Agent settings"
-              className="nav-link"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 36,
-                height: 36,
-                borderRadius: "var(--radius)",
-                color: "var(--text-secondary)",
-                flexShrink: 0,
-              }}
-            >
-              <Settings size={18} strokeWidth={1.75} />
-            </Link>
-          </Tooltip>
-        )}
-      </div>
-
-      {/* Centered column: capped width so the chat reads like a composer (not
-          stretched edge-to-edge on wide monitors). The hero lives INSIDE the
-          chat (heroSlot), centered while empty, scrolling up once chatting. */}
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          display: "flex",
-          flexDirection: "column",
-          width: "100%",
-          maxWidth: 840,
-          margin: "0 auto",
-        }}
-      >
-        <div style={{ flex: 1, minHeight: 0 }}>
-          <AssistantChat
-            tenantId={tenantId}
-            agentKey="orchestrator"
-            bare
-            heroSlot={hero}
-            emptyTitle="Ask for anything — I'll handle it"
-            emptyBody=""
-            suggestions={[
-              "Give me a breakdown of everything important today",
-              "Work my leads and win back anyone who's gone quiet",
-              "Pull together this month's invoices",
-              "Draft a blog about our newest class",
-            ]}
-            placeholder="Ask Adonis…"
-            height="100%"
-            voiceEnabled={voiceEnabled}
-            initialInput={initialInput}
-            controlsContainer={controlsEl}
-            composeFooter={
-              <ModelPicker
-                agentKey="orchestrator"
-                initialModel={model}
-                canEdit={isAdmin}
-                openRouterConfigured={openRouterConfigured}
-              />
-            }
-          />
-        </div>
-      </div>
+      <AdonisChat
+        tenantId={tenantId}
+        agentKey="orchestrator"
+        isAdmin={isAdmin}
+        firstName={firstName}
+        businessName={businessName}
+        suggestions={SUGGESTIONS}
+        voiceEnabled={voiceEnabled}
+        initialInput={initialInput}
+        modelChip={<ModelPicker agentKey="orchestrator" initialModel={model} canEdit={isAdmin} openRouterConfigured={openRouterConfigured} />}
+        headerEnd={
+          isAdmin ? (
+            <Tooltip label="Agent settings">
+              <Link href="/agents" aria-label="Agent settings" className="ax-top-btn" style={{ padding: 0, width: 36 }}>
+                <Settings size={17} strokeWidth={1.75} />
+              </Link>
+            </Tooltip>
+          ) : null
+        }
+      />
     </div>
   );
 }
