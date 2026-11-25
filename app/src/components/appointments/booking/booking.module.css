@@ -1,0 +1,639 @@
+/* New booking screen (/appointments/new). Every colour is an app token from
+   globals.css / lib/theme.ts, so dark and light both follow the admin theme.
+   Selection uses the accent; the prepaid banner and tag use the success
+   colour. Controls keep at least 12px of side padding. */
+
+.root {
+  --bk-sel: var(--accent);
+  --bk-sel-soft: var(--accent-soft);
+  --bk-ok: var(--success);
+  --bk-ok-soft: var(--success-soft);
+  --bk-ok-ink: var(--success);
+}
+:global(:root[data-theme="light"]) .root {
+  /* The dark-tuned green is too light to read as text on a near-white card. */
+  --bk-ok-ink: color-mix(in srgb, var(--success) 70%, #000);
+}
+
+/* ------------------------------------------------------------- layout */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+}
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.side {
+  position: sticky;
+  top: 20px;
+}
+
+/* -------------------------------------------------------- card pieces */
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.link {
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--hairline-strong);
+}
+.link:hover {
+  color: var(--text-primary);
+}
+.muted {
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+.link:focus-visible,
+.chip:focus-visible,
+.tile:focus-visible,
+.day:focus-visible,
+.slot:focus-visible,
+.segBtn:focus-visible,
+.result:focus-visible,
+.option:focus-visible {
+  outline: 2px solid var(--bk-sel);
+  outline-offset: 2px;
+}
+
+/* -------------------------------------------------------------- pills */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 9px 16px;
+  min-height: 38px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline-strong);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.chip:hover {
+  border-color: var(--text-tertiary);
+}
+.chipOn {
+  background: var(--bk-sel-soft);
+  border-color: var(--bk-sel);
+}
+.chipOk {
+  background: color-mix(in srgb, var(--bk-ok) 18%, transparent);
+  border-color: var(--bk-ok);
+  color: var(--bk-ok-ink);
+}
+.chipSm {
+  font-size: 12.5px;
+  padding: 7px 14px;
+  min-height: 34px;
+}
+
+/* ------------------------------------------------------------- client */
+.who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--surface-3);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-heading), sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+.whoName {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+.whoSub {
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+.results {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.result {
+  text-align: left;
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+}
+.result:hover {
+  border-color: var(--hairline-strong);
+}
+.resultSub {
+  color: var(--text-tertiary);
+  margin-left: 8px;
+}
+.walkGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.prepaid {
+  margin-top: 14px;
+  border: 1px solid color-mix(in srgb, var(--bk-ok) 45%, transparent);
+  background: var(--bk-ok-soft);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.prepaid + .prepaid {
+  margin-top: 8px;
+}
+.prepaidCount {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--bk-ok) 22%, transparent);
+  display: grid;
+  place-items: center;
+  color: var(--bk-ok-ink);
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.prepaidText {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.prepaidText b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------- treatment */
+.groupSection + .groupSection {
+  margin-top: 16px;
+}
+.group {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  margin: 0 0 8px;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+.tile {
+  font: inherit;
+  text-align: left;
+  border: 1px solid var(--hairline);
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 11px 12px;
+  min-height: 46px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px 8px;
+  flex-wrap: wrap;
+  color: var(--text-primary);
+  transition: border-color 0.15s var(--ease), background-color 0.15s var(--ease);
+}
+.tile:hover {
+  border-color: var(--hairline-strong);
+}
+.tileOn {
+  border-color: var(--bk-sel);
+  background: var(--bk-sel-soft);
+}
+.tileName {
+  font-weight: 500;
+  font-size: 14px;
+}
+.tileMeta {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.tag {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--bk-ok-ink);
+  white-space: nowrap;
+}
+.length {
+  display: flex;
+  gap: 8px 10px;
+  margin-top: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 3px;
+}
+.segBtn {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.segBtnOn {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+/* --------------------------------------------------------------- when */
+.days {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 6px;
+  margin: -2px -2px 10px;
+  scrollbar-width: thin;
+}
+.day {
+  flex: 0 0 auto;
+  width: 64px;
+  border: 1px solid var(--hairline);
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 8px 0;
+  text-align: center;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text-primary);
+}
+.dayName {
+  display: block;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.dayNum {
+  font-family: var(--font-heading), sans-serif;
+  font-weight: 600;
+  font-size: 17px;
+}
+.dayOn {
+  border-color: var(--bk-sel);
+  background: var(--bk-sel-soft);
+}
+.day:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.period {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: 12px 0 8px;
+}
+.periods > .period:first-child {
+  margin-top: 0;
+}
+.slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.slot {
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--hairline);
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 8px 14px;
+  min-width: 66px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.slot:hover:not(:disabled) {
+  border-color: var(--hairline-strong);
+}
+.slotOn {
+  border-color: var(--bk-sel);
+  background: var(--bk-sel-soft);
+}
+.slot:disabled {
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.hint {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  margin-top: 12px;
+}
+.warn {
+  font-size: 12.5px;
+  color: var(--warning);
+  margin-top: 8px;
+}
+.inline {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+/* ------------------------------------------------------------ payment */
+.links {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+.panel {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.option {
+  font: inherit;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  background: transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+.optionOn {
+  border-color: var(--bk-sel);
+  background: var(--bk-sel-soft);
+}
+.optionRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.optionName {
+  font-weight: 500;
+}
+.optionSub {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.full {
+  grid-column: 1 / -1;
+}
+.fieldLabel {
+  display: block;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.msgs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+}
+.msgOk {
+  color: var(--bk-ok-ink);
+  font-weight: 500;
+}
+.msgWarn {
+  color: var(--warning);
+}
+.msgBad {
+  color: var(--danger);
+}
+.msg {
+  color: var(--text-secondary);
+}
+.split {
+  padding: 14px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 12px;
+  background: var(--warning-soft);
+}
+.splitTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.splitText {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+/* ------------------------------------------------------------ summary */
+.summary {
+  background: var(--surface-1);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: var(--shadow-2);
+}
+.summaryTitle {
+  margin: 0 0 14px;
+  font-family: var(--font-heading), sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--hairline);
+  font-size: 14px;
+}
+.rowKey {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+.rowValue {
+  font-weight: 500;
+  text-align: right;
+  color: var(--text-primary);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rowEmpty {
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+.total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin: 14px 0 4px;
+}
+.totalKey {
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+.totalValue {
+  font-family: var(--font-heading), sans-serif;
+  font-weight: 600;
+  font-size: 26px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.struck {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  font-weight: 400;
+  margin-right: 8px;
+}
+.notePaid {
+  font-size: 12.5px;
+  color: var(--bk-ok-ink);
+}
+.noteDue {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+}
+.book {
+  width: 100%;
+  margin-top: 16px;
+}
+
+/* A summary line and the Book button, pinned to the bottom of the screen
+   while the form scrolls, when there is no room for the side panel. */
+.bar {
+  display: none;
+  position: sticky;
+  bottom: 12px;
+  z-index: 20;
+  margin-top: 16px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 12px 16px;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 16px;
+  box-shadow: var(--shadow-2);
+}
+.barText {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.barTitle {
+  display: block;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------ narrow screens */
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .side {
+    display: none;
+  }
+  .bar {
+    display: flex;
+  }
+}
+@media (max-width: 560px) {
+  .walkGrid,
+  .fieldGrid {
+    grid-template-columns: 1fr;
+  }
+  .tiles {
+    grid-template-columns: 1fr 1fr;
+  }
+  /* The sentence takes the row; the Use it button drops under it, lined up with the text. */
+  .prepaid {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .prepaidText {
+    flex: 1 1 calc(100% - 42px);
+  }
+  .prepaid .chip {
+    margin-left: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip,
+  .tile {
+    transition: none;
+  }
+}
