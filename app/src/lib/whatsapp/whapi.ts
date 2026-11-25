@@ -5,6 +5,7 @@ import { timingSafeEqual } from "node:crypto";
 import { normalizePhone } from "./phone";
 import type {
   ConnectionStatus,
+  InboundMedia,
   InboundMessage,
   MessageStatus,
   QrResult,
@@ -132,7 +133,9 @@ export class WhapiBridge implements WhatsAppBridge {
     const messages = asArray(getProp(payload, "messages"));
     for (const m of messages) {
       if (getProp(m, "from_me") === true) continue;
-      if (getProp(m, "type") !== "text") continue;
+      const type = String(getProp(m, "type") ?? "");
+      const media = whapiMedia(type, getProp(m, type));
+      if (type !== "text" && !media) continue;
       // Only accept 1:1 user chats. Skip groups (@g.us), status/broadcast, and
       // channels/newsletters — a clinic enquiry is always a direct message, and
       // we must never ingest group chatter into leads. When chat_id is absent we
@@ -143,7 +146,7 @@ export class WhapiBridge implements WhatsAppBridge {
       if (chatId && !isDirect) continue;
       const from = String(getProp(m, "from") ?? "");
       if (from.endsWith("@g.us")) continue;
-      const body = String(getProp(getProp(m, "text"), "body") ?? "");
+      const body = media ? media.text : String(getProp(getProp(m, "text"), "body") ?? "");
       const id = String(getProp(m, "id") ?? "");
       if (!from || !id || !body) continue;
       const tsRaw = Number(getProp(m, "timestamp") ?? 0);
@@ -154,9 +157,20 @@ export class WhapiBridge implements WhatsAppBridge {
         text: body,
         providerMessageId: id,
         timestamp: timestamp || Date.now(),
+        ...(media ? { media: [media.item] } : {}),
       };
     }
     return null;
+  }
+
+  /** The file's own link first (no token sent), then Whapi's media endpoint with the token. */
+  mediaSources(media: InboundMedia): Array<{ url: string; headers?: Record<string, string> }> {
+    const out: Array<{ url: string; headers?: Record<string, string> }> = [];
+    if (media.link?.startsWith("https://")) out.push({ url: media.link });
+    if (media.mediaId) {
+      out.push({ url: `${this.base}/media/${encodeURIComponent(media.mediaId)}`, headers: { Authorization: `Bearer ${this.token}` } });
+    }
+    return out;
   }
 
   parseStatusWebhook(payload: unknown): StatusUpdate | null {
@@ -200,6 +214,42 @@ function mapStatus(raw: string): MessageStatus | null {
     default:
       return null;
   }
+}
+
+const WHAPI_MEDIA: Record<string, { kind: InboundMedia["kind"]; placeholder: string }> = {
+  image: { kind: "image", placeholder: "[Photo]" },
+  video: { kind: "video", placeholder: "[Video]" },
+  audio: { kind: "audio", placeholder: "[Audio]" },
+  voice: { kind: "audio", placeholder: "[Voice note]" },
+  document: { kind: "file", placeholder: "[File]" },
+};
+
+/**
+ * A Whapi photo / video / audio / voice / document message: its caption (or a
+ * placeholder) as the text, and what to download. Shape: `{ type: "image",
+ * image: { id, mime_type, file_size, link?, caption?, filename? } }`.
+ */
+function whapiMedia(type: string, obj: unknown): { text: string; item: InboundMedia } | null {
+  const spec = Object.prototype.hasOwnProperty.call(WHAPI_MEDIA, type) ? WHAPI_MEDIA[type] : undefined;
+  if (!spec || !obj || typeof obj !== "object") return null;
+  const id = String(getProp(obj, "id") ?? "");
+  const link = String(getProp(obj, "link") ?? "");
+  if (!id && !link) return null;
+  const caption = String(getProp(obj, "caption") ?? "").trim();
+  const size = Number(getProp(obj, "file_size") ?? 0);
+  const name = String(getProp(obj, "filename") ?? getProp(obj, "file_name") ?? "").trim();
+  const mime = String(getProp(obj, "mime_type") ?? "");
+  return {
+    text: caption || spec.placeholder,
+    item: {
+      kind: spec.kind,
+      ...(id ? { mediaId: id } : {}),
+      ...(link ? { link } : {}),
+      ...(mime ? { mime } : {}),
+      ...(name ? { name } : {}),
+      ...(Number.isFinite(size) && size > 0 ? { size } : {}),
+    },
+  };
 }
 
 function ensureDataUrl(s: string): string {

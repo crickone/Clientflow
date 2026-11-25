@@ -79,14 +79,25 @@ export interface MessagingEvent {
   messageId: string;
   text: string;
   timestamp: number;
+  /** Photos, videos, audio and files, with Meta's (signed, expiring) CDN link. Empty when none. */
+  attachments: MessagingAttachment[];
 }
+
+export interface MessagingAttachment {
+  type: "image" | "video" | "audio" | "file";
+  url: string;
+}
+
+const ATTACHMENT_TYPES = new Set(["image", "video", "audio", "file"]);
 
 /**
  * Parse Messenger / Instagram messaging webhooks: `{ object: "page"|"instagram",
  * entry: [{ id, messaging: [{ sender:{id}, recipient:{id}, timestamp,
  * message:{ mid, text, is_echo, attachments } }] }] }`. A message with no text
  * (a photo, a sticker, a story reply) becomes a short placeholder so the
- * conversation still shows something arrived. Reactions, reads and deliveries
+ * conversation still shows something arrived; image/video/audio/file
+ * attachments also keep their link so the file itself can be downloaded
+ * (lib/inbox/media.ts). Reactions, reads and deliveries
  * carry no `message` and are skipped. Never throws.
  */
 export function parseMessagingEvents(payload: unknown): MessagingEvent[] {
@@ -108,11 +119,19 @@ export function parseMessagingEvents(payload: unknown): MessagingEvent[] {
       const isEcho = prop(message, "is_echo") === true;
       const customerId = str(prop(isEcho ? prop(ev, "recipient") : prop(ev, "sender"), "id"));
       if (!customerId) continue;
+      const rawAttachments = prop(message, "attachments");
       let text = str(prop(message, "text")).trim();
       if (!text) {
-        const attachments = prop(message, "attachments");
-        const type = Array.isArray(attachments) ? str(prop(attachments[0], "type")) : "";
+        const type = Array.isArray(rawAttachments) ? str(prop(rawAttachments[0], "type")) : "";
         text = type ? `[${type === "image" ? "Photo" : type.charAt(0).toUpperCase() + type.slice(1)}]` : "[Attachment]";
+      }
+      const attachments: MessagingAttachment[] = [];
+      for (const a of Array.isArray(rawAttachments) ? rawAttachments : []) {
+        const type = str(prop(a, "type"));
+        const url = str(prop(prop(a, "payload"), "url"));
+        if (ATTACHMENT_TYPES.has(type) && url.startsWith("https://")) {
+          attachments.push({ type: type as MessagingAttachment["type"], url });
+        }
       }
       out.push({
         channel,
@@ -122,6 +141,7 @@ export function parseMessagingEvents(payload: unknown): MessagingEvent[] {
         messageId,
         text,
         timestamp: toFiniteNumber(prop(ev, "timestamp")) ?? Date.now(),
+        attachments,
       });
     }
   }
