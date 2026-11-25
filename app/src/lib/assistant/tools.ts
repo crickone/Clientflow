@@ -1,4 +1,5 @@
 import "server-only";
+import { voidBookingPayments } from "@/lib/bookingPayments";
 
 import type Anthropic from "@anthropic-ai/sdk";
 import JSZip from "jszip";
@@ -1975,6 +1976,8 @@ function cancelAppointment(ctx: ToolContext, input: Record<string, unknown>): st
     .set({ status: "cancelled", updatedAt: new Date(), ...appointmentStatusDates(found[0].status, "cancelled", new Date()) })
     .where(eq(appointments.id, found[0].id))
     .run();
+  // The payment the booking recorded goes with it (see lib/bookingPayments).
+  if (found[0].status !== "cancelled") voidBookingPayments(found[0].id);
   return JSON.stringify({ result: `Cancelled ${c.name}'s appointment on ${date} at ${found[0].startTime}.` });
 }
 

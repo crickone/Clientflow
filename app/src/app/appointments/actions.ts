@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { voidBookingPayments } from "@/lib/bookingPayments";
 import { requireUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { eq, sql } from "drizzle-orm";
@@ -145,6 +146,9 @@ export async function updateStatusAction(
     .set({ status, updatedAt: new Date(), ...appointmentStatusDates(prev?.status ?? null, status, new Date()) })
     .where(eq(appointments.id, id))
     .run();
+  // A cancelled booking no longer owes or used anything: drop the payment it
+  // recorded when it was made (gift voucher balance given back).
+  if (status === "cancelled" && prev?.status !== "cancelled") voidBookingPayments(id);
   await logActivity(
     `appointment.${status}`,
     `Appointment #${id} marked ${status}`,
@@ -302,8 +306,10 @@ export async function uncompleteAppointmentAction(id: number) {
 
 export async function deleteAppointmentAction(id: number) {
   await requireUser();
-  // Detach payments so the financial record survives the appointment delete.
-  // sessions cascade automatically via FK.
+  // The payment a desk booking recorded goes with it (it was written when the
+  // booking was made, not when money was taken); online payments are kept,
+  // detached. Sessions cascade via FK.
+  voidBookingPayments(id);
   db.update(payments)
     .set({ appointmentId: null })
     .where(eq(payments.appointmentId, id))

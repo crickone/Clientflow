@@ -153,6 +153,21 @@ export function BookingForm({
       })
       .catch(() => setActivePackages([]));
   }, [clientId, therapyId, bookDate]);
+  // Every prepaid package the client has, whatever treatment is picked: a
+  // Black Friday buyer booked for a different massage (or before a treatment
+  // was chosen) used to get no hint, and was charged as a voucher instead.
+  const [otherPrepaid, setOtherPrepaid] = useState<(Package & { available?: number })[]>([]);
+  useEffect(() => {
+    if (!clientId) {
+      setOtherPrepaid([]);
+      return;
+    }
+    fetch(`/api/packages?clientId=${clientId}&date=${encodeURIComponent(bookDate)}`)
+      .then((r) => r.json())
+      .then((d: (Package & { available?: number })[]) => setOtherPrepaid(Array.isArray(d) ? d : []))
+      .catch(() => setOtherPrepaid([]));
+  }, [clientId, bookDate]);
+  const prepaidElsewhere = otherPrepaid.filter((p) => p.therapyId !== therapyId);
   const prepaidLeft = activePackages.reduce(
     (n, p) => n + ((p as Package & { available?: number }).available ?? p.totalSessions - p.sessionsUsed),
     0,
@@ -592,6 +607,35 @@ export function BookingForm({
 
       <Card>
         <CardLabel>Payment</CardLabel>
+        {prepaidLeft === 0 && prepaidElsewhere.length > 0 && (
+          <div
+            style={{
+              margin: "0 0 12px",
+              padding: "10px 12px",
+              borderRadius: "var(--radius)",
+              border: "1px solid var(--hairline-strong)",
+              fontSize: 13,
+              color: "var(--text-secondary)",
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <span>
+              This client has a prepaid session for a different treatment:{" "}
+              {prepaidElsewhere
+                .map((p) => `${p.packageName} (${p.available ?? p.totalSessions - p.sessionsUsed} left, use by ${p.expiryDate.split("-").reverse().join("/")})`)
+                .join("; ")}
+              . Book that treatment to use it instead of charging.
+            </span>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {prepaidElsewhere.map((p) => (
+                <Button key={p.id} type="button" size="sm" variant="secondary" onClick={() => { methodChosen.current = false; setTherapyId(p.therapyId); }}>
+                  Use {p.packageName}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
         {prepaidLeft > 0 && (
           <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--text-secondary)" }}>
             {prepaidLeft === 1 ? "This client has 1 prepaid session" : `This client has ${prepaidLeft} prepaid sessions`} for this treatment
