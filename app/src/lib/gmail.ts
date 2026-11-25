@@ -12,6 +12,7 @@ import { refreshAccessToken } from "@/lib/google/oauth";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import { GMAIL_SYNC_MIN_GAP_MS, isMessageRead, shouldSyncNow } from "@/lib/gmailSync";
 import { notifyInboundEmail } from "@/lib/notifications/notify";
+import { isAutoReply } from "@/lib/leadFlows/autoReply";
 
 // Re-exported so `@/lib/gmail` stays the one import path for anything
 // Gmail-related — callers (e.g. the dashboard brief route) don't need to know
@@ -446,9 +447,13 @@ export async function syncGmailInbox(
         });
         // A reply from a lead stops their follow-ups (lib/pipeline/stage.ts). Loaded
         // here: the stage writer reaches email, which reaches this file.
-        void import("@/lib/pipeline/stage")
-          .then((m) => m.onLeadEmailReply(tenantId, from.email || null, msg.internalDate ? new Date(Number(msg.internalDate)) : null, msg.snippet ?? null))
-          .catch((err) => console.error("[gmail] lead reply hook failed:", err));
+        // An out-of-office or other auto-reply is not a person answering: skipped.
+        const autoReply = isAutoReply(Object.fromEntries((headers ?? []).map((h) => [h.name, h.value])), headerVal(headers, "Subject"));
+        if (!autoReply) {
+          void import("@/lib/pipeline/stage")
+            .then((m) => m.onLeadEmailReply(tenantId, from.email || null, msg.internalDate ? new Date(Number(msg.internalDate)) : null, msg.snippet ?? null))
+            .catch((err) => console.error("[gmail] lead reply hook failed:", err));
+        }
       }
     }
 

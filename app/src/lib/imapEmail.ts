@@ -13,6 +13,7 @@ import { getTenantDbById } from "@/lib/db/tenant";
 import { clients, emailMessages, imapConnections } from "@/lib/db/schema";
 import { decryptToken, encryptToken } from "@/lib/google/tokenCrypto";
 import { notifyInboundEmail } from "@/lib/notifications/notify";
+import { isAutoReply } from "@/lib/leadFlows/autoReply";
 import { isUnreachableSmtpError } from "@/lib/mailgunRouteModel";
 
 /**
@@ -481,6 +482,8 @@ interface ParsedMail {
   to?: AddressObject;
   html?: string | false;
   text?: string;
+  /** Lower-case header name to value (mailparser gives a Map; structured values are objects). */
+  headers?: Map<string, unknown>;
 }
 
 /** One parsed, not-yet-persisted INBOX message, ready to dedupe + insert. */
@@ -495,6 +498,8 @@ type ParsedInboxMessage = {
   snippet: string;
   internalDate: Date;
   clientId: number | null;
+  /** An out-of-office or other automatic reply (lib/leadFlows/autoReply.ts). */
+  autoReply: boolean;
 };
 
 /**
@@ -607,6 +612,10 @@ export async function syncImapInbox(
               snippet: snippetOf(bodyText),
               internalDate: mail.date ?? new Date(),
               clientId: clientByEmail.get(from.email) ?? null,
+              autoReply: isAutoReply(
+                Object.fromEntries([...(mail.headers ?? new Map<string, unknown>())].map(([k, v]) => [k, typeof v === "string" ? v : undefined])),
+                mail.subject,
+              ),
             });
           } catch (err) {
             // Best-effort: one unparsable message must not abort the batch.
@@ -664,9 +673,12 @@ export async function syncImapInbox(
               at: m.internalDate,
             });
             // A reply from a lead stops their follow-ups (lib/pipeline/stage.ts).
-            void import("@/lib/pipeline/stage")
-              .then((mod) => mod.onLeadEmailReply(tenantId, m.from.email || null, m.internalDate, m.snippet))
-              .catch((err) => console.error("[imapEmail] lead reply hook failed:", err));
+            // An out-of-office or other auto-reply is not a person answering: skipped.
+            if (!m.autoReply) {
+              void import("@/lib/pipeline/stage")
+                .then((mod) => mod.onLeadEmailReply(tenantId, m.from.email || null, m.internalDate, m.snippet))
+                .catch((err) => console.error("[imapEmail] lead reply hook failed:", err));
+            }
           } catch (err) {
             // Best-effort: e.g. a UNIQUE race on gmail_message_id must not abort the rest.
             console.error("[imapEmail] syncImapInbox: failed to insert a message, skipping:", err);
