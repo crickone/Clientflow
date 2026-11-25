@@ -27,6 +27,10 @@ const ALLOWED = new Set(
     "components/people/GhlImportCard.tsx",
     "app/leads/[id]/page.tsx",
     "app/clients/[id]/page.tsx",
+    // The daily lapse job: reads imported_at only.
+    "lib/pipeline/lapse.ts",
+    // The platform console (inside the admin): a person's subject access export and delete.
+    "lib/platform/data.ts",
   ].map((p) => path.join(SRC, p)),
 );
 const NEVER = ["lib/ai/", "lib/agents/", "lib/inbox/", "lib/adonisMap/", "lib/leadFlows/", "lib/marketing/", "lib/email", "lib/assistant/", "app/api/agents/"];

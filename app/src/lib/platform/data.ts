@@ -236,6 +236,16 @@ const LEAD_RELATED: { table: string; column: string }[] = [
   { table: "automation_queue", column: "lead_id" },
 ];
 
+/**
+ * The GoHighLevel import record (lib/ghlImport): the person's own GoHighLevel
+ * details and the staff-only medical note. The export includes it, since it
+ * is theirs. A delete keeps the row with its GoHighLevel ids, so importing
+ * the same files again does not bring the person back, and blanks the
+ * personal fields, as lib/ghlImport/store forgetImportedPerson does.
+ */
+const GHL_IMPORT_TABLE = "ghl_import_people";
+const GHL_IMPORT_BLANK = "staff_medical_note = NULL, tags = NULL, treatment = NULL, used_before = NULL, town = NULL, ghl_source = NULL";
+
 export function exportPerson(tenantId: number, kind: "client" | "lead", id: number): { ok: true; data: unknown } | { ok: false; error: string } {
   const raw = rawFor(tenantId);
   if (!raw) return { ok: false, error: "Could not reach that database." };
@@ -255,6 +265,11 @@ export function exportPerson(tenantId: number, kind: "client" | "lead", id: numb
     } catch {
       // A table this tenant does not have.
     }
+  }
+  try {
+    related[GHL_IMPORT_TABLE] = raw.prepare(`SELECT * FROM ${GHL_IMPORT_TABLE} WHERE ${kind}_id = ?`).all(id);
+  } catch {
+    // No import table on this tenant.
   }
   return { ok: true, data: { exportedAt: new Date().toISOString(), kind, person, related } };
 }
@@ -278,6 +293,11 @@ export function deletePerson(tenantId: number, kind: "client" | "lead", id: numb
     } catch {
       // A table this tenant does not have.
     }
+  }
+  try {
+    raw.prepare(`UPDATE ${GHL_IMPORT_TABLE} SET ${GHL_IMPORT_BLANK}, ${kind}_id = NULL WHERE ${kind}_id = ?`).run(id);
+  } catch {
+    // No import table on this tenant.
   }
   removed += raw.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id).changes;
   return { ok: true, note: `Deleted the ${kind} and ${removed - 1} related record${removed - 1 === 1 ? "" : "s"}.` };

@@ -1,8 +1,9 @@
 import "server-only";
 
-import { and, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 
 import { schema } from "@/lib/db";
+import { GHL_LEAD_SOURCE } from "@/lib/ghlImport/mapping";
 import { openTenantDb, type TenantDb } from "@/lib/db/tenant";
 import { listTenants } from "@/lib/tenants";
 import { resolveStageIdByRoleOnConn, stageIdsByRoleOnConn } from "./stageRepo";
@@ -37,6 +38,22 @@ function isActive(
     .where(eq(schema.payments.clientId, clientId))
     .get();
   return !!pay?.t && Number(pay.t) >= cutoffMs;
+}
+
+/**
+ * A GoHighLevel import (lib/ghlImport) brings in won customers with no
+ * visits or payments in Adonis yet. Such a lead counts as active for 90
+ * days from the import, so the next day's run does not lapse them all.
+ * Reads imported_at only, from the lead's latest import record.
+ */
+function importedSince(conn: TenantDb, leadId: number, cutoffMs: number): boolean {
+  const row = conn
+    .select({ at: schema.ghlImportPeople.importedAt })
+    .from(schema.ghlImportPeople)
+    .where(eq(schema.ghlImportPeople.leadId, leadId))
+    .orderBy(desc(schema.ghlImportPeople.id))
+    .get();
+  return !!row && row.at.getTime() >= cutoffMs;
 }
 
 function paidCount(conn: TenantDb, clientId: number): number {
@@ -83,6 +100,7 @@ function writeLapseStage(conn: TenantDb, leadId: number, role: "lapsed" | "won" 
 /**
  * Daily recompute of the reversible `lapsed` state for ONE tenant:
  *  - customers (`sale`/`repeat_customer`) with no activity in 90 days → `lapsed`
+ *    (a GoHighLevel import counts as activity for 90 days, see importedSince)
  *  - `lapsed` leads who became active again → revert to `repeat_customer` (≥2
  *    payments) or `sale`.
  * Idempotent — safe to run repeatedly. The caller supplies the tenant connection
@@ -104,10 +122,11 @@ export function recomputeLapsed(conn: TenantDb): {
   const lapsedIds = stageIdsByRoleOnConn(conn, "lapsed");
 
   const customers = customerStageIds.length
-    ? conn.select({ id: schema.leads.id, clientId: schema.leads.clientId }).from(schema.leads).where(inArray(schema.leads.stageId, customerStageIds)).all()
+    ? conn.select({ id: schema.leads.id, clientId: schema.leads.clientId, source: schema.leads.source }).from(schema.leads).where(inArray(schema.leads.stageId, customerStageIds)).all()
     : [];
   for (const l of customers) {
     if (l.clientId == null) continue;
+    if (l.source === GHL_LEAD_SOURCE && importedSince(conn, l.id, cutoffMs)) continue;
     if (!isActive(conn, l.clientId, cutoffIso, cutoffMs)) { writeLapseStage(conn, l.id, "lapsed"); lapsed++; }
   }
 

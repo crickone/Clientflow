@@ -86,15 +86,24 @@ export async function scoreLeadsIfDue(tenantId: number): Promise<number> {
     .from(leadMessages)
     .groupBy(leadMessages.leadId)
     .as("last_msg");
+  // A reply: an imported lead is scored once they reply. The import's own
+  // follow-ups are outbound, so the first WhatsApp of a flow does not count.
+  const lastInbound = tdb
+    .select({ leadId: leadMessages.leadId, at: sql<number>`max(${leadMessages.createdAt})`.as("last_in_at") })
+    .from(leadMessages)
+    .where(eq(leadMessages.direction, "inbound"))
+    .groupBy(leadMessages.leadId)
+    .as("last_in");
   const rows = tdb
-    .select({ id: leads.id, source: leads.source, scoredAt: leads.leadScoredAt, updatedAt: leads.updatedAt, clientId: leads.clientId, role: pipelineStages.role, lastMsgAt: lastMsg.at })
+    .select({ id: leads.id, source: leads.source, scoredAt: leads.leadScoredAt, updatedAt: leads.updatedAt, clientId: leads.clientId, role: pipelineStages.role, lastMsgAt: lastMsg.at, lastInboundAt: lastInbound.at })
     .from(leads)
     .leftJoin(pipelineStages, eq(pipelineStages.id, leads.stageId))
     .leftJoin(lastMsg, eq(lastMsg.leadId, leads.id))
+    .leftJoin(lastInbound, eq(lastInbound.leadId, leads.id))
     .all();
   const now = Date.now();
   const due = rows
-    .filter((r) => scoreDue({ scoredAt: r.scoredAt, lastActivity: Math.max(r.updatedAt.getTime(), Number(r.lastMsgAt) || 0), stageRole: r.role ?? null, isClient: r.clientId !== null, importedUntouched: r.source === GHL_LEAD_SOURCE && !r.lastMsgAt }, now))
+    .filter((r) => scoreDue({ scoredAt: r.scoredAt, lastActivity: Math.max(r.updatedAt.getTime(), Number(r.lastMsgAt) || 0), stageRole: r.role ?? null, isClient: r.clientId !== null, importedUntouched: r.source === GHL_LEAD_SOURCE && !r.lastInboundAt }, now))
     // Never-scored and most recently active first.
     .sort((a, b) => (a.scoredAt === null ? -1 : 0) - (b.scoredAt === null ? -1 : 0) || Math.max(b.updatedAt.getTime(), Number(b.lastMsgAt) || 0) - Math.max(a.updatedAt.getTime(), Number(a.lastMsgAt) || 0))
     .slice(0, PER_RUN);

@@ -53,7 +53,7 @@ check("never scored: due", scoreDue({ ...base, scoredAt: null }, now));
 check("new activity since the score: due", scoreDue({ ...base, lastActivity: h(1) }, now));
 check("score over a day old: due", scoreDue({ ...base, scoredAt: h(25) }, now));
 check("clients and closed leads are left alone", !scoreDue({ ...base, scoredAt: null, isClient: true }, now) && !scoreDue({ ...base, scoredAt: null, stageRole: "lost" }, now) && !scoreDue({ ...base, scoredAt: null, stageRole: "sale" }, now));
-check("an imported lead with no messages yet: not due", !scoreDue({ ...base, scoredAt: null, importedUntouched: true }, now));
-check("an imported lead once it has messages: due as usual", scoreDue({ ...base, scoredAt: null, importedUntouched: false }, now));
+check("an imported lead that has not replied yet: not due", !scoreDue({ ...base, scoredAt: null, importedUntouched: true }, now));
+check("an imported lead once they reply: due as usual", scoreDue({ ...base, scoredAt: null, importedUntouched: false }, now));
 
 console.log(`leadScoreModel: ${passed} checks passed`);
