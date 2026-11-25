@@ -98,6 +98,9 @@ assert.deepEqual(offerText(offers[0], "Mary"), {
   strong: "1 prepaid Deep tissue massage",
   rest: ", 60 min, from Black Friday. Use by 1 Mar 2027.",
 });
+const suffixed = prepaidOffers([pkg(20, 31)], [{ id: 31, name: "Swedish massage (30 min)", defaultDurationMinutes: 30 }]);
+assert.equal(suffixed[0].treatment, "Swedish massage", "the length suffix is dropped; the minutes are said once");
+assert.equal(offerText(suffixed[0], "Mary").strong, "1 prepaid Swedish massage");
 assert.equal(offerText(offers[0], "  ").lead, "This client has ", "no first name yet");
 
 console.log("booking packageChoiceModel: all checks passed.");

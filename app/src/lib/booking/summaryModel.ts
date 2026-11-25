@@ -39,6 +39,8 @@ export interface SummaryInput {
   /** Null unless paying by voucher with a code typed. */
   voucher: (VoucherCoverage & { valid: boolean }) | null;
   secondaryMethod: SecondaryMethod;
+  /** The venue's word for a package, lower case. Defaults to "package". */
+  planWord?: string;
 }
 
 export interface SummaryMoney {
@@ -96,7 +98,7 @@ export function summaryMoney(i: SummaryInput): SummaryMoney {
     }
     return { value: i.price, struck: null, paymentLabel: "Gift voucher", shortPayment: "Voucher", note: "Paid by gift voucher.", tone: "paid" };
   }
-  const label = i.paymentMethod === "package" ? "Prepaid package" : methodLabel(i.paymentMethod);
+  const label = i.paymentMethod === "package" ? `Prepaid ${i.planWord ?? "package"}` : methodLabel(i.paymentMethod);
   return { value: i.price, struck: null, paymentLabel: label, shortPayment: label, note: DUE, tone: "due" };
 }
 

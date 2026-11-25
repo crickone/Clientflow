@@ -1,5 +1,6 @@
 "use client";
 
+import { useVocab } from "@/components/providers/VocabProvider";
 import { Button } from "@/components/ui/Button";
 import { euro } from "@/lib/booking/format";
 import type { SummaryMoney } from "@/lib/booking/summaryModel";
@@ -30,11 +31,12 @@ function Row({ k, v }: { k: string; v: string }) {
 
 /** The sticky Booking panel on wide screens. */
 export function BookingSummary({ client, treatment, when, money, bookLabel, canBook, submitting, onBook }: Props) {
+  const vocab = useVocab();
   return (
     <div className={s.summary}>
       <h2 className={s.summaryTitle}>Booking</h2>
-      <Row k="Client" v={client} />
-      <Row k="Treatment" v={treatment} />
+      <Row k={vocab.member} v={client} />
+      <Row k={vocab.service} v={treatment} />
       <Row k="When" v={when} />
       <Row k="Payment" v={money.paymentLabel} />
       <div className={s.total}>

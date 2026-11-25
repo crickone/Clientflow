@@ -39,6 +39,8 @@ assert.equal(bundle.struck, null, "nothing to strike when the package value equa
 const noPkg = summaryMoney({ ...base, paymentMethod: "package" });
 assert.equal(noPkg.value, 80);
 assert.equal(noPkg.tone, "due");
+assert.equal(noPkg.paymentLabel, "Prepaid package");
+assert.equal(summaryMoney({ ...base, paymentMethod: "package", planWord: "membership" }).paymentLabel, "Prepaid membership", "the venue's word");
 
 // ------------------------------------------------------------ new package
 const signUp = summaryMoney({ ...base, paymentMethod: "package", packageMode: "new", newPackage: { name: "Ten pack", priceEur: 600 } });

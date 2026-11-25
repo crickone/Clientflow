@@ -6,7 +6,7 @@
 // secondaryPaymentMethod leaves a split voucher payment short.
 import assert from "node:assert/strict";
 
-import { EMPTY_NEW_PACKAGE, bookingEntries, bookingFormData, bookingProblem, readyToBook, type BookingDraft } from "./bookingPayload";
+import { EMPTY_NEW_PACKAGE, bookingEntries, bookingFormData, bookingProblem, readyToBook, templateStillFits, type BookingDraft } from "./bookingPayload";
 
 const VOCAB = { service: "Therapy", member: "Client" };
 
@@ -124,6 +124,30 @@ assert.equal(
 );
 assert.equal(bookingProblem(draft({ paymentMethod: "package", packageMode: "new", newPackage: { ...EMPTY_NEW_PACKAGE, templateId: 3 } }), VOCAB), null);
 assert.equal(bookingProblem(draft({ clientId: null }), { service: "Class", member: "Member" }), "Pick a member.", "venue words");
+
+assert.equal(bookingProblem(walkInWith("a@b.c"), VOCAB), "Enter a valid email for the walk-in client, or leave it empty.", "zod refuses a one-letter domain ending, so the screen does too");
+assert.equal(bookingProblem(walkInWith("a@b.co"), VOCAB), null);
+assert.equal(bookingProblem(draft({ durationMinutes: 30.5 }), VOCAB), "Enter the length in whole minutes.");
+assert.equal(bookingProblem(draft({ priceEur: -5 }), VOCAB), "The price cannot be below zero.");
+assert.equal(bookingProblem(draft({ priceEur: Number.NaN }), VOCAB), "The price cannot be below zero.");
+assert.equal(bookingProblem(draft({ priceEur: 0 }), VOCAB), null, "a free session is allowed");
+assert.equal(
+  bookingProblem(draft({ priceEur: -5, paymentMethod: "package", packageMode: "new", newPackage: { ...EMPTY_NEW_PACKAGE, templateId: 3 } }), VOCAB),
+  null,
+  "a package sign-up sends 0 as the session price, whatever the field holds",
+);
+assert.equal(readyToBook(draft({ durationMinutes: 30.5 })), false);
+
+// ------------------------------------------------------------ a package template follows the treatment
+const TEMPLATES = [
+  { id: 3, therapyId: 17 },
+  { id: 4, therapyId: 18 },
+];
+assert.equal(templateStillFits(null, 17, TEMPLATES), true, "a custom package has no template to go stale");
+assert.equal(templateStillFits(3, 17, TEMPLATES), true);
+assert.equal(templateStillFits(4, 17, TEMPLATES), false, "a template of another treatment does not fit");
+assert.equal(templateStillFits(99, 17, TEMPLATES), false, "an unknown template does not fit");
+assert.equal(templateStillFits(3, null, TEMPLATES), false, "no treatment picked");
 
 assert.equal(readyToBook(draft()), true);
 assert.equal(readyToBook(draft({ clientId: null })), false);

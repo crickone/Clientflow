@@ -10,6 +10,7 @@ import {
   bookingFormData,
   bookingProblem,
   readyToBook,
+  templateStillFits,
   type BookingDraft,
   type NewPackageDraft,
 } from "@/lib/booking/bookingPayload";
@@ -80,8 +81,13 @@ export function NewBooking({
   const vocab = useVocab();
 
   // ------------------------------------------------------------ client
-  const [clientMode, setClientMode] = useState<"existing" | "walk_in">(defaultWalkInName && !defaultClientId ? "walk_in" : "existing");
-  const [clientId, setClientId] = useState<number | null>(defaultClientId ?? null);
+  // A ?client= that is not a positive id on the list (NaN, 0, a stranger) is ignored.
+  const seedClientId =
+    defaultClientId != null && Number.isInteger(defaultClientId) && defaultClientId > 0 && clients.some((c) => c.id === defaultClientId)
+      ? defaultClientId
+      : null;
+  const [clientMode, setClientMode] = useState<"existing" | "walk_in">(defaultWalkInName && seedClientId == null ? "walk_in" : "existing");
+  const [clientId, setClientId] = useState<number | null>(seedClientId);
   const [walkIn, setWalkIn] = useState<WalkIn>(() => {
     const [firstName, lastName] = splitName(defaultWalkInName);
     return { firstName, lastName, email: "", phone: "" };
@@ -114,6 +120,10 @@ export function NewBooking({
   // Until staff pick a method themselves, a prepaid session pays by default.
   const methodChosen = useRef(Boolean(defaultVoucherCode));
   const [newPackage, setNewPackage] = useState<NewPackageDraft>(EMPTY_NEW_PACKAGE);
+  // A package template belongs to one treatment: drop it when the treatment changes (the Length switch).
+  useEffect(() => {
+    setNewPackage((prev) => (templateStillFits(prev.templateId, therapyId, packageTemplates) ? prev : { ...prev, templateId: null }));
+  }, [therapyId, packageTemplates]);
   const [voucherCode, setVoucherCode] = useState(defaultVoucherCode ?? "");
   const voucherInfo = useVoucherLookup(voucherCode, choice.paymentMethod === "voucher");
   const [secondary, setSecondary] = useState<SecondaryMethod>("card");
@@ -122,6 +132,10 @@ export function NewBooking({
 
   // Every usable prepaid package the client has on the booking's date, any treatment.
   const [packages, setPackages] = useState<UsablePackage[]>([]);
+  // The previous client's packages go as soon as the client changes, not when the next list arrives.
+  useEffect(() => {
+    setPackages([]);
+  }, [clientId]);
   useEffect(() => {
     if (clientMode !== "existing" || clientId == null) {
       setPackages([]);
@@ -213,6 +227,7 @@ export function NewBooking({
     })(),
     voucher: choice.paymentMethod === "voucher" && voucherCode ? { ...coverage, valid: voucherInfo.state === "valid" } : null,
     secondaryMethod: secondary,
+    planWord: vocab.plan.toLowerCase(),
   });
 
   const firstName = clientMode === "existing" ? client?.firstName ?? "" : walkIn.firstName.trim();
@@ -223,7 +238,7 @@ export function NewBooking({
   const canBook = readyToBook(draft) && !submitting;
   const barTitle = therapy
     ? [family?.label ?? therapy.name, startTime ? `${shortDate(date)} ${chipTime(startTime)}` : shortDate(date)].join(", ")
-    : "Pick a treatment";
+    : `Pick a ${vocab.service.toLowerCase()}`;
 
   async function book() {
     const problem = bookingProblem(draft, vocab);
@@ -237,6 +252,7 @@ export function NewBooking({
       const data = (await res.json().catch(() => ({ ok: false }))) as { ok: boolean; id?: number; error?: string };
       if (!data.ok) {
         toast.error(data.error ?? `Could not book ${vocab.booking.toLowerCase()}.`);
+        setSubmitting(false);
         return;
       }
       toast.success(`${vocab.booking} booked.`);
@@ -244,7 +260,6 @@ export function NewBooking({
       router.refresh();
     } catch {
       toast.error(`Could not book ${vocab.booking.toLowerCase()}.`);
-    } finally {
       setSubmitting(false);
     }
   }

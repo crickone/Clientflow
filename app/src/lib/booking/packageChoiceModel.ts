@@ -10,6 +10,7 @@
  */
 
 import { fullDate } from "./format";
+import { baseName } from "./treatmentGroups";
 
 export type PaymentMethod = "cash" | "card" | "package" | "voucher" | "bank_transfer";
 export type PackageMode = "existing" | "new";
@@ -96,7 +97,7 @@ export function prepaidOffers(
       packageId: p.id,
       therapyId: p.therapyId,
       count: p.available,
-      treatment: t.name,
+      treatment: baseName(t.name),
       minutes: t.defaultDurationMinutes,
       packageName: p.packageName,
       expiryDate: p.expiryDate,

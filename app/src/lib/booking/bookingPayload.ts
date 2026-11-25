@@ -6,6 +6,8 @@
  * and split payment) keeps working unchanged.
  */
 
+import { z } from "zod";
+
 import type { PackageMode, PaymentMethod } from "./packageChoiceModel";
 import type { SecondaryMethod } from "./summaryModel";
 
@@ -102,15 +104,29 @@ export function bookingFormData(d: BookingDraft): FormData {
 /** Client, treatment and a time are set: the Book button can be pressed. */
 export function readyToBook(d: BookingDraft): boolean {
   const client = d.clientMode === "existing" ? d.clientId != null : d.walkIn.firstName.trim() !== "";
-  return client && d.therapyIds.length > 0 && d.durationMinutes > 0 && HM.test(d.startTime);
+  return client && d.therapyIds.length > 0 && Number.isInteger(d.durationMinutes) && d.durationMinutes > 0 && HM.test(d.startTime);
+}
+
+/** The new-package template still belongs to the selected treatment (or none is picked). */
+export function templateStillFits(
+  templateId: number | null,
+  therapyId: number | null,
+  templates: { id: number; therapyId: number }[],
+): boolean {
+  if (templateId == null) return true;
+  const t = templates.find((x) => x.id === templateId);
+  return t != null && t.therapyId === therapyId;
 }
 
 /** Why this booking cannot be sent yet, in the words the toast shows, or null. */
 export function bookingProblem(d: BookingDraft, vocab: { service: string; member: string }): string | null {
   if (d.therapyIds.length === 0 || !(d.durationMinutes > 0)) return `Pick a ${vocab.service.toLowerCase()}.`;
+  if (!Number.isInteger(d.durationMinutes)) return "Enter the length in whole minutes.";
+  const signUp = d.paymentMethod === "package" && d.packageMode === "new";
+  if (!signUp && !(d.priceEur >= 0)) return "The price cannot be below zero.";
   if (d.clientMode === "existing" && d.clientId == null) return `Pick a ${vocab.member.toLowerCase()}.`;
   if (d.clientMode === "walk_in" && !d.walkIn.firstName.trim()) return `Enter the walk-in ${vocab.member.toLowerCase()}'s first name.`;
-  if (d.clientMode === "walk_in" && d.walkIn.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.walkIn.email.trim())) {
+  if (d.clientMode === "walk_in" && d.walkIn.email.trim() && !z.string().email().safeParse(d.walkIn.email.trim()).success) {
     return `Enter a valid email for the walk-in ${vocab.member.toLowerCase()}, or leave it empty.`;
   }
   if (!HM.test(d.startTime)) return "Pick a start time.";

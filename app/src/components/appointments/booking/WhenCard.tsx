@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useVocab } from "@/components/providers/VocabProvider";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
-import { chipTime, clock12, weekdayLong } from "@/lib/booking/format";
+import { chipTime, clock12, fullDate, weekdayLong } from "@/lib/booking/format";
 import { groupByPeriod, onGrid, type StripDay } from "@/lib/booking/slotModel";
 
 import s from "./booking.module.css";
@@ -58,7 +58,7 @@ export function WhenCard({ strip, date, onDate, startTime, onStartTime, duration
             type="button"
             disabled={d.closed}
             aria-pressed={d.date === date}
-            aria-label={`${weekdayLong(d.date)} ${d.day}${d.closed ? ", closed" : ""}`}
+            aria-label={`${weekdayLong(d.date)} ${fullDate(d.date)}${d.closed ? ", closed" : ""}`}
             className={`${s.day} ${d.date === date ? s.dayOn : ""}`}
             onClick={() => onDate(d.date)}
           >
