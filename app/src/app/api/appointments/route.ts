@@ -1,5 +1,5 @@
 import { guard } from "@/lib/api/guard";
-import { packageRefusal } from "@/lib/packageBalanceModel";
+import { packageRefusal, perSessionValue } from "@/lib/packageBalanceModel";
 import { bookedByPackage } from "@/lib/packageBalance";
 import { NextResponse, type NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
@@ -119,6 +119,7 @@ export async function POST(req: NextRequest) {
     // Paying with an existing prepaid package (e.g. a Black Friday bundle):
     // it must be this client's, still active, usable on the booking's date,
     // and have a session left once the sessions already booked on it are held.
+    let packageSessionValue: number | null = null;
     if (parsed.paymentMethod === "package" && packageId && packageMode !== "new") {
       const pkg = db.select().from(packages).where(eq(packages.id, packageId)).get();
       if (!pkg || (parsed.clientId && pkg.clientId !== parsed.clientId)) {
@@ -126,6 +127,8 @@ export async function POST(req: NextRequest) {
       }
       const refusal = packageRefusal(pkg, bookedByPackage([pkg.id]).get(pkg.id) ?? 0, parsed.date, formatDate);
       if (refusal) return NextResponse.json({ ok: false, error: refusal }, { status: 409 });
+      // The session is worth what the package cost per session, not the list price.
+      packageSessionValue = perSessionValue(pkg);
     }
 
     // Resolve client (existing or walk-in) only after the slot is valid.
@@ -174,7 +177,7 @@ export async function POST(req: NextRequest) {
         status,
         ...appointmentStatusDates(null, status, new Date()),
         therapyIds: JSON.stringify(therapyIds),
-        totalPriceEur: parsed.totalPriceEur,
+        totalPriceEur: packageSessionValue ?? parsed.totalPriceEur,
         notes,
       })
       .returning({ id: appointments.id })

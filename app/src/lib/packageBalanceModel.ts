@@ -10,6 +10,17 @@ export function sessionsLeft(p: { totalSessions: number; sessionsUsed: number },
   return Math.max(0, p.totalSessions - p.sessionsUsed - Math.max(0, booked));
 }
 
+/**
+ * What one session from this package is worth: what was paid for it, spread
+ * over its sessions. A session paid from a EUR 64 one-session Black Friday
+ * package is worth EUR 64, not the treatment's EUR 80 list price -- that list
+ * price used to land on the booking and in earnings once it was completed.
+ */
+export function perSessionValue(p: { pricePaidEur: number; totalSessions: number }): number {
+  if (!(p.totalSessions > 0) || !(p.pricePaidEur >= 0)) return 0;
+  return Math.round((p.pricePaidEur / p.totalSessions) * 100) / 100;
+}
+
 /** A package can pay for a session on `date` (YYYY-MM-DD) if it hasn't expired by then. */
 export function usableOn(expiryDate: string, date: string): boolean {
   return Boolean(expiryDate) && expiryDate >= date;

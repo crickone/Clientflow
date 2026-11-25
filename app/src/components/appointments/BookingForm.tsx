@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { perSessionValue } from "@/lib/packageBalanceModel";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { Client, Package, PackageTemplate, Therapy } from "@/lib/db/schema";
@@ -153,6 +154,26 @@ export function BookingForm({
       })
       .catch(() => setActivePackages([]));
   }, [clientId, therapyId, bookDate]);
+  // Paying from a package: the session is worth what the package cost per
+  // session (a EUR 64 Black Friday massage), not the treatment's list price.
+  const priceFromPackage = useRef(false);
+  useEffect(() => {
+    if (paymentMethod === "package" && packageId !== "") {
+      const p = activePackages.find((x) => x.id === packageId);
+      if (p) {
+        setPrice(perSessionValue(p));
+        priceFromPackage.current = true;
+      }
+      return;
+    }
+    // Switched away from the package: back to the treatment's list price.
+    if (priceFromPackage.current) {
+      priceFromPackage.current = false;
+      const t = therapyId !== "" ? therapyById.get(therapyId) : undefined;
+      if (t) setPrice(t.defaultPriceEur);
+    }
+  }, [paymentMethod, packageId, activePackages, therapyId, therapyById]);
+
   // Every prepaid package the client has, whatever treatment is picked: a
   // Black Friday buyer booked for a different massage (or before a treatment
   // was chosen) used to get no hint, and was charged as a voucher instead.
