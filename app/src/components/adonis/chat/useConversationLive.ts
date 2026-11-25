@@ -64,6 +64,11 @@ export function useConversationLive({ base, id, enabled, tenantId, onSettled }: 
   const streamFailed = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idRef = useRef(id);
+  // Bumped whenever the following effect starts or is cleaned up. A tick or timer
+  // that began under an older generation (another id, `enabled` false, unmounted)
+  // must not set state, open a stream or re-arm the poll.
+  const genRef = useRef(0);
+  const activeRef = useRef(false);
   const onSettledRef = useRef(onSettled);
   const tickRef = useRef<() => void>(() => {});
   idRef.current = id;
@@ -75,7 +80,11 @@ export function useConversationLive({ base, id, enabled, tenantId, onSettled }: 
 
   const later = useCallback((ms: number) => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => tickRef.current(), ms);
+    if (!activeRef.current) return;
+    const gen = genRef.current;
+    timerRef.current = setTimeout(() => {
+      if (gen === genRef.current && activeRef.current) tickRef.current();
+    }, ms);
   }, []);
 
   const closeStream = useCallback(() => {
@@ -89,6 +98,7 @@ export function useConversationLive({ base, id, enabled, tenantId, onSettled }: 
   }, []);
 
   const openStream = useCallback((): boolean => {
+    if (!activeRef.current) return false;
     if (esRef.current) return true;
     const convId = idRef.current;
     if (streamFailed.current || !convId || typeof EventSource === "undefined") return false;
@@ -128,6 +138,8 @@ export function useConversationLive({ base, id, enabled, tenantId, onSettled }: 
   const tick = useCallback(async () => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
+    if (!activeRef.current) return;
+    const gen = genRef.current;
     const convId = idRef.current;
     if (!convId || esRef.current) return;
     let next: ConversationView | null | undefined;
@@ -138,14 +150,20 @@ export function useConversationLive({ base, id, enabled, tenantId, onSettled }: 
     } catch {
       /* a network blip: try again on the next tick */
     }
-    if (idRef.current !== convId || esRef.current) return;
+    if (gen !== genRef.current || !activeRef.current || idRef.current !== convId || esRef.current) return;
     if (next !== undefined) setSettledId(convId);
     if (next !== undefined && !holdRef.current) {
       const wasRunning = Boolean(convRef.current?.running);
       convRef.current = next;
       setConv(next);
-      if (wasRunning && !next?.running) settle();
-      if (next?.running && openStream()) return;
+      if (wasRunning && !next?.running) {
+        setTransport("idle");
+        settle();
+      }
+      if (next?.running) {
+        if (openStream()) return;
+        setTransport("poll");
+      }
     }
     const running = Boolean(convRef.current?.running) || holdRef.current;
     later(running ? FAST_MS : document.hidden ? HIDDEN_MS : IDLE_MS);
@@ -155,6 +173,8 @@ export function useConversationLive({ base, id, enabled, tenantId, onSettled }: 
   // A different conversation: start from nothing and fetch it.
   useEffect(() => {
     if (!enabled || !id) return;
+    activeRef.current = true;
+    genRef.current += 1;
     closeStream();
     streamFailed.current = false;
     convRef.current = null;
@@ -167,6 +187,8 @@ export function useConversationLive({ base, id, enabled, tenantId, onSettled }: 
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
+      activeRef.current = false;
+      genRef.current += 1;
       document.removeEventListener("visibilitychange", onVisible);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -179,9 +201,16 @@ export function useConversationLive({ base, id, enabled, tenantId, onSettled }: 
   useEffect(() => {
     if (!enabled) return;
     if (running) {
-      if (!openStream()) later(FAST_MS);
+      // The caller's POST is in flight with an optimistic `running: true`: a stream
+      // snapshot would replace it and its `end` would settle early. wake() opens it.
+      if (holdRef.current) return;
+      if (!openStream()) {
+        setTransport("poll");
+        later(FAST_MS);
+      }
     } else {
       streamFailed.current = false; // the next run tries the stream again
+      if (!esRef.current) setTransport("idle");
     }
   }, [enabled, running, openStream, later]);
 
