@@ -12,6 +12,7 @@ import { getTenantDbById } from "@/lib/db/tenant";
 import * as schema from "@/lib/db/schema";
 
 import { setFlowClockForTests } from "../clock";
+import { setFlowTransportForTests, type FlowTransport } from "../transport";
 
 export interface Scratch {
   tid: number;
@@ -62,4 +63,38 @@ export function fakeClock(start: number): { now(): number; set(t: number): void;
 
 export function queueRows(tid: number, leadId: number) {
   return getTenantDbById(tid).select().from(schema.automationQueue).where(eq(schema.automationQueue.leadId, leadId)).all();
+}
+
+export interface FakeSend {
+  to: "lead" | "number" | "email";
+  leadId?: number;
+  address?: string;
+  text: string;
+  subject?: string;
+  html?: string;
+}
+
+/** Record every send instead of making it. `failWhatsAppFor` makes WhatsApps to those lead ids fail like an undeliverable number. */
+export function installFakeTransport(opts: { connected?: boolean } = {}): { sent: FakeSend[]; failWhatsAppFor: Set<number>; restore(): void } {
+  const sent: FakeSend[] = [];
+  const failWhatsAppFor = new Set<number>();
+  let count = 0;
+  const fake: FlowTransport = {
+    whatsAppConnected: () => opts.connected ?? true,
+    async sendWhatsAppToLead(leadId, text) {
+      if (failWhatsAppFor.has(leadId)) throw new Error("This number is not on WhatsApp.");
+      sent.push({ to: "lead", leadId, text });
+      return { providerMessageId: `fake-${++count}` };
+    },
+    async sendWhatsAppToNumber(phone, text) {
+      sent.push({ to: "number", address: phone, text });
+      return { providerMessageId: `fake-${++count}` };
+    },
+    async sendEmail(_tenantId, o) {
+      sent.push({ to: "email", address: Array.isArray(o.to) ? o.to.join(",") : o.to, subject: o.subject, html: o.html, text: o.text ?? "" });
+      return { ok: true, id: `fake-${++count}` };
+    },
+  };
+  setFlowTransportForTests(fake);
+  return { sent, failWhatsAppFor, restore: () => setFlowTransportForTests(undefined) };
 }
