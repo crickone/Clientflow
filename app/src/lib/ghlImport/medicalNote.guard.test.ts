@@ -13,7 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const SRC = path.join(process.cwd(), "src");
-const PATTERN = /staffMedicalNote|staff_medical_note|medicalCondition|ghlImportPeople|ghl_import_people|getImportedPerson|ImportedPersonView/;
+const PATTERN = /staffMedicalNote|staff_medical_note|medicalCondition|ghlImportPeople|ghl_import_people|\bgetImportedPerson|ImportedPersonView/;
 const ALLOWED = new Set(
   [
     "lib/db/schema.ts",
@@ -27,10 +27,6 @@ const ALLOWED = new Set(
     "components/people/GhlImportCard.tsx",
     "app/leads/[id]/page.tsx",
     "app/clients/[id]/page.tsx",
-    // These two only call forgetImportedPerson (which wipes the note on delete;
-    // the name contains "getImportedPerson") and never read the record.
-    "app/leads/actions.ts",
-    "app/clients/actions.ts",
   ].map((p) => path.join(SRC, p)),
 );
 const NEVER = ["lib/ai/", "lib/agents/", "lib/inbox/", "lib/adonisMap/", "lib/leadFlows/", "lib/marketing/", "lib/email", "lib/assistant/", "app/api/agents/"];
