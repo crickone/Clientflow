@@ -197,7 +197,7 @@
 /* Composer: pinned at the bottom of the thread, or inside the opening screen. */
 .ax-dock { position: relative; flex-shrink: 0; padding: 12px 24px calc(16px + var(--ax-kb, 0px)); }
 .ax-dock::before { content: ""; position: absolute; left: 0; right: 0; top: -28px; height: 28px; background: linear-gradient(to top, var(--bg), transparent); pointer-events: none; }
-@media (max-width: 640px) { .ax-dock { padding: 10px 12px calc(12px + var(--ax-kb, 0px)); } }
+@media (max-width: 640px) { .ax-dock { padding: 10px 16px calc(12px + var(--ax-kb, 0px)); } }
 .ax-box {
   max-width: 680px; margin: 0 auto; padding: 14px 12px 10px 18px;
   border: 1px solid var(--ax-line-2); border-radius: 22px; background: var(--surface-2);
@@ -299,6 +299,7 @@ a.ax-ti:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 
 .ax-hi-del { flex: none; display: inline-grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 8px; background: none; color: var(--text-tertiary); opacity: 0; cursor: pointer; }
 .ax-hi:hover .ax-hi-del, .ax-hi-del:focus-visible { opacity: 1; }
 @media (hover: none) { .ax-hi-del { opacity: 0.7; } }
+.ax-hi-del--hold { pointer-events: none; opacity: 0 !important; }
 .ax-hi-del:hover { background: var(--surface-2); color: var(--danger); }
 .ax-empty-list { padding: 24px 8px; text-align: center; font-size: 13px; color: var(--text-tertiary); }
 

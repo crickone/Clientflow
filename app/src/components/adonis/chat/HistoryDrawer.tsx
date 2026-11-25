@@ -110,7 +110,10 @@ export function HistoryDrawer({ open, onClose, items, activeId, onOpen, onNew, o
                             <span className="ax-hi-title">{c.title || "Untitled"}</span>
                             {c.running ? <span className="ax-live">Working</span> : <span className="ax-hi-time">{historyTimeLabel(c.updatedAt, at)}</span>}
                           </button>
-                          {!c.running && (
+                          {c.running ? (
+                            // A chat Adonis is still working in cannot be deleted; keep its slot so the trailing column lines up.
+                            <span className="ax-hi-del ax-hi-del--hold" aria-hidden />
+                          ) : (
                             <button type="button" className="ax-hi-del" onClick={() => onDelete(c.id)} aria-label={`Delete ${c.title || "this chat"}`}>
                               <Trash2 size={14} strokeWidth={1.9} />
                             </button>
