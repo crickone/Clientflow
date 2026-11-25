@@ -112,9 +112,16 @@ export function pickOpeningMove(
   recent: string | readonly string[] | null,
   hasPhoto: boolean,
   random: () => number = Math.random,
+  /**
+   * Only photo-led moves. A new post's first slide always carries a
+   * photograph when photography exists (COVER_PHOTO_RULE); handing it a
+   * type-only move contradicted that rule, and the designer followed the move:
+   * two posts in three went out with no photo on any slide.
+   */
+  photoOnly = false,
 ): OpeningMove {
   const exclude = new Set(recent == null ? [] : typeof recent === "string" ? [recent] : recent.slice(0, RECENT_OPENINGS));
-  const usable = OPENING_MOVES.filter((m) => hasPhoto || !m.needsPhoto);
+  const usable = OPENING_MOVES.filter((m) => (photoOnly ? m.needsPhoto : hasPhoto || !m.needsPhoto));
   const candidates = usable.filter((m) => !exclude.has(m.key));
   // Falling back to `usable` matters when exclusion empties the list — a
   // single-move set would otherwise have nothing to return.

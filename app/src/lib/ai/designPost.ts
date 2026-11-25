@@ -353,7 +353,7 @@ export async function designPost(
   // for why this is a direction rather than a layout to fill in.
   const ad = options.ad ?? null;
   const recentMoves = recentList(RECENT_OPENING_MOVES_KEY, readKey<string | null>(LAST_OPENING_MOVE_KEY, null));
-  const move = pickOpeningMove(recentMoves, hasPhotography);
+  const move = pickOpeningMove(recentMoves, hasPhotography, Math.random, hasPhotography);
   if (!ad) {
     setKey(LAST_OPENING_MOVE_KEY, move.key);
     setKey(RECENT_OPENING_MOVES_KEY, rememberRecent(recentMoves, move.key, RECENT_OPENINGS));

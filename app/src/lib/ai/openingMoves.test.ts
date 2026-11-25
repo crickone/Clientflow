@@ -88,3 +88,19 @@ const seen = new Set(
 check("every move is reachable", seen.size === OPENING_MOVES.length);
 
 console.log(`\nopeningMoves: ${passed} checks passed`);
+
+// A new post with photography only ever opens on a photo-led move.
+{
+  const { pickOpeningMove: pick, OPENING_MOVES: all } = require("./openingMoves") as typeof import("./openingMoves");
+  for (let i = 0; i < 50; i++) {
+    const m = pick(null, true, () => i / 50, true);
+    if (!m.needsPhoto) throw new Error(`photoOnly picked a type-only move: ${m.key}`);
+  }
+  const photoKeys = all.filter((m) => m.needsPhoto).map((m) => m.key);
+  // Every photo move is still reachable, and recent ones are still avoided.
+  const seen = new Set<string>();
+  for (let i = 0; i < 50; i++) seen.add(pick(null, true, () => i / 50, true).key);
+  if (photoKeys.some((k) => !seen.has(k))) throw new Error("not every photo move is reachable");
+  if (pick([photoKeys[0]], true, () => 0, true).key === photoKeys[0]) throw new Error("a recent photo move was not avoided");
+  console.log("openingMoves photoOnly: 3 checks passed.");
+}
