@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/DropdownMenu";
 
 /**
- * The model chip under the /adonis compose box: names the model Adonis is
+ * The model chip in the /adonis composer: names the model Adonis is
  * running on, and lets an admin switch it in place. It writes the same
  * `agents.model` row as the Model card on /agents/orchestrator (via the same
  * admin-gated `saveModel` server action), so the two never disagree, and the
@@ -58,12 +58,13 @@ export function ModelPicker({
     display: "inline-flex",
     alignItems: "center",
     gap: 6,
-    padding: "4px 10px",
+    minHeight: 32,
+    padding: "0 12px",
     border: "1px solid var(--hairline)",
     borderRadius: 999,
     background: "transparent",
     color: "var(--text-tertiary)",
-    fontSize: 11.5,
+    fontSize: 12,
     lineHeight: 1.3,
     fontFamily: "inherit",
   };

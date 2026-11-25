@@ -10,6 +10,7 @@ import { withUsageContext, type UsageContext } from "@/lib/ai/usageContext";
 import { composeAgentSystem } from "@/lib/agents/context";
 import { resolveChatAgent } from "@/lib/agents/chatAgent";
 import { runAgentTurn } from "@/lib/agents/runAgentTurn";
+import { liveKey as busKey, publish } from "@/lib/agents/liveBus";
 import { humanResult } from "@/components/messaging/chatText";
 import { getAdCreative } from "@/lib/ads/creatives";
 import { adsFinishedMessage, adIdsFromResults } from "@/lib/agents/backgroundWorkModel";
@@ -72,9 +73,30 @@ type Conv = {
 
 /** Conversations with a turn in progress in THIS process. A row marked running that isn't here was cut off by a restart. */
 const live = new Set<string>();
-const liveKey = (c: Ctx) => `${c.tenantId}:${c.convId}`;
+/**
+ * The conversation object each running turn is writing to. Readers (the GET
+ * route, a stream's first snapshot) are given this, so they see the reply as
+ * it stands now rather than as of the last save, and the deltas published
+ * after it apply to exactly that text.
+ */
+const memory = new Map<string, Conv>();
+/**
+ * One per running turn: "Stop" in the compose box ends the turn at once (see
+ * `drive`). A model call already running is left to finish in the background
+ * so it is metered; its words and writes are dropped.
+ */
+const aborts = new Map<string, AbortController>();
+const liveKey = (c: Ctx) => busKey(c.tenantId, c.convId);
 
 const SAVE_EVERY_MS = 500;
+const STOPPED_NOTE = "_Stopped._";
+
+type TurnRunner = typeof runAgentTurn;
+let turnRunner: TurnRunner = runAgentTurn;
+/** Tests only: run turns with a fake instead of the model. Pass undefined to restore. */
+export function setTurnRunnerForTests(fn: TurnRunner | undefined): void {
+  turnRunner = fn ?? runAgentTurn;
+}
 
 function db(tenantId: number) {
   return getTenantDbById(tenantId);
@@ -103,6 +125,8 @@ function row(c: Ctx): AgentConversation | undefined {
 }
 
 function write(c: Ctx, conv: Conv): void {
+  const now = Date.now();
+  conv.updatedAt = now;
   db(c.tenantId)
     .update(agentConversations)
     .set({
@@ -113,7 +137,7 @@ function write(c: Ctx, conv: Conv): void {
       building: conv.building,
       campaignId: conv.campaignId,
       stopRequested: conv.stopRequested,
-      updatedAt: new Date(),
+      updatedAt: new Date(now),
     })
     .where(eq(agentConversations.id, c.convId))
     .run();
@@ -163,12 +187,14 @@ export function listConversations(tenantId: number, userId: number, agentKey: st
     .orderBy(desc(agentConversations.updatedAt))
     .limit(60)
     .all()
-    .map((r) => ({ id: r.id, title: r.title, updatedAt: r.updatedAt.getTime(), running: r.status === "running" && live.has(`${tenantId}:${r.id}`) }));
+    .map((r) => ({ id: r.id, title: r.title, updatedAt: r.updatedAt.getTime(), running: r.status === "running" && live.has(busKey(tenantId, r.id)) }));
 }
 
+/** The conversation for its owner; while a turn runs, as it stands this instant (see `memory`). */
 export function getConversation(c: Ctx): ConversationView | null {
-  const conv = load(c);
-  return conv ? view(conv) : null;
+  const conv = load(c); // also the owner check: someone else's id is null
+  if (!conv) return null;
+  return view(memory.get(liveKey(c)) ?? conv);
 }
 
 export function deleteConversation(c: Ctx): boolean {
@@ -216,7 +242,8 @@ export type ConversationAction =
   | { type: "cancel"; index: number }
   | { type: "goAgain"; index: number; tweak: string }
   | { type: "buildRest"; campaignId: number }
-  | { type: "stop" };
+  /** `now`: end the turn Adonis is on (the compose box's Stop). Without it, stop after the current step (the autopilot banner). */
+  | { type: "stop"; now?: boolean };
 
 export class ConversationError extends Error {
   constructor(
@@ -236,11 +263,18 @@ export function act(c: Ctx, action: ConversationAction): ConversationView {
   let conv = load(c);
   if (action.type === "stop") {
     if (!conv) throw new ConversationError("Conversation not found.", 404);
+    const mem = memory.get(liveKey(c));
     if (conv.status === "running") {
+      // Set it on the running turn's own object too, or its next save would
+      // write stopRequested: false back over this click.
       conv.stopRequested = true;
-      write(c, conv);
+      if (mem) mem.stopRequested = true;
+      write(c, mem ?? conv);
+      // Other open tabs hear about it now, not at the next tool start or the end.
+      publish(liveKey(c), { type: "state", conversation: view(mem ?? conv) });
+      if (action.now) aborts.get(liveKey(c))?.abort();
     }
-    return view(conv);
+    return view(mem ?? conv);
   }
   if (conv?.status === "running") throw new ConversationError("Adonis is still working in this chat.", 409);
 
@@ -369,12 +403,29 @@ function followUp(c: Ctx, message: string, tries = 0): void {
 /** The loop: take turns until Adonis needs the operator. Runs detached; `live` already holds this conversation. */
 async function drive(c: Ctx, kick: Kick): Promise<void> {
   const conv = parse(row(c)!);
+  const key = liveKey(c);
+  memory.set(key, conv);
+  const abort = new AbortController();
+  aborts.set(key, abort);
+  // Settles when the compose box's Stop fires. The turn in flight is raced
+  // against it: on Stop the loop stops waiting for that turn at once instead
+  // of letting a model call that ignores the signal keep writing words.
+  const stoppedNow = new Promise<"stopped">((resolve) => {
+    abort.signal.addEventListener("abort", () => resolve("stopped"), { once: true });
+  });
   let lastSave = 0;
+  /** Save, and send every tab the whole conversation. */
   const save = () => {
     lastSave = Date.now();
     write(c, conv);
+    publish(key, { type: "state", conversation: view(conv) });
   };
-  const stopAsked = () => row(c)?.stopRequested === true;
+  /** Save only: the throttled save while words stream. The `text` deltas already carry them. */
+  const saveQuietly = () => {
+    lastSave = Date.now();
+    write(c, conv);
+  };
+  const stopAsked = () => conv.stopRequested || row(c)?.stopRequested === true;
   // File every AI cost under the campaign being worked on, else this chat,
   // for the account's AI usage page.
   const campaignNames = new Map<number, string>();
@@ -445,12 +496,13 @@ async function drive(c: Ctx, kick: Kick): Promise<void> {
       }
       if (turn > 0 && stopAsked()) break;
       if (next) conv.messages.push({ role: "user", hidden: true, content: next, tools: [], artifacts: [] });
-      const reply: ConvMessage = { role: "assistant", content: "", tools: [], artifacts: [] };
+      const reply: ConvMessage = { role: "assistant", content: "", tools: [], artifacts: [], startedAt: Date.now() };
       const history = modelHistory(conv.messages);
       conv.messages.push(reply);
+      const replyIndex = conv.messages.length - 1;
       save();
 
-      const out = await withUsageContext(usageTag(), () => runAgentTurn({
+      const turnDone = withUsageContext(usageTag(), () => turnRunner({
         tenantId: c.tenantId,
         agentKey: c.agentKey,
         userId: c.userId,
@@ -458,18 +510,46 @@ async function drive(c: Ctx, kick: Kick): Promise<void> {
         system,
         tools: resolved.tools,
         messages: history,
+        // runAgentTurn reads this only between model calls, so a call already
+        // running finishes and is metered; it never reaches the provider.
+        signal: abort.signal,
         onText: (t) => {
+          // Stopped: the turn may still be streaming in the background (it is
+          // left to finish so it is metered), but nothing more reaches the
+          // reply or the page.
+          if (abort.signal.aborted) return;
           reply.content += t;
-          if (Date.now() - lastSave > SAVE_EVERY_MS) save();
+          // The words go to the page at once; the database save stays
+          // throttled and sends no state (the delta carries the words).
+          publish(key, { type: "text", index: replyIndex, delta: t });
+          if (Date.now() - lastSave > SAVE_EVERY_MS) saveQuietly();
         },
         onTool: (n) => {
+          if (abort.signal.aborted) return;
           reply.tools.push(n);
+          publish(key, { type: "tool", index: replyIndex, name: n });
           save();
         },
       }));
+      const out = await Promise.race([turnDone, stoppedNow]);
+      if (out === "stopped") {
+        // The turn carries on detached until its model call ends (and is
+        // metered). Whatever it returns, pending writes included, is dropped.
+        turnDone.catch(() => {
+          /* a stopped turn's failure has nobody left to tell */
+        });
+        reply.durationMs = Date.now() - (reply.startedAt ?? Date.now());
+        reply.content = [reply.content, STOPPED_NOTE].filter(Boolean).join("\n\n");
+        break;
+      }
       reply.content = out.text;
+      reply.durationMs = Date.now() - (reply.startedAt ?? Date.now());
       for (const a of out.artifacts) {
         if (!reply.artifacts.some((x) => x.url === a.url)) reply.artifacts.push({ url: a.url, filename: a.filename, label: a.label });
+      }
+      if (abort.signal.aborted) {
+        reply.content = [reply.content, STOPPED_NOTE].filter(Boolean).join("\n\n");
+        break;
       }
 
       const decision = decideAfterTurn({ pending: out.pendingWrites, autopilot: conv.building, campaignId: conv.campaignId, nudges });
@@ -497,16 +577,34 @@ async function drive(c: Ctx, kick: Kick): Promise<void> {
       next = continuationMessage(results, { auto: true, autopilot: conv.building });
     }
   } catch (err) {
-    const msg = err instanceof AiCapError ? err.message : agentErrorText(err);
-    if (!(err instanceof AiCapError)) console.error(`[adonis ${c.convId}]`, err);
     const last = conv.messages[conv.messages.length - 1];
-    if (last?.role === "assistant") last.content = [last.content, `_Error: ${msg}_`].filter(Boolean).join("\n\n");
-    else conv.messages.push({ role: "assistant", content: `_Error: ${msg}_`, tools: [], artifacts: [] });
+    if (last?.role === "assistant" && last.startedAt !== undefined && last.durationMs === undefined) {
+      last.durationMs = Date.now() - last.startedAt;
+    }
+    if (abort.signal.aborted) {
+      if (last?.role === "assistant") last.content = [last.content, STOPPED_NOTE].filter(Boolean).join("\n\n");
+      else conv.messages.push({ role: "assistant", content: STOPPED_NOTE, tools: [], artifacts: [] });
+    } else {
+      const msg = err instanceof AiCapError ? err.message : agentErrorText(err);
+      if (!(err instanceof AiCapError)) console.error(`[adonis ${c.convId}]`, err);
+      if (last?.role === "assistant") last.content = [last.content, `_Error: ${msg}_`].filter(Boolean).join("\n\n");
+      else conv.messages.push({ role: "assistant", content: `_Error: ${msg}_`, tools: [], artifacts: [] });
+    }
   } finally {
     conv.status = "idle";
     conv.building = false;
     conv.stopRequested = false;
-    write(c, conv);
-    live.delete(liveKey(c));
+    // A failed save must not skip the cleanup and the final publishes below,
+    // or the chat would look busy for good in this process.
+    try {
+      write(c, conv);
+    } catch (err) {
+      console.error(`[adonis ${c.convId}] final save failed`, err);
+    }
+    live.delete(key);
+    memory.delete(key);
+    aborts.delete(key);
+    publish(key, { type: "state", conversation: view(conv) });
+    publish(key, { type: "end" });
   }
 }

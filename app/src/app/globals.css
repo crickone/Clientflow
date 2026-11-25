@@ -707,10 +707,6 @@ a {
   .app-page {
     padding: 18px 16px 72px;
   }
-  /* Free up header space on small screens */
-  .ai-subtitle {
-    display: none;
-  }
 }
 
 /* THE EDITOR'S TOOLBAR STARTS AT THE MARGIN ON A PHONE.
@@ -1085,31 +1081,7 @@ a {
 }
 .spin { animation: spin 0.9s linear infinite; }
 
-/* Assistant "working" affordances */
-@keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
-.ai-caret {
-  display: inline-block;
-  width: 7px;
-  height: 15px;
-  background: var(--accent);
-  margin-left: 2px;
-  vertical-align: text-bottom;
-  border-radius: 1px;
-  animation: blink 1s step-end infinite;
-}
-@keyframes dotBounce {
-  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-  40% { transform: translateY(-4px); opacity: 1; }
-}
-.ai-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  margin-right: 5px;
-  animation: dotBounce 1.2s infinite;
-}
+/* A thin "working" bar (research scan progress) */
 @keyframes aiShimmer {
   0% { background-position: -400px 0; }
   100% { background-position: 400px 0; }
@@ -1522,27 +1494,6 @@ a {
   /* The sweep is the one layer that is ONLY movement -- with the animation
      off it would park a bright bloom over the left edge. */
   .agent-holo > .agent-holo-scan { display: none; }
-}
-
-/* Voice T2: the mic button's "live" recording indicator — a small pulsing
-   dot pinned to the button's corner (the button itself gets `position:
-   relative` inline, only while recording — see AssistantChat.tsx). Same
-   box-shadow-ring technique as .tt-next-pulse below, just its own keyframe
-   since that one's ring colour is timetable-specific (--tt-pulse). */
-@keyframes voiceRecPulse {
-  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55); }
-  70% { box-shadow: 0 0 0 7px rgba(220, 38, 38, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
-}
-.voice-rec-dot {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #dc2626;
-  animation: voiceRecPulse 1.4s ease-out infinite;
 }
 
 /* Combined tab: chat + activity feed side-by-side, stacked on narrow screens */
@@ -2261,18 +2212,9 @@ a {
 /* Freeze looping animations for users who prefer reduced motion (the MotionConfig
    handles Framer; this covers the hand-rolled CSS loops). */
 @media (prefers-reduced-motion: reduce) {
-  .skeleton, .ai-shimmer, .ai-caret, .ai-dot { animation: none !important; }
+  .skeleton, .ai-shimmer { animation: none !important; }
   html { scroll-behavior: auto !important; }
 }
-
-/* /adonis hero mark — theme-specific asset (white on dark, ink on light).
-   Both <img>s render; CSS shows the one matching the active theme, keyed on
-   the [data-theme] attribute the light/dark toggle stamps on <html>. Default
-   (no attribute = the original dark app) shows the dark (white) mark. */
-.adonis-hero-logo { display: block; margin: 0 auto; }
-.adonis-hero-logo--light { display: none; }
-:root[data-theme="light"] .adonis-hero-logo--dark { display: none; }
-:root[data-theme="light"] .adonis-hero-logo--light { display: block; }
 
 /* A text action that sits inside a sentence rather than beside one — the
    "Not what you meant? Redesign the slide" correction row in the redesign
@@ -4758,8 +4700,6 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .op-adlink code { font-size: 12px; padding: 4px 8px; border-radius: 6px; background: var(--surface-1); border: 1px solid var(--hairline); color: var(--text-primary); overflow-wrap: anywhere; }
 .op-copy { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 12.5px; cursor: pointer; }
 .op-copy:hover { background: var(--surface-3, var(--surface-2)); }
-.ai-autopilot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--hairline); background: var(--accent-soft); font-size: 12.5px; color: var(--text-secondary); }
-.ai-autopilot button { flex-shrink: 0; border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-primary); border-radius: 8px; padding: 5px 10px; font: inherit; font-size: 12.5px; cursor: pointer; }
 
 /* Adonis chat: the campaign checklist, in the conversation */
 .ai-tasks { margin: 10px 0 2px; max-width: 520px; border: 1px solid var(--hairline); border-radius: var(--radius); background: var(--surface-1); padding: 12px 14px 10px; }
