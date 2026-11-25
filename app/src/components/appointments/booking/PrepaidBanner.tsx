@@ -28,6 +28,7 @@ export function PrepaidBanner({ offer, firstName, using, onToggle }: Props) {
       <button
         type="button"
         aria-pressed={using}
+        aria-label={`Use ${offer.packageName} for this booking`}
         className={`${s.chip} ${s.chipSm} ${using ? s.chipOk : ""}`}
         onClick={() => onToggle(!using)}
       >

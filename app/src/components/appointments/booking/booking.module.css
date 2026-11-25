@@ -93,7 +93,7 @@
   white-space: nowrap;
   transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease);
 }
-.chip:hover {
+.chip:not(.chipOn):not(.chipOk):hover {
   border-color: var(--text-tertiary);
 }
 .chipOn {
@@ -236,7 +236,7 @@
   color: var(--text-primary);
   transition: border-color 0.15s var(--ease), background-color 0.15s var(--ease);
 }
-.tile:hover {
+.tile:not(.tileOn):hover {
   border-color: var(--hairline-strong);
 }
 .tileOn {
@@ -325,6 +325,9 @@
   font-weight: 600;
   font-size: 17px;
 }
+.day:not(.dayOn):not(:disabled):hover {
+  border-color: var(--hairline-strong);
+}
 .dayOn {
   border-color: var(--bk-sel);
   background: var(--bk-sel-soft);
@@ -359,7 +362,7 @@
   color: var(--text-primary);
   cursor: pointer;
 }
-.slot:hover:not(:disabled) {
+.slot:not(.slotOn):not(:disabled):hover {
   border-color: var(--hairline-strong);
 }
 .slotOn {

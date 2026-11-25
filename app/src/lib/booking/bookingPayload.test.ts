@@ -113,6 +113,10 @@ assert.equal(bookingProblem(draft({ durationMinutes: 0 }), VOCAB), "Pick a thera
 assert.equal(bookingProblem(draft({ clientId: null }), VOCAB), "Pick a client.");
 assert.equal(bookingProblem(draft({ clientMode: "walk_in" }), VOCAB), "Enter the walk-in client's first name.");
 assert.equal(bookingProblem(draft({ startTime: "" }), VOCAB), "Pick a start time.");
+const walkInWith = (email: string) => draft({ clientMode: "walk_in", walkIn: { firstName: "Sam", lastName: "", email, phone: "" } });
+assert.equal(bookingProblem(walkInWith("not-an-email"), VOCAB), "Enter a valid email for the walk-in client, or leave it empty.");
+assert.equal(bookingProblem(walkInWith(" sam@example.com "), VOCAB), null);
+assert.equal(bookingProblem(walkInWith(""), VOCAB), null);
 assert.equal(
   bookingProblem(draft({ paymentMethod: "package", packageMode: "new", newPackage: { ...EMPTY_NEW_PACKAGE, name: "Ten pack", sessions: 10 } }), VOCAB),
   "Pick a package template or fill in the custom package details.",

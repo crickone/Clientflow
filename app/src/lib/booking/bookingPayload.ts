@@ -110,6 +110,9 @@ export function bookingProblem(d: BookingDraft, vocab: { service: string; member
   if (d.therapyIds.length === 0 || !(d.durationMinutes > 0)) return `Pick a ${vocab.service.toLowerCase()}.`;
   if (d.clientMode === "existing" && d.clientId == null) return `Pick a ${vocab.member.toLowerCase()}.`;
   if (d.clientMode === "walk_in" && !d.walkIn.firstName.trim()) return `Enter the walk-in ${vocab.member.toLowerCase()}'s first name.`;
+  if (d.clientMode === "walk_in" && d.walkIn.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.walkIn.email.trim())) {
+    return `Enter a valid email for the walk-in ${vocab.member.toLowerCase()}, or leave it empty.`;
+  }
   if (!HM.test(d.startTime)) return "Pick a start time.";
   if (
     d.paymentMethod === "package" &&
