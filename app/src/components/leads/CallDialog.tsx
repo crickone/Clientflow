@@ -121,38 +121,46 @@ export function CallDialog({
 
   function submit() {
     start(async () => {
-      if (tab === "log") {
-        if (!outcome) {
-          toast.error("Pick what happened on the call.");
-          return;
-        }
-        let callbackDayValue: string | null = null;
-        if (outcome === "call_back") {
-          const d = pickedDay();
-          if ("error" in d) {
-            toast.error(d.error);
-            return;
-          }
-          callbackDayValue = d.day;
-        }
-        done(await logCallAction(leadId, { outcome, note: note.trim() || null, callbackDay: callbackDayValue }));
-        return;
+      try {
+        await send();
+      } catch {
+        toast.error("Couldn't save. Try again.");
       }
-      if (when === "time") {
-        if (!date || !time) {
-          toast.error("Pick a day and a time.");
-          return;
-        }
-        done(await scheduleCallAction(leadId, { date, time }));
-        return;
-      }
-      const d = pickedDay();
-      if ("error" in d) {
-        toast.error(d.error);
-        return;
-      }
-      done(await scheduleCallAction(leadId, { day: d.day }));
     });
+  }
+
+  async function send() {
+    if (tab === "log") {
+      if (!outcome) {
+        toast.error("Pick what happened on the call.");
+        return;
+      }
+      let callbackDayValue: string | null = null;
+      if (outcome === "call_back") {
+        const d = pickedDay();
+        if ("error" in d) {
+          toast.error(d.error);
+          return;
+        }
+        callbackDayValue = d.day;
+      }
+      done(await logCallAction(leadId, { outcome, note: note.trim() || null, callbackDay: callbackDayValue }));
+      return;
+    }
+    if (when === "time") {
+      if (!date || !time) {
+        toast.error("Pick a day and a time.");
+        return;
+      }
+      done(await scheduleCallAction(leadId, { date, time }));
+      return;
+    }
+    const d = pickedDay();
+    if ("error" in d) {
+      toast.error(d.error);
+      return;
+    }
+    done(await scheduleCallAction(leadId, { day: d.day }));
   }
 
   return (

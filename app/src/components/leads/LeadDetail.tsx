@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   ArrowLeft,
   CalendarClock,
@@ -67,6 +67,10 @@ interface Props {
 
 export function LeadDetail({ lead: initialLead, messages: initialMessages, stages, voice, staff, flow, calls }: Props) {
   const [lead, setLead] = useState(initialLead);
+  // A router.refresh() (e.g. after a call moves the lead) hands in a new prop: adopt it.
+  useEffect(() => {
+    setLead(initialLead);
+  }, [initialLead]);
   const [messages, setMessages] = useState(initialMessages);
   const [drafting, setDrafting] = useState(false);
   const [pending, start] = useTransition();

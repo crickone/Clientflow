@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type CSSProperties } from "react";
+import { useEffect, useState, useTransition, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -63,6 +63,14 @@ export function LeadFollowUpsCard({
   const [consent, setConsent] = useState(consentAt != null);
   const [pending, start] = useTransition();
 
+  // Re-seed when a refresh brings new values from the server.
+  useEffect(() => {
+    setAssignee(assignedUserId != null ? String(assignedUserId) : "");
+  }, [assignedUserId]);
+  useEffect(() => {
+    setConsent(consentAt != null);
+  }, [consentAt]);
+
   function assign(value: string) {
     const before = assignee;
     setAssignee(value);
@@ -83,7 +91,7 @@ export function LeadFollowUpsCard({
     if (next) {
       const yes = await confirm({
         title: "They agreed to marketing?",
-        body: "Only tick this if they told you they want news and offers. It lets the Long-term nurture flow send to them, and adds them to your email contacts.",
+        body: "Only turn this on if they told you they want news and offers. It lets the Long-term nurture flow send to them, and adds them to your email contacts.",
         confirmLabel: "They agreed",
       });
       if (!yes) return;
@@ -127,6 +135,7 @@ export function LeadFollowUpsCard({
               type="button"
               role="switch"
               aria-checked={consent}
+              aria-label="Agreed to marketing"
               onClick={() => void toggleConsent()}
               disabled={pending}
               style={{
