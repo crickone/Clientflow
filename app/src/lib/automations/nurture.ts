@@ -1,10 +1,10 @@
 import "server-only";
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import type { Lead } from "@/lib/db/schema";
-import { isTriggerEnabled } from "@/lib/leadFlows/flowModel";
+import { isTriggerEnabled, PENDING_STATUSES } from "@/lib/leadFlows/flowModel";
 import { startFlow, stopFlows } from "@/lib/leadFlows/runs";
 
 /**
@@ -56,12 +56,12 @@ export function cancelNurtureForLead(leadId: number): number {
   return stopFlows(leadId, "won or lost", "all");
 }
 
-/** Queued messages for a lead, soonest first -- for the lead's detail view. */
+/** Messages still to go for a lead (queued, or held while their follow-up is off), soonest first -- for the lead's detail view. */
 export function listQueuedForLead(leadId: number) {
   return db
     .select()
     .from(schema.automationQueue)
-    .where(and(eq(schema.automationQueue.leadId, leadId), eq(schema.automationQueue.status, "queued"), eq(schema.automationQueue.kind, "message")))
+    .where(and(eq(schema.automationQueue.leadId, leadId), inArray(schema.automationQueue.status, [...PENDING_STATUSES]), eq(schema.automationQueue.kind, "message")))
     .orderBy(asc(schema.automationQueue.dueAt))
     .all();
 }

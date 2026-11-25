@@ -52,7 +52,7 @@ export default async function LeadDetailPage(
       <LeadDetail lead={lead} messages={messages} stages={stages} voice={voice} staff={staff} flow={flow} calls={calls} />
       {imported && (
         <div style={{ maxWidth: 560, marginTop: 16 }}>
-          <GhlImportCard person={imported} leadId={id} />
+          <GhlImportCard person={imported} leadId={id} isAdmin={membership?.role === "admin"} />
         </div>
       )}
     </div>

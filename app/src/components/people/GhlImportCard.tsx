@@ -13,7 +13,7 @@ const DAY = new Intl.DateTimeFormat("en-IE", { timeZone: "Europe/Dublin", day: "
  * medical note is shown here and nowhere else (never to the AI, never in a
  * message or an export).
  */
-export function GhlImportCard({ person, leadId }: { person: ImportedPersonView; leadId?: number }) {
+export function GhlImportCard({ person, leadId, isAdmin = false }: { person: ImportedPersonView; leadId?: number; isAdmin?: boolean }) {
   const facts: [string, string | null][] = [
     ["Stage there", person.ghlStage ? `${person.ghlStage}${person.daysInStage != null ? `, ${person.daysInStage} days` : ""}` : null],
     ["Source", person.ghlSource],
@@ -28,7 +28,8 @@ export function GhlImportCard({ person, leadId }: { person: ImportedPersonView; 
       {person.doNotContact && (
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
           <Badge tone="danger">Do not contact</Badge>
-          {leadId != null && <AllowContactButton leadId={leadId} />}
+          {/* Clearing do not contact is admin only (allowContactAgainAction). */}
+          {leadId != null && isAdmin && <AllowContactButton leadId={leadId} />}
         </div>
       )}
       <dl style={{ margin: 0, display: "grid", gap: 8 }}>

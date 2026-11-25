@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 const STEP_STATUS: Record<string, { label: string; tone: "success" | "info" | "danger" | "neutral" }> = {
   sent: { label: "Sent", tone: "success" },
   queued: { label: "Due", tone: "info" },
+  held: { label: "Waits for the follow-up to be switched on", tone: "neutral" },
   failed: { label: "Failed", tone: "danger" },
   cancelled: { label: "Not sent", tone: "neutral" },
 };
@@ -73,7 +74,7 @@ export default async function RunPage(props: { params: Promise<{ key: string; ru
                     </strong>
                     <Badge tone={st.tone}>{st.label}</Badge>
                     <span style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginLeft: "auto" }}>
-                      {s.sentAt ? `Sent ${fmtWhen(s.sentAt)}` : `${s.status === "queued" ? "Due" : "Was due"} ${fmtWhen(s.dueAt)}`}
+                      {s.sentAt ? `Sent ${fmtWhen(s.sentAt)}` : `${s.status === "queued" || s.status === "held" ? "Due" : "Was due"} ${fmtWhen(s.dueAt)}`}
                     </span>
                   </div>
                   {isMessage && s.subject && <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Subject: {s.subject}</div>}

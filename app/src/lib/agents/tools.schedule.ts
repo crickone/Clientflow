@@ -1,9 +1,10 @@
 import "server-only";
 
 import type Anthropic from "@anthropic-ai/sdk";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
+import { PENDING_STATUSES } from "@/lib/leadFlows/flowModel";
 import { getCampaign as getEmailCampaign, listCampaigns as listEmailCampaigns } from "@/lib/marketing/campaigns";
 import { scheduleEmailCampaign, unscheduleEmailCampaign, listScheduledEmailCampaigns } from "@/lib/marketing/schedule";
 import { cancelScheduledPost, listScheduledPosts, normalizeChannels, publishPostNow, schedulePost } from "@/lib/social/schedule";
@@ -166,7 +167,7 @@ export const SCHEDULE_TOOLS: Anthropic.Tool[] = [
   {
     name: "list_schedule",
     description:
-      "Everything booked for a time, soonest first: scheduled social posts (with whether posting is connected yet), scheduled email sends, scheduled blog posts, and how many nurture-sequence messages are queued. Also lists email campaign drafts that could be scheduled. Use before scheduling, and to answer 'what's going out this week'.",
+      "Everything booked for a time, soonest first: scheduled social posts (with whether posting is connected yet), scheduled email sends, scheduled blog posts, and how many nurture-sequence messages are still to go (waitingForFollowUpOn: of those, how many wait for a follow-up that is switched off). Also lists email campaign drafts that could be scheduled. Use before scheduling, and to answer 'what's going out this week'.",
     input_schema: { type: "object", properties: {} },
   },
 ];
@@ -352,12 +353,16 @@ export function listScheduleTool(ctx: ToolContext, _input: Record<string, unknow
     .filter((c) => c.status === "draft")
     .slice(0, 20)
     .map((c) => ({ emailCampaignId: c.id, name: c.name, subject: c.subject }));
-  const queued =
+  // Still to go: queued, or held while their follow-up is off (they go once it is switched on).
+  const countMessages = (statuses: readonly ("queued" | "held")[]) =>
     db
       .select({ n: sql<number>`count(*)` })
       .from(schema.automationQueue)
-      .where(and(eq(schema.automationQueue.status, "queued"), eq(schema.automationQueue.kind, "message")))
+      .where(and(inArray(schema.automationQueue.status, [...statuses]), eq(schema.automationQueue.kind, "message")))
       .get()?.n ?? 0;
+  const queued = countMessages(PENDING_STATUSES);
+  const waitingForFollowUpOn = countMessages(["held"]);
+  // The next one that actually goes: a held message waits for its follow-up to be switched on.
   const nextNurture = db
     .select({ dueAt: schema.automationQueue.dueAt })
     .from(schema.automationQueue)
@@ -394,7 +399,7 @@ export function listScheduleTool(ctx: ToolContext, _input: Record<string, unknow
       scheduledEmails: emails,
       scheduledBlogs,
       emailDraftsAvailable: drafts,
-      nurtureQueue: { queued, next: nextNurture ? formatDublin(nextNurture.dueAt.getTime()) : null },
+      nurtureQueue: { queued, waitingForFollowUpOn, next: nextNurture ? formatDublin(nextNurture.dueAt.getTime()) : null },
       note: "Times are Irish local time. A post with a note is waiting on the Facebook connection.",
     }),
   };

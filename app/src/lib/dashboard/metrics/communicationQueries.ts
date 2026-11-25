@@ -3,6 +3,7 @@ import "server-only";
 import { and, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
+import { PENDING_STATUSES } from "@/lib/leadFlows/flowModel";
 import type { MsgRow } from "./communication";
 
 const d = (ms: number) => new Date(ms);
@@ -159,18 +160,18 @@ export function topTags(fromMs: number, toMs: number, limit: number): { label: s
     .map((r) => ({ label: r.label, value: Number(r.value) }));
 }
 
-/** Automated messages: sent (sentAt in range), failed and still queued (dueAt in range). */
+/** Automated messages: sent (sentAt in range), failed and still to go (queued, or held while their follow-up is off; dueAt in range). */
 export function automationCounts(fromMs: number, toMs: number): { sent: number; failed: number; queued: number } {
   const q = schema.automationQueue;
-  const count = (status: "sent" | "failed" | "queued", col: typeof q.sentAt | typeof q.dueAt) =>
+  const count = (statuses: readonly ("sent" | "failed" | "queued" | "held")[], col: typeof q.sentAt | typeof q.dueAt) =>
     Number(
       db
         .select({ n: sql<number>`count(*)` })
         .from(q)
-        .where(and(eq(q.kind, "message"), eq(q.status, status), isNotNull(col), gte(col, d(fromMs)), lt(col, d(toMs))))
+        .where(and(eq(q.kind, "message"), inArray(q.status, [...statuses]), isNotNull(col), gte(col, d(fromMs)), lt(col, d(toMs))))
         .get()?.n ?? 0,
     );
-  return { sent: count("sent", q.sentAt), failed: count("failed", q.dueAt), queued: count("queued", q.dueAt) };
+  return { sent: count(["sent"], q.sentAt), failed: count(["failed"], q.dueAt), queued: count(PENDING_STATUSES, q.dueAt) };
 }
 
 export type AwaitingReply = {

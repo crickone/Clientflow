@@ -188,15 +188,27 @@ export function parseGhlOpportunities(text: string): ReadResult<GhlOpportunity> 
   return { ok: true, rows: out };
 }
 
+const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
+const PHONE_SHAPED = /^\+?[\d\s()-]{6,}$/;
+
+/** A cell a spreadsheet would run as a formula. A + or - start is safe only on a plain number or a phone number. */
+function runsAsFormula(s: string): boolean {
+  if (/^[=@\t\r]/.test(s)) return true;
+  if (!/^[+-]/.test(s)) return false;
+  if (PLAIN_NUMBER.test(s)) return false;
+  return !(PHONE_SHAPED.test(s) && (s.match(/\d/g)?.length ?? 0) >= 6);
+}
+
 /**
  * Rows to CSV text: quoted where needed, quotes doubled, CRLF line ends. A
- * cell that a spreadsheet would run as a formula (=, @, or + / - followed
- * by something other than a digit) gets a leading apostrophe.
+ * cell that a spreadsheet would run as a formula (=, @, tab, CR, or + / -
+ * unless the cell is a plain number or a phone number) gets a leading
+ * apostrophe.
  */
 export function toCsv(rows: (string | number | null | undefined)[][]): string {
   const esc = (v: string | number | null | undefined): string => {
     let s = v == null ? "" : String(v);
-    if (/^[=@\t\r]/.test(s) || /^[+-](?![\d\s(]|$)/.test(s)) s = `'${s}`;
+    if (runsAsFormula(s)) s = `'${s}`;
     return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return rows.map((r) => r.map(esc).join(",")).join("\r\n") + "\r\n";

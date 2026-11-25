@@ -91,9 +91,29 @@ const csv = toCsv([
 ]);
 const lines = csv.split("\r\n");
 ok(lines[0] === "Name,Notes,Phone", "header row");
-ok(lines[1] === '"Ann ""The Boss"" Example","line one\nline two",+353870000001', "quotes doubled; a line break is quoted");
-ok(csv.includes('"\'=HYPERLINK(1)"') || csv.includes("'=HYPERLINK(1)"), "a formula is defused");
-ok(csv.includes("+353870000001"), "a phone number with a plus is left alone");
+ok(lines[1] === '"Ann ""The Boss"" Example","line one\nline two",+353870000001', "quotes doubled; a line break is quoted; a phone number with a plus is left alone");
+ok(lines[2] === "'=HYPERLINK(1),\"a, b\",'-", "a formula is defused; a lone minus is defused");
 ok(csv.endsWith(",,7\r\n"), "null and undefined are empty; numbers written; CRLF at the end");
+
+// One cell at a time: exactly what a spreadsheet gets.
+const cell = (v: string) => toCsv([[v]]).slice(0, -2);
+const CELLS: [string, string, string][] = [
+  ["=1+1", "'=1+1", "an = start"],
+  ["@SUM(1)", "'@SUM(1)", "an @ start"],
+  ["\t=1", "'\t=1", "a tab start"],
+  ["\r=1", "\"'\r=1\"", "a carriage return start (quoted for the line break)"],
+  ["-2+3+cmd|' /c calc'!A0", "'-2+3+cmd|' /c calc'!A0", "a minus start that is not a number"],
+  ["+cmd", "'+cmd", "a plus start that is not a number"],
+  ["+353 87 000 0001", "+353 87 000 0001", "a spaced phone number is left alone"],
+  ["+353870000001", "+353870000001", "a phone number is left alone"],
+  ["-5", "-5", "a negative number is left alone"],
+  ["+1.5", "+1.5", "a signed decimal is left alone"],
+  ["+1 2", "'+1 2", "too few digits for a phone number"],
+  ["Ann", "Ann", "plain text is left alone"],
+];
+for (const [input, expected, name] of CELLS) {
+  assert.equal(cell(input), expected, name);
+  n++;
+}
 
 console.log(`ghlImport csv: ${n} checks passed.`);

@@ -119,7 +119,10 @@ export function releaseHeldImportRows(triggerKey: string, now: number = flowNow(
   if (held.length === 0) return { queued: 0, skipped: 0 };
   const plan = planRelease(held.map((r) => ({ ...r, dueAt: r.dueAt.getTime() })), now, (at) => todayIn(at));
   db.transaction((tx) => {
-    if (plan.cancel.length) tx.update(q).set({ status: "cancelled", error: SKIPPED_WHILE_OFF }).where(inArray(q.id, plan.cancel)).run();
+    // In batches: a flow switched on after a big import can release thousands of rows, past SQLite's bound-parameter limit.
+    for (let i = 0; i < plan.cancel.length; i += 500) {
+      tx.update(q).set({ status: "cancelled", error: SKIPPED_WHILE_OFF }).where(inArray(q.id, plan.cancel.slice(i, i + 500))).run();
+    }
     for (const r of plan.queue) tx.update(q).set({ status: "queued", dueAt: new Date(r.dueAt) }).where(eq(q.id, r.id)).run();
     // A run left with nothing to do has finished.
     const runIds = [...new Set(held.map((r) => r.runId).filter((id): id is number => id != null))];
