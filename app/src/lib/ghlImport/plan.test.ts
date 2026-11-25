@@ -228,6 +228,17 @@ ok(of(people.aoife).person.staffMedicalNote === MEDICAL, "the medical note is ca
   ok(p.lead?.mode === "place" && p.lead.columnName === "Long-term nurture" && p.lead.enteredAt === NOW && p.run?.flowKey === "lead_nurture" && p.run.steps[0].step === 0, "past its end: nurture from week 1, entered now");
   ok(p.run!.steps[0].dueAt === TOMORROW_OPEN + spread(people.dara) && p.run!.steps.every((s) => s.dueAt >= IMPORT_DAY_ENDS), "week 1 tomorrow at her spread, nothing on the import day");
 }
+// Resumed run whose move would fall later on the import day: the person moves on at import instead.
+{
+  // Six days in Call back later: both steps (2d, 4d) were done in GoHighLevel and the move is due at 6d.
+  // Her spread puts that move at 09:00 + 133 minutes today, after now (10:00), so the unspread move is not yet past.
+  const zed = contact("Zed", { contactId: "c-late" });
+  ok(spread(zed) > 60 * 60_000, "her spread puts the move after now");
+  const p = buildPlan(joinPeople([zed], [opp(zed, "Call Back Later", 6)]), snap, { exportDay: EXPORT_DAY, now: NOW }).people[0];
+  ok(p.lead?.mode === "place" && p.lead.columnName === "Long-term nurture" && p.lead.enteredAt === NOW && p.run?.flowKey === "lead_nurture", "moved on to nurture at import");
+  ok(p.run!.steps.length > 0 && p.run!.steps[0].dueAt >= IMPORT_DAY_ENDS, "the first nurture step is not on the import day");
+  ok(p.run!.finishAt === null || p.run!.finishAt >= IMPORT_DAY_ENDS, "no finish move on the import day");
+}
 // Eve: booked 14 days ago: Consultation booked, no flow.
 ok(of(people.eve).lead?.mode === "place" && (of(people.eve).lead as { columnName: string }).columnName === "Consultation booked" && of(people.eve).run === null, "booked, no flow");
 // Fiona: DND: column kept, no flow, no consent.

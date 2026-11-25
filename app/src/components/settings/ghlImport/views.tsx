@@ -292,7 +292,7 @@ export function ResultView({ result, onAgain }: { result: ApplyResult; onAgain: 
           <CheckCircle2 size={16} aria-hidden /> Imported
         </h2>
         <p className={styles.note}>
-          Nothing was sent. Follow-up messages go at their times while each follow-up is switched on. Email contacts added counts people with no opportunity; leads with marketing consent are on your email contacts too.
+          Nothing was sent. Follow-up messages go at their times while each follow-up is switched on. Email contacts only counts people with no opportunity; leads with marketing consent are on your email contacts too.
           {result.runsWaiting > 0 ? ` ${num(result.runsWaiting)} people wait for a follow-up that is off.` : ""}
           {result.holdingCreated ? " A Holding column was added to the board." : ""}
         </p>
@@ -302,7 +302,7 @@ export function ResultView({ result, onAgain }: { result: ApplyResult; onAgain: 
           ["New leads", result.leadsCreated],
           ["Leads updated", result.leadsUpdated],
           ["New clients", result.clientsCreated],
-          ["Email contacts added", result.contactsAdded],
+          ["Email contacts only", result.contactsAdded],
           ["Do not contact", result.doNotContact],
           ["In a follow-up", result.runsPlaced],
           ["Messages scheduled", result.messagesQueued],

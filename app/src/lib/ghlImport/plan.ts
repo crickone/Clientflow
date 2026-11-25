@@ -445,7 +445,11 @@ function planPerson(p: ImportPerson, snap: Snapshot, ix: Index, opts: PlanOption
     else if (flow.key === NURTURE_FLOW && !hasConsent) note = `${note}. No marketing consent: column only`;
     else {
       const sp = schedule(p, interest, snap, flow, { from: intent.from, emailOnly: intent.emailOnly, entry: ghlStageAt, now: opts.now, suppressed });
-      if (!sp.ended) run = runFrom(flow, sp, intent.emailOnly);
+      // A finish move that would fall on the import day (after now, once spread) counts as ended: the
+      // person moves on at import, and the next flow starts on the next sending day. Otherwise the
+      // move would run later today and start nurture week 1 on the import day.
+      const endsToday = sp.finishAt != null && todayIn(sp.finishAt) === todayIn(opts.now);
+      if (!sp.ended && !endsToday) run = runFrom(flow, sp, intent.emailOnly);
       else if (flow.finish) {
         const next = resolveColumn(flow.finish.column, snap.columns);
         if (next) {
