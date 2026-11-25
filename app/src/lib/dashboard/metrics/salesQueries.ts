@@ -264,7 +264,9 @@ export function slaBreachCount(nowMs: number): number {
     .leftJoin(schema.pipelineStages, eq(schema.pipelineStages.id, schema.leads.stageId))
     .where(
       and(
-        sql`(${schema.pipelineStages.role} IS NULL OR ${schema.pipelineStages.role} = 'new')`,
+        // A null role is a lead with no stage yet, or a column without a role; the
+        // five follow-up columns (system_key set) are worked leads, not uncontacted ones.
+        sql`(${schema.pipelineStages.role} = 'new' OR (${schema.pipelineStages.role} IS NULL AND ${schema.pipelineStages.systemKey} IS NULL))`,
         lt(schema.leads.createdAt, d(nowMs - SLA_RED_MS)),
         sql`NOT EXISTS (SELECT 1 FROM ${schema.leadMessages} WHERE ${schema.leadMessages.leadId} = ${schema.leads.id} AND ${schema.leadMessages.direction} = 'outbound' AND ${schema.leadMessages.sentAt} IS NOT NULL)`,
       ),

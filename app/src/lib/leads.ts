@@ -13,6 +13,10 @@ import { getCallFlow } from "./voice/flow";
 import { enqueueCall } from "./voice/queue";
 import type { StageRole } from "./pipeline/roles";
 import { notifyNewLead } from "./notifications/notify";
+import { setLeadMarketingConsent } from "./leadFlows/consent";
+import { defaultAssigneeForNewLead } from "./leadFlows/assignment";
+import { alertNewLead } from "./leadFlows/alerts";
+import type { ConsentSource } from "./leadFlows/consentModel";
 
 export type LeadStatus = "new" | "contacted" | "replied" | "booked" | "lost";
 
@@ -28,6 +32,8 @@ export interface NormalizedLeadInput {
   email?: string | null;
   phone?: string | null;
   therapyInterest?: string | null;
+  /** They agreed to marketing on the form or in the integration that sent them; how. Omitted = not asked. */
+  marketingConsent?: ConsentSource | null;
   notes?: string | null;
   rawPayload?: unknown;
   /** How they arrived the visit they got in touch (lib/arrival.ts). Kept on create only. */
@@ -68,7 +74,10 @@ export function upsertLead(input: NormalizedLeadInput): {
       .from(leads)
       .where(and(eq(leads.source, source), eq(leads.sourceLeadId, sourceLeadId)))
       .get();
-    if (existing) return { lead: existing, created: false };
+    if (existing) {
+      if (input.marketingConsent && existing.marketingConsentAt == null) recordIntakeConsent(existing.id, input.marketingConsent, { liftUnsubscribe: false });
+      return { lead: existing, created: false };
+    }
   }
 
   // A lead lands on the board it was asked for (a campaign's own pipeline,
@@ -93,12 +102,14 @@ export function upsertLead(input: NormalizedLeadInput): {
       notes: nz(input.notes),
       rawPayload: input.rawPayload ? JSON.stringify(input.rawPayload) : null,
       arrival: input.arrival ? JSON.stringify(input.arrival) : null,
+      assignedUserId: defaultAssigneeForNewLead(),
       pipelineId,
       stageId: resolveEntryStageId(pipelineId) ?? undefined,
     })
     .returning()
     .all();
   const lead = inserted[0];
+  if (input.marketingConsent) recordIntakeConsent(lead.id, input.marketingConsent);
   if (lead.stageId != null) {
     recordStageEvent(db, { leadId: lead.id, pipelineId: lead.pipelineId, fromStageId: null, toStageId: lead.stageId, actor: input.actor ?? "system" });
   }
@@ -107,6 +118,8 @@ export function upsertLead(input: NormalizedLeadInput): {
   // Tell the team (not for a lead that came in on a message, which already
   // notified, or one a staff member typed in). Never throws.
   notifyNewLead(lead, input.actor);
+  // The assignee's own alert and the WhatsApp alert (lib/leadFlows/alerts). Never throws.
+  alertNewLead(lead, input.actor);
   return { lead, created: true };
 }
 
@@ -163,6 +176,15 @@ function enrolInCallFlow(lead: Lead): void {
     );
   } catch (err) {
     console.error("[voice] could not enrol a new lead in the call flow:", err);
+  }
+}
+
+/** Fail-soft: a consent problem never costs the lead. */
+function recordIntakeConsent(leadId: number, source: ConsentSource, options?: { liftUnsubscribe?: boolean }): void {
+  try {
+    setLeadMarketingConsent(leadId, true, source, options);
+  } catch (err) {
+    console.error(`[leads] marketing consent not recorded for lead #${leadId}:`, err);
   }
 }
 

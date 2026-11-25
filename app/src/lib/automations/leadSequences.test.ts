@@ -3,7 +3,9 @@
 // Lead follow-up workflows, native (replacing GoHighLevel for the clinics
 // that used it, 2026-11-11). Against a real scratch tenant database:
 //   - an enquiry joins "New lead" when it is on, by WhatsApp and email,
-//     skipping a channel the lead has no contact for
+//     skipping a channel the lead has no contact for (the New lead flow's
+//     finish move to Long-term nurture is a queue row too, so counts are of
+//     messages)
 //   - a walk-in typed in by hand gets nothing
 //   - with "New lead" off, an enquiry keeps getting the campaign sequence
 //   - a reply stops the nudges; booking swaps them for the booked messages
@@ -66,6 +68,7 @@ const requireLocal = createRequire(import.meta.url);
             and(
               eq(schema.automationQueue.leadId, leadId),
               eq(schema.automationQueue.status, "queued"),
+              eq(schema.automationQueue.kind, "message"),
               ...(trigger ? [eq(schema.automationQueue.triggerKey, trigger)] : []),
             ),
           )

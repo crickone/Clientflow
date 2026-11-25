@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FileText, Loader2, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -17,6 +18,7 @@ import {
   supportsDelays,
   SHORTCODES,
   type Channel,
+  type IntervalUnit,
   type MessageInput,
   type TriggerStatus,
 } from "@/lib/automationModel";
@@ -29,6 +31,12 @@ interface Detail {
   enabled: boolean;
   externalEnabled: boolean;
   messages: MessageInput[];
+  startColumn?: string | null;
+  finishColumn?: string | null;
+  finishAfterValue?: number | null;
+  finishAfterUnit?: IntervalUnit | null;
+  flow: { columnStarted: boolean; finishable: boolean; beforeCall: boolean; columns: { ref: string; name: string }[] } | null;
+  defaults: MessageInput[];
 }
 
 export function TriggerEditor({ initial, businessName }: { initial: Detail; businessName: string }) {
@@ -39,6 +47,10 @@ export function TriggerEditor({ initial, businessName }: { initial: Detail; busi
   const [messages, setMessages] = useState<MessageInput[]>(
     initial.messages.length ? initial.messages : [blankMessage()],
   );
+  const [startColumn, setStartColumn] = useState(initial.startColumn ?? "");
+  const [finishColumn, setFinishColumn] = useState(initial.finishColumn ?? "");
+  const [finishAfterValue, setFinishAfterValue] = useState<number>(initial.finishAfterValue ?? 7);
+  const [finishAfterUnit, setFinishAfterUnit] = useState<IntervalUnit>(initial.finishAfterUnit ?? "days");
   const [saving, start] = useTransition();
 
   const patch = (i: number, p: Partial<MessageInput>) =>
@@ -53,6 +65,7 @@ export function TriggerEditor({ initial, businessName }: { initial: Detail; busi
         enabled,
         externalEnabled,
         messages: messages.filter((m) => m.template.trim() || m.attachmentFilename),
+        ...(initial.flow ? { startColumn, finishColumn, finishAfterValue, finishAfterUnit } : {}),
       });
       if (res.ok) {
         toast.success("Trigger saved.");
@@ -100,6 +113,61 @@ export function TriggerEditor({ initial, businessName }: { initial: Detail; busi
         </div>
       </div>
 
+      {initial.flow && !comingSoon && (
+        <div style={card}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>When it runs</div>
+          {initial.flow.columnStarted && (
+            <div>
+              <Label htmlFor="flow-start">Starts when a lead enters</Label>
+              <select id="flow-start" value={startColumn} onChange={(e) => setStartColumn(e.target.value)} style={flowSelect}>
+                <option value="">No column (it never starts)</option>
+                {initial.flow.columns.map((c) => (
+                  <option key={c.ref} value={c.ref}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <div style={flowHint}>Starting a flow stops any other flow the lead is in. Entering the column again starts it again.</div>
+            </div>
+          )}
+          {initial.flow.finishable && (
+            <div>
+              <Label htmlFor="flow-finish">If they have not replied by the end, move them to</Label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                <select id="flow-finish" value={finishColumn} onChange={(e) => setFinishColumn(e.target.value)} style={{ ...flowSelect, flex: "1 1 220px", width: "auto" }}>
+                  <option value="">Leave them where they are</option>
+                  {initial.flow.columns.map((c) => (
+                    <option key={c.ref} value={c.ref}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <Input
+                  type="number"
+                  min={0}
+                  aria-label="After"
+                  value={finishAfterValue}
+                  disabled={!finishColumn}
+                  onChange={(e) => setFinishAfterValue(Math.max(0, Number(e.target.value) || 0))}
+                  style={{ flex: "0 0 96px", width: 96, height: 40 }}
+                />
+                <select aria-label="Unit" value={finishAfterUnit} disabled={!finishColumn} onChange={(e) => setFinishAfterUnit(e.target.value as IntervalUnit)} style={{ ...flowSelect, flex: "0 0 130px", width: 130 }}>
+                  <option value="hours">Hours</option>
+                  <option value="days">Days</option>
+                </select>
+              </div>
+              <div style={flowHint}>Counted from when the flow starts, like the message delays.</div>
+            </div>
+          )}
+          {initial.flow.beforeCall && (
+            <div style={flowHint}>The first message goes when the call is booked. Every later message is counted back from the call: 1 hour means an hour before it.</div>
+          )}
+          <div style={flowHint}>
+            Messages only go out in your sending hours. Set them in <Link href="/settings/lead-follow-ups" style={{ color: "var(--text-secondary)", textDecoration: "underline" }}>Settings, Lead follow-ups</Link>.
+          </div>
+        </div>
+      )}
+
       {/* Message series */}
       {comingSoon ? (
         <div style={card}>
@@ -123,13 +191,26 @@ export function TriggerEditor({ initial, businessName }: { initial: Detail; busi
               businessName={businessName}
               delaysLive={supportsDelays(initial.key)}
               liveChannels={liveChannelsFor(initial.key)}
+              interestVersions={!!initial.flow}
+              beforeCall={!!initial.flow?.beforeCall}
             />
           ))}
 
-          <div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             <Button variant="outline" onClick={addMsg}>
               <Plus size={15} /> Add another message
             </Button>
+            {initial.defaults.length > 0 && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setMessages(initial.defaults.map((m) => ({ ...m })));
+                  toast.success("Default wording loaded. Save to keep it.");
+                }}
+              >
+                Use the default wording
+              </Button>
+            )}
           </div>
         </>
       )}
@@ -155,6 +236,8 @@ function MessageCard({
   businessName,
   delaysLive,
   liveChannels,
+  interestVersions,
+  beforeCall,
 }: {
   index: number;
   message: MessageInput;
@@ -166,6 +249,10 @@ function MessageCard({
   delaysLive: boolean;
   /** Channels that actually send for this trigger (liveChannelsFor). */
   liveChannels: Channel[];
+  /** Lead flows: the treatment keywords field. */
+  interestVersions: boolean;
+  /** Call booked: later delays count back from the call. */
+  beforeCall: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -267,6 +354,16 @@ function MessageCard({
         )}
       </div>
 
+      {interestVersions && (
+        <div>
+          <Label htmlFor={`interest-${index}`}>Only for leads interested in</Label>
+          <Input id={`interest-${index}`} value={message.matchInterest ?? ""} onChange={(e) => onPatch({ matchInterest: e.target.value })} placeholder="Everyone" />
+          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 6 }}>
+            Leave empty for everyone. Words separated by commas, matched against what the lead asked about (for example: hbot, hyperbaric). Type other for the version everyone else gets at the same time.
+          </div>
+        </div>
+      )}
+
       {/* attachment (email only: WhatsApp follow-ups send text) */}
       <div style={message.channel === "whatsapp" ? { display: "none" } : undefined}>
         <Label>Attached file</Label>
@@ -300,9 +397,15 @@ function MessageCard({
 
       {/* timing — live only for triggers that queue their messages (the nurture sequence); every other trigger sends immediately today (Theme D1) */}
       <div>
+        {beforeCall && index === 0 ? (
+          <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Sent when the call is booked.</div>
+        ) : (
+          <>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, opacity: delaysLive ? 1 : 0.55 }}>
           <div>
-            <Label htmlFor={`delay-${index}`}>{delaysLive ? "Send this message after" : "When do you want to send this message?"}</Label>
+            <Label htmlFor={`delay-${index}`}>
+              {beforeCall && index > 0 ? "Send this long before the call" : delaysLive ? "Send this message after" : "When do you want to send this message?"}
+            </Label>
             <Input
               id={`delay-${index}`}
               type="number"
@@ -330,11 +433,13 @@ function MessageCard({
         </div>
         <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 6 }}>
           {delaysLive
-            ? message.channel === "whatsapp"
-              ? "Counted from when the sequence starts. WhatsApp messages only go between 9am and 9pm Irish time; one due outside that waits until 9am."
-              : "Counted from when the sequence starts. 0 sends straight away."
+            ? beforeCall
+              ? "Counted back from the call. A reminder that sending hours would push past the call is not sent."
+              : "Counted from when the flow starts. Messages go inside your sending hours (Settings, Lead follow-ups); with none set, WhatsApps go between 9am and 9pm Irish time and emails straight away."
             : "Scheduled & multi-channel sending coming soon — for now every message sends by Email, immediately."}
         </div>
+          </>
+        )}
       </div>
 
       {/* No sending engine exists yet (automations are a stub — see the
@@ -361,6 +466,17 @@ const card: React.CSSProperties = {
   background: "var(--surface-1)",
   padding: 20,
 };
+const flowSelect: React.CSSProperties = {
+  width: "100%",
+  height: 40,
+  padding: "0 12px",
+  borderRadius: "var(--radius)",
+  border: "1px solid var(--hairline)",
+  background: "var(--surface-1)",
+  color: "var(--text-primary)",
+  fontSize: 13,
+};
+const flowHint: React.CSSProperties = { fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 6, lineHeight: 1.5 };
 const codeTag: React.CSSProperties = {
   fontFamily: "var(--font-mono), monospace",
   fontSize: 11,

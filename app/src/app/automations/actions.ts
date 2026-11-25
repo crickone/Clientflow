@@ -18,12 +18,17 @@ const messageSchema = z.object({
   attachmentOriginal: z.string().trim().max(300).nullable().default(null),
   delayValue: z.coerce.number().int().min(0).max(100000).catch(0),
   delayUnit: z.enum(["minutes", "hours", "days"]),
+  matchInterest: z.string().trim().max(200).nullable().optional(),
 });
 const triggerSchema = z.object({
   key: z.enum(KEYS),
   enabled: z.coerce.boolean(),
   externalEnabled: z.coerce.boolean(),
   messages: z.array(messageSchema).max(20),
+  startColumn: z.string().trim().max(40).nullable().optional(),
+  finishColumn: z.string().trim().max(40).nullable().optional(),
+  finishAfterValue: z.coerce.number().int().min(0).max(1000).nullable().optional(),
+  finishAfterUnit: z.enum(["minutes", "hours", "days"]).nullable().optional(),
 });
 
 export type SaveResult = { ok: true } | { ok: false; error: string };

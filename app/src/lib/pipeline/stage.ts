@@ -7,11 +7,15 @@ import { logActivity } from "@/lib/queries";
 import { listStages, resolveStageIdByRole, resolveEntryStageId } from "./stageRepo";
 import { leadPipelineId } from "./pipelineRepo";
 import { recordStageEvent, type StageActor } from "./stageEvents";
-import { cancelNurtureForLead, cancelSequences, enrolLeadInSequence } from "@/lib/automations/nurture";
-import { STOP_ON_BOOKED, STOP_ON_NO_SHOW, STOP_ON_REPLY } from "@/lib/automationModel";
-import { getCurrentTenant } from "@/lib/db/tenant";
+import { KEEP_ON_REPLY } from "@/lib/automationModel";
+import { alertHotLead } from "@/lib/leadFlows/alerts";
+import { applyColumnEntry } from "@/lib/leadFlows/columnEntry";
+import { stopFlows } from "@/lib/leadFlows/runs";
+import { boundTenantId, getCurrentTenant, runWithTenant } from "@/lib/db/tenant";
+import { EMAIL_MAX_AGE_MS } from "@/lib/notifications/model";
+import { isPositiveReply } from "@/lib/leadFlows/flowPlan";
+import { beginThinkingReplyCheck, queueThinkingNurtureMove, takeReplyCheck } from "@/lib/leadFlows/replies";
 import { queueCrmStage } from "@/lib/facebook/capi";
-import { INACTIVE_ROLES } from "./roles";
 import { reopensOnRepeatEnquiry, shouldAdvance, ROLE_TO_LEGACY_KEY, type StageRecord, type StageRole } from "./roles";
 
 export type { StageRole } from "./roles";
@@ -42,12 +46,19 @@ export function currentStageRecord(leadId: number): StageRecord | null {
   return stages.find((s) => s.id === row.stageId) ?? null;
 }
 
+export interface StageWriteOptions {
+  /** false: enter the column without starting its flow (Schedule a call starts its own). */
+  startFlow?: boolean;
+  /** Treat a write to the column the lead is already in as entering it again (Log a call). */
+  reenter?: boolean;
+}
+
 /**
  * Canonical writer: set a lead's stage_id + dual-write the frozen pipeline_stage
  * text (from the stage's role → legacy key) so not-yet-migrated readers/tests keep
  * working during the transition. Logs an activity row.
  */
-export function writeStageId(leadId: number, stageId: number, note: string, actor: StageActor = "system"): void {
+export function writeStageId(leadId: number, stageId: number, note: string, actor: StageActor = "system", opts: StageWriteOptions = {}): void {
   const before = db
     .select({ stageId: schema.leads.stageId, pipelineId: schema.leads.pipelineId })
     .from(schema.leads)
@@ -56,15 +67,6 @@ export function writeStageId(leadId: number, stageId: number, note: string, acto
   const pipelineId = leadPipelineId(leadId);
   const stage = pipelineId == null ? undefined : listStages(pipelineId).find((s) => s.id === stageId);
   const legacy = stage?.role ? ROLE_TO_LEGACY_KEY[stage.role] : undefined;
-  // A customer, or a no, is out of the nurture sequence: whatever is still
-  // queued for them is dropped here, at the one place a stage is written.
-  if (stage?.role && INACTIVE_ROLES.has(stage.role)) {
-    try {
-      cancelNurtureForLead(leadId);
-    } catch (err) {
-      console.error(`[pipeline] could not cancel nurture for lead #${leadId}:`, err);
-    }
-  }
   db.update(schema.leads)
     .set({ stageId, ...(legacy ? { pipelineStage: legacy as typeof schema.leads.$inferInsert.pipelineStage } : {}), updatedAt: new Date() })
     .where(eq(schema.leads.id, leadId))
@@ -72,23 +74,14 @@ export function writeStageId(leadId: number, stageId: number, note: string, acto
   if (before) {
     recordStageEvent(db, { leadId, pipelineId: before.pipelineId, fromStageId: before.stageId ?? null, toStageId: stageId, actor });
   }
-  // Lead follow-up sequences (lib/automations/nurture.ts): booking in stops
-  // the "come and book" nudges and starts the booked messages; a no-show
-  // stops those and starts the rebooking ones. Fail-soft: the move stands.
-  if (stage?.role === "booked" || stage?.role === "no_show") {
+  // Lead follow-up flows (lib/leadFlows/columnEntry.ts): entering a column
+  // can stop the flows a lead is in and start that column's own. A sale or a
+  // write-off stops them all. Fail-soft: the move stands.
+  if (stage && (before?.stageId !== stageId || opts.reenter)) {
     try {
-      const lead = db.select().from(schema.leads).where(eq(schema.leads.id, leadId)).get();
-      if (lead && before?.stageId !== stageId) {
-        if (stage.role === "booked") {
-          cancelSequences(leadId, STOP_ON_BOOKED);
-          enrolLeadInSequence(lead, "lead_booked");
-        } else {
-          cancelSequences(leadId, STOP_ON_NO_SHOW);
-          enrolLeadInSequence(lead, "lead_no_show");
-        }
-      }
+      applyColumnEntry(leadId, stage, actor, { startFlow: opts.startFlow });
     } catch (err) {
-      console.error(`[pipeline] follow-up sequence for lead #${leadId} not updated:`, err);
+      console.error(`[pipeline] follow-up flows for lead #${leadId} not updated:`, err);
     }
   }
   // A Facebook lead-ads lead that books, attends or buys: Meta is told, by
@@ -97,7 +90,7 @@ export function writeStageId(leadId: number, stageId: number, note: string, acto
   if (stage?.role && before?.stageId !== stageId) {
     try {
       const lead = db.select({ source: schema.leads.source, sourceLeadId: schema.leads.sourceLeadId }).from(schema.leads).where(eq(schema.leads.id, leadId)).get();
-      if (lead) queueCrmStage(getCurrentTenant().id, lead, stage.role);
+      if (lead) queueCrmStage(boundTenantId() ?? getCurrentTenant().id, lead, stage.role);
     } catch (err) {
       console.error(`[pipeline] conversion-lead event for lead #${leadId} not queued:`, err);
     }
@@ -195,14 +188,14 @@ export function reopenLostLead(leadId: number, note: string): boolean {
 }
 
 /** Operator override — set ANY stage by id (drag / picker / agent), bypassing forward-only. */
-export function setStageToId(leadId: number, stageId: number, actor: StageActor = "user"): void {
+export function setStageToId(leadId: number, stageId: number, actor: StageActor = "user", opts: StageWriteOptions = {}): void {
   const exists = db.select({ id: schema.leads.id, pipelineId: schema.leads.pipelineId }).from(schema.leads).where(eq(schema.leads.id, leadId)).get();
   if (!exists) return;
   // A stage from another board is refused, not silently applied: the lead
   // would then show in no column of the board it is on.
   const stage = listStages(exists.pipelineId).find((s) => s.id === stageId);
   if (!stage) return;
-  writeStageId(leadId, stageId, `Lead set to ${stage.name} (manual)`, actor);
+  writeStageId(leadId, stageId, `Lead set to ${stage.name} (manual)`, actor, opts);
 }
 
 export function leadIdForClient(clientId: number): number | null {
@@ -211,24 +204,103 @@ export function leadIdForClient(clientId: number): number | null {
 }
 
 // ── Event hooks (signatures UNCHANGED — call sites in appointments/packages/whatsapp untouched) ──
-export function onInboundFromLead(leadId: number): void {
-  // They replied: a person takes it from here, so the automatic nudges stop.
+/** What a lead said, when the caller has it (for the hot-lead alert and the Thinking about it check). */
+export interface LeadReply {
+  text: string;
+  messageId?: number;
+  channel?: string;
+}
+
+export function onInboundFromLead(leadId: number, reply?: LeadReply): void {
+  // In Thinking about it (flow on), the reply is read by the inbox triage
+  // before anything moves (lib/leadFlows/replies.ts).
   try {
-    cancelSequences(leadId, STOP_ON_REPLY);
+    if (beginThinkingReplyCheck(leadId, currentStageRecord(leadId)?.systemKey === "thinking", reply)) return;
+  } catch (err) {
+    console.error(`[pipeline] reply check for lead #${leadId} not started:`, err);
+  }
+  // They replied: a person takes it from here, so the automatic nudges stop
+  // (a booked call's confirmation and reminder carry on).
+  try {
+    stopFlows(leadId, "replied", { except: KEEP_ON_REPLY });
   } catch (err) {
     console.error(`[pipeline] could not stop follow-ups for lead #${leadId}:`, err);
   }
-  advanceStage(leadId, "engaged", "replied");
+  // Hot now, and only now: the assignee and the alert number are told.
+  if (advanceStage(leadId, "engaged", "replied")) alertHotLead(leadId, reply?.text ?? null);
 }
-export function onInboundFromClient(clientId: number): void {
+
+/** The inbox triage has read a lead's message: settles a waiting Thinking about it reply check. */
+export function onLeadReplyTriaged(leadId: number, messageId: number, triage: { category: string; priority?: string | null }): void {
+  const check = takeReplyCheck(leadId, messageId);
+  if (!check) return;
+  resolveThinkingReply(leadId, check.text, isPositiveReply(triage));
+}
+
+/**
+ * Act on a Thinking about it reply: a yes (wants to book or talk) makes a
+ * hot lead and alerts; anything else moves them to Long-term nurture in 7
+ * days. Nothing happens if they are no longer in the column.
+ */
+export function resolveThinkingReply(leadId: number, text: string, positive: boolean): void {
+  if (currentStageRecord(leadId)?.systemKey !== "thinking") return;
+  if (positive) {
+    stopFlows(leadId, "replied: wants to book or talk", "all");
+    if (advanceStage(leadId, "engaged", "replied")) alertHotLead(leadId, text || null);
+    return;
+  }
+  queueThinkingNurtureMove(leadId);
+}
+
+/** A message dated further ahead than this is not treated as a reply (same bound as notifications/model.ts emailNotifies). */
+const EMAIL_FUTURE_SKEW_MS = 5 * 60 * 1000;
+
+/**
+ * An email arrived from a lead's address (Gmail or IMAP sync): a reply like
+ * any other, when it is recent (a first sync of old mail changes nothing).
+ * Explicit tenant: the mail sync runs with no request.
+ */
+export function onLeadEmailReply(tenantId: number, fromEmail: string | null, at: Date | null, snippet: string | null): void {
+  const email = (fromEmail ?? "").trim().toLowerCase();
+  if (!email || !at) return;
+  const age = Date.now() - at.getTime();
+  // Too old (a first sync of old mail) or dated in the future (a bad clock
+  // or a forged date): same bounds as notifications/model.ts emailNotifies.
+  if (age > EMAIL_MAX_AGE_MS || age < -EMAIL_FUTURE_SKEW_MS) return;
+  runWithTenant(tenantId, () => {
+    const rows = db.select({ id: schema.leads.id }).from(schema.leads).where(sql`lower(${schema.leads.email}) = ${email}`).all();
+    for (const r of rows) {
+      try {
+        onInboundFromLead(r.id, { text: snippet ?? "", channel: "email" });
+      } catch (err) {
+        console.error(`[pipeline] email reply for lead #${r.id} not handled:`, err);
+      }
+    }
+  });
+}
+/**
+ * A client replied. The lead linked to that client is treated exactly like a
+ * lead replying: its flows stop and it becomes a Hot lead. `reply` carries the
+ * text for the alert; pass `messageId` only when it is a LEAD message (a
+ * client message id means nothing to the Thinking about it reply check).
+ * Returns true when a lead is linked to the client (so the reply was handled).
+ */
+export function onInboundFromClient(clientId: number, reply?: LeadReply): boolean {
   const leadId = leadIdForClient(clientId);
-  if (leadId) advanceStage(leadId, "engaged", "replied");
+  if (!leadId) return false;
+  onInboundFromLead(leadId, reply);
+  return true;
 }
 /** A fresh lead score: 70 or more moves the lead to Hot lead (forward-only). */
 export function onLeadScored(leadId: number, score: number, nextStep: string | null | undefined): void {
   const source = db.select({ source: schema.leads.source }).from(schema.leads).where(eq(schema.leads.id, leadId)).get()?.source ?? null;
   const reason = hotReasonFromScore(score, nextStep, source);
-  if (reason) advanceStage(leadId, "engaged", reason);
+  if (!reason) return;
+  // A lead a person or a flow put in a follow-up column (No answer, Thinking
+  // about it, ...) stays there while its flow runs: only a reply or a
+  // booking pulls it out, never a score.
+  if (currentStageRecord(leadId)?.systemKey) return;
+  advanceStage(leadId, "engaged", reason);
 }
 export function onAppointmentBooked(clientId: number, status: string): void {
   const leadId = leadIdForClient(clientId);

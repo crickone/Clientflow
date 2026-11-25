@@ -356,12 +356,12 @@ export function listScheduleTool(ctx: ToolContext, _input: Record<string, unknow
     db
       .select({ n: sql<number>`count(*)` })
       .from(schema.automationQueue)
-      .where(and(eq(schema.automationQueue.status, "queued")))
+      .where(and(eq(schema.automationQueue.status, "queued"), eq(schema.automationQueue.kind, "message")))
       .get()?.n ?? 0;
   const nextNurture = db
     .select({ dueAt: schema.automationQueue.dueAt })
     .from(schema.automationQueue)
-    .where(eq(schema.automationQueue.status, "queued"))
+    .where(and(eq(schema.automationQueue.status, "queued"), eq(schema.automationQueue.kind, "message")))
     .orderBy(asc(schema.automationQueue.dueAt))
     .limit(1)
     .get();

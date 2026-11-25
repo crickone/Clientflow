@@ -167,7 +167,7 @@ export function automationCounts(fromMs: number, toMs: number): { sent: number; 
       db
         .select({ n: sql<number>`count(*)` })
         .from(q)
-        .where(and(eq(q.status, status), isNotNull(col), gte(col, d(fromMs)), lt(col, d(toMs))))
+        .where(and(eq(q.kind, "message"), eq(q.status, status), isNotNull(col), gte(col, d(fromMs)), lt(col, d(toMs))))
         .get()?.n ?? 0,
     );
   return { sent: count("sent", q.sentAt), failed: count("failed", q.dueAt), queued: count("queued", q.dueAt) };

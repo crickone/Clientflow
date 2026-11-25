@@ -379,6 +379,16 @@ export const leads = sqliteTable("leads", {
    * intent"). Shown on the card. Null when it got there by hand or not yet.
    */
   hotReason: text("hot_reason"),
+  /**
+   * When the lead agreed to marketing (news and offers), epoch ms; null = no.
+   * Only the Long-term nurture flow needs it (lib/leadFlows/consent.ts).
+   * Cleared by an unsubscribe.
+   */
+  marketingConsentAt: integer("marketing_consent_at"),
+  /** How it was given: "form", "api" (a lead posted in with it), or "staff". */
+  marketingConsentSource: text("marketing_consent_source"),
+  /** The staff member (control-plane user id) this lead is assigned to; null = nobody. */
+  assignedUserId: integer("assigned_user_id"),
   status: text("status", {
     enum: ["new", "contacted", "replied", "booked", "lost"],
   })
@@ -457,11 +467,16 @@ export const pipelineStages = sqliteTable(
     colour: text("colour").notNull(),
     position: integer("position").notNull(),
     role: text("role"), // StageRole | null; app-enforced unique-where-set PER PIPELINE
+    /** FollowUpKey | null (lib/pipeline/followUpColumns.ts); unique per pipeline where set. */
+    systemKey: text("system_key"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
   },
-  (t) => ({ byPipelineRole: uniqueIndex("idx_pipeline_stages_pipeline_role").on(t.pipelineId, t.role) }),
+  (t) => ({
+    byPipelineRole: uniqueIndex("idx_pipeline_stages_pipeline_role").on(t.pipelineId, t.role),
+    byPipelineKey: uniqueIndex("idx_pipeline_stages_pipeline_key").on(t.pipelineId, t.systemKey),
+  }),
 );
 
 /**
@@ -2695,6 +2710,12 @@ export const automationTriggers = sqliteTable("automation_triggers", {
   key: text("key").notNull().unique(), // one of TRIGGER_CATALOG keys
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
   externalEnabled: integer("external_enabled", { mode: "boolean" }).notNull().default(false),
+  /** Lead flows: the column (a column ref) that starts it. null = the default in lib/leadFlows/flowModel FLOW_DEFAULTS; "" = none. */
+  startColumn: text("start_column"),
+  /** Lead flows: where the card goes when the flow ends with no reply. null = the default; "" = it stays put. */
+  finishColumn: text("finish_column"),
+  finishAfterValue: integer("finish_after_value"),
+  finishAfterUnit: text("finish_after_unit", { enum: ["minutes", "hours", "days"] }),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
@@ -2713,6 +2734,8 @@ export const automationMessages = sqliteTable(
     attachmentOriginal: text("attachment_original"),
     delayValue: integer("delay_value").notNull().default(0),
     delayUnit: text("delay_unit", { enum: ["minutes", "hours", "days"] }).notNull().default("minutes"),
+    /** Lead flows: comma-separated interest keywords, or "other"; null = everyone (lib/leadFlows/flowPlan pickForInterest). */
+    matchInterest: text("match_interest"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -2759,13 +2782,72 @@ export const automationQueue = sqliteTable(
     status: text("status", { enum: ["queued", "sent", "failed", "cancelled"] }).notNull().default("queued"),
     error: text("error"),
     sentAt: integer("sent_at", { mode: "timestamp_ms" }),
+    /** The lead_flow_runs row this belongs to; null for rows queued before runs existed. */
+    runId: integer("run_id"),
+    /** The message's position in its flow (the first WhatsApp of a run is its lowest WhatsApp step). */
+    step: integer("step"),
+    /** What the row is: a message to the lead, or a timed step of the flow itself (lib/leadFlows/flowModel QueueKind). */
+    kind: text("kind", { enum: ["message", "move", "callback_check", "reply_check", "staff_alert"] }).notNull().default("message"),
+    /** JSON for the non-message kinds (lib/leadFlows/flowModel QueuePayload). */
+    payload: text("payload"),
+    /** The WhatsApp provider's id once sent, so a failed delivery status finds its row. */
+    providerMessageId: text("provider_message_id"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
   },
-  (t) => ({ due: index("idx_automation_queue_due").on(t.status, t.dueAt) }),
+  (t) => ({
+    due: index("idx_automation_queue_due").on(t.status, t.dueAt),
+    byLead: index("idx_automation_queue_lead").on(t.leadId, t.status),
+    byProvider: index("idx_automation_queue_provider").on(t.providerMessageId),
+  }),
 );
 export type AutomationQueueRow = typeof automationQueue.$inferSelect;
+
+/**
+ * One lead going through one follow-up flow (lib/leadFlows/runs.ts). Its
+ * messages and timed steps are automation_queue rows carrying run_id.
+ * Starting any flow stops every other active run for that lead.
+ */
+export const leadFlowRuns = sqliteTable(
+  "lead_flow_runs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    leadId: integer("lead_id").notNull(),
+    triggerKey: text("trigger_key").notNull(),
+    status: text("status", { enum: ["active", "finished", "stopped"] }).notNull().default("active"),
+    stopReason: text("stop_reason"),
+    startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+    endedAt: integer("ended_at", { mode: "timestamp_ms" }),
+  },
+  (t) => ({ byLead: index("idx_lead_flow_runs_lead").on(t.leadId, t.status) }),
+);
+export type LeadFlowRun = typeof leadFlowRuns.$inferSelect;
+
+/**
+ * Calls with a lead: logged after the fact (Log a call), or booked ahead
+ * (Schedule a call). A timed call also has a diary entry.
+ */
+export const leadCalls = sqliteTable(
+  "lead_calls",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    leadId: integer("lead_id").notNull(),
+    kind: text("kind", { enum: ["logged", "scheduled"] }).notNull(),
+    /** Log a call outcome (lib/leadFlows/callPlan CallOutcome). */
+    outcome: text("outcome"),
+    /** A timed call, epoch ms. */
+    scheduledFor: integer("scheduled_for"),
+    /** A call-back day with no time, "YYYY-MM-DD". */
+    scheduledDay: text("scheduled_day"),
+    calendarEventId: integer("calendar_event_id"),
+    note: text("note"),
+    userId: integer("user_id"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => ({ byLead: index("idx_lead_calls_lead").on(t.leadId, t.createdAt) }),
+);
+export type LeadCall = typeof leadCalls.$inferSelect;
 
 // ── Forms (Kahunas — questionnaires, check-ins, habits, contact, terms) ────────
 
@@ -3500,6 +3582,8 @@ export const notifications = sqliteTable(
     /** The same event notifies once: a second insert with this key is ignored. */
     dedupeKey: text("dedupe_key").notNull().unique(),
     adminOnly: integer("admin_only", { mode: "boolean" }).notNull().default(false),
+    /** Set for a personal alert: only this user (control-plane id) sees it. Null = the whole business. */
+    forUserId: integer("for_user_id"),
     createdAt: integer("created_at").notNull(),
   },
   (t) => ({ created: index("idx_notifications_created").on(t.createdAt) }),

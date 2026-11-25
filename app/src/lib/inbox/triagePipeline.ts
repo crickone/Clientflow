@@ -26,6 +26,7 @@ import { sendReply } from "@/lib/messaging/reply";
 import { logActivity } from "@/lib/queries";
 import { shadowJevTriage } from "@/lib/inbox/jevTrial";
 import { scoreLead } from "@/lib/leadScore";
+import { onLeadReplyTriaged } from "@/lib/pipeline/stage";
 
 export type OwnerType = "lead" | "client";
 export type { AutoReplyDecision };
@@ -265,6 +266,15 @@ async function runTriageBound(
   }
 
   applyTags(ownerType, ownerId, triage.tags);
+
+  // The Thinking about it flow waits on this read of a lead's reply (lib/leadFlows/replies.ts).
+  if (ownerType === "lead") {
+    try {
+      onLeadReplyTriaged(ownerId, messageId, { category: triage.category, priority: triage.priority });
+    } catch (err) {
+      console.error("[triage] lead flow reply check failed:", err);
+    }
+  }
 
   // Auto-send path: send the grounded reply now, on the channel the contact
   // wrote on (lib/messaging/reply). It throws on any

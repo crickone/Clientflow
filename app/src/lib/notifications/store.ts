@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, inArray, lt, lte, notInArray, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { controlSqlite } from "@/lib/db/control";
@@ -37,6 +37,8 @@ export interface NewNotification {
   href: string;
   /** The same key notifies once. */
   key: string;
+  /** A personal alert: only this user sees it. */
+  forUserId?: number | null;
   now?: number;
 }
 
@@ -61,6 +63,7 @@ export function createNotification(n: NewNotification): number | null {
       href: n.href,
       dedupeKey: n.key.slice(0, 300),
       adminOnly: isAdminOnlyKind(n.kind),
+      forUserId: n.forUserId ?? null,
       createdAt: n.now ?? Date.now(),
     })
     .onConflictDoNothing({ target: notifications.dedupeKey })
@@ -92,10 +95,14 @@ function readAllBefore(userId: number): number {
   return now;
 }
 
-/** What this person may see in the bell: their role allows it and the kind is on in the app. */
+/** What this person may see in the bell: their role allows it, the kind is on in the app, and it is for everyone or for them. */
 function visibleTo(userId: number, role: StaffRole): SQL | undefined {
   const off = NOTIFICATION_KINDS.filter((k) => !getPrefs(userId)[k].inApp);
-  return and(role === "admin" ? undefined : eq(notifications.adminOnly, false), off.length ? notInArray(notifications.kind, off) : undefined);
+  return and(
+    role === "admin" ? undefined : eq(notifications.adminOnly, false),
+    off.length ? notInArray(notifications.kind, off) : undefined,
+    or(isNull(notifications.forUserId), eq(notifications.forUserId, userId)),
+  );
 }
 
 function unreadExpr(userId: number, before: number): SQL<number> {

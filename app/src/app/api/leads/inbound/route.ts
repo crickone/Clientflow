@@ -5,6 +5,7 @@ import { verifyApiKey } from "@/lib/apiKeys";
 import { runWithTenant } from "@/lib/db/tenant";
 import { logActivity } from "@/lib/queries";
 import { upsertLead } from "@/lib/leads";
+import { isConsentYes } from "@/lib/leadFlows/consentModel";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ const RATE_WINDOW_MS = 60 * 1000; // …per minute
  *     "email": "niamh@example.com",
  *     "phone": "+353 87 …",
  *     "therapyInterest": "HBOT",
+ *     "marketingConsent": true,       // optional: they agreed to news and offers (Long-term nurture needs it)
  *     "notes": "Interested in HBOT for arthritis",
  *     "raw": { ... }                  // anything you want to persist for debugging
  *   }
@@ -53,6 +55,7 @@ const schema = z.object({
   email: z.string().email().optional().or(z.literal("")).nullable(),
   phone: z.string().optional().nullable(),
   therapyInterest: z.string().optional().nullable(),
+  marketingConsent: z.union([z.boolean(), z.string(), z.number()]).optional().nullable(),
   notes: z.string().optional().nullable(),
   raw: z.unknown().optional(),
 });
@@ -133,6 +136,7 @@ export async function POST(req: NextRequest) {
       email: parsed.data.email || null,
       phone: parsed.data.phone,
       therapyInterest: parsed.data.therapyInterest,
+      marketingConsent: isConsentYes(parsed.data.marketingConsent) ? "api" : null,
       notes: parsed.data.notes,
       rawPayload: parsed.data.raw ?? body,
     });

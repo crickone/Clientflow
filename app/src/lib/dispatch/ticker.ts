@@ -110,7 +110,7 @@ async function runTenant(tenantId: number, baseUrl: string, summary: DispatchSum
       console.error(`[dispatch] tenant ${tenantId} scheduled blog posts failed:`, err);
     }
     try {
-      summary.nurtureSent += await dispatchDueAutomationQueue(tenantId);
+      summary.nurtureSent += await dispatchDueAutomationQueue(tenantId, Date.now(), baseUrl);
     } catch (err) {
       console.error(`[dispatch] tenant ${tenantId} nurture queue failed:`, err);
     }

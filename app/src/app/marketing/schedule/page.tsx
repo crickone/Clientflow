@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ScheduleBoard } from "@/components/marketing/ScheduleBoard";
@@ -52,7 +52,7 @@ export default async function SchedulePage() {
     db
       .select({ n: sql<number>`count(*)` })
       .from(schema.automationQueue)
-      .where(eq(schema.automationQueue.status, "queued"))
+      .where(and(eq(schema.automationQueue.status, "queued"), eq(schema.automationQueue.kind, "message")))
       .get()?.n ?? 0;
 
   return (

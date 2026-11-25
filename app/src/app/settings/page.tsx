@@ -24,6 +24,7 @@ import {
   Scale,
   Gauge,
   Bell,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -79,6 +80,7 @@ function buildGroups(vocab: ReturnType<typeof getVocab>, tenantId: number): { ti
         { href: "/settings/blocks", icon: Ban, title: "Block-out times", desc: "Lunch breaks, holidays and other closures." },
         { href: "/settings/packages", icon: PackageIcon, title: `${vocab.plan} types`, desc: `Ready-made ${vocab.plan.toLowerCase()}s to sell in one click.` },
         { href: "/settings/pipeline", icon: Workflow, title: "Lead pipeline", desc: "The stages leads move through on the leads board." },
+        { href: "/settings/lead-follow-ups", icon: Clock, title: "Lead follow-ups", desc: "Sending hours, who new leads go to, and WhatsApp alerts for staff." },
       ],
     },
     {

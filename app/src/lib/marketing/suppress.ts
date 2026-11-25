@@ -4,6 +4,7 @@ import { eq, sql } from "drizzle-orm";
 
 import { getTenantDbById } from "@/lib/db/tenant";
 import { contacts, suppressions } from "@/lib/db/schema";
+import { onEmailSuppressed } from "@/lib/leadFlows/consent";
 
 /**
  * Hard do-not-email gate (Task 6). `suppressions` is append-mostly and
@@ -65,4 +66,12 @@ export function suppress(tenantId: number, email: string, reason: SuppressionRea
     .set(patch)
     .where(eq(sql`lower(${contacts.email})`, clean))
     .run();
+
+  // Lead follow-up flows: nothing more is mailed to this address, and an
+  // unsubscribe stops the lead's flows too. Never breaks the suppression.
+  try {
+    onEmailSuppressed(tenantId, clean, reason);
+  } catch (err) {
+    console.error("[marketing] lead flows not updated for a suppressed address:", err);
+  }
 }

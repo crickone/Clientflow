@@ -1,5 +1,6 @@
 import type { Database as BetterSqlite3 } from "better-sqlite3";
-import { DEFAULT_STAGES, LEGACY_KEY_TO_ROLE } from "@/lib/pipeline/roles";
+import { DEFAULT_STAGES, LEGACY_KEY_TO_ROLE, type StageRole } from "@/lib/pipeline/roles";
+import { isFollowUpKey, planFollowUpColumns, type ColumnSlot } from "@/lib/pipeline/followUpColumns";
 import { runExerciseLibraryBootstrap } from "./exerciseLibraryBootstrap";
 import { dropWorkoutExerciseIdForeignKeys } from "./dropExerciseIdFk";
 
@@ -336,6 +337,32 @@ export const TENANT_MIGRATIONS: Migration[] = [
         SET cancelled_at = updated_at, cancelled_at_approx = 1
         WHERE status IN ('cancelled', 'no_show') AND cancelled_at IS NULL
       `);
+    },
+  },
+  {
+    id: "0011-follow-up-columns",
+    description:
+      "Lead follow-up flows: add the five follow-up columns (No answer, Call back later, Thinking about it, Long-term nurture, Message undelivered) to every board that lacks them, each tagged with its system_key so flows find it whatever it is renamed to. Create-only: a board that already has a column with that key is left alone. Existing columns keep their relative order; positions are renumbered 0..n-1 so the new ones sit after Hot lead and before Lapsed. No lead moves.",
+    up: (sqlite) => {
+      const boards = sqlite.prepare("SELECT DISTINCT pipeline_id AS id FROM pipeline_stages").all() as { id: number }[];
+      const read = sqlite.prepare("SELECT id, position, role, system_key FROM pipeline_stages WHERE pipeline_id = ?");
+      const move = sqlite.prepare("UPDATE pipeline_stages SET position = ? WHERE id = ?");
+      const insert = sqlite.prepare(
+        "INSERT INTO pipeline_stages (pipeline_id, name, colour, position, role, system_key, created_at) VALUES (?, ?, ?, ?, NULL, ?, ?)",
+      );
+      const now = Date.now();
+      for (const b of boards) {
+        const rows = read.all(b.id) as { id: number; position: number; role: string | null; system_key: string | null }[];
+        const slots: ColumnSlot[] = rows.map((r) => ({
+          id: r.id,
+          position: r.position,
+          role: r.role as StageRole | null,
+          systemKey: isFollowUpKey(r.system_key) ? r.system_key : null,
+        }));
+        const plan = planFollowUpColumns(slots);
+        for (const m of plan.moves) move.run(m.position, m.id);
+        for (const i of plan.inserts) insert.run(b.id, i.name, i.colour, i.position, i.key, now);
+      }
     },
   },
 ];

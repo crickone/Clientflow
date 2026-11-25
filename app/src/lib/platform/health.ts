@@ -142,11 +142,11 @@ export function getTenantHealth(tenantId: number, opts: { deep?: boolean } = {})
         queues.push({
           key: "nurture",
           label: "Nurture messages",
-          due: count("SELECT count(*) AS n FROM automation_queue WHERE status = 'queued' AND due_at <= ?", now),
-          waiting: count("SELECT count(*) AS n FROM automation_queue WHERE status = 'queued' AND due_at > ?", now),
-          failed: count("SELECT count(*) AS n FROM automation_queue WHERE status = 'failed'"),
+          due: count("SELECT count(*) AS n FROM automation_queue WHERE kind = 'message' AND status = 'queued' AND due_at <= ?", now),
+          waiting: count("SELECT count(*) AS n FROM automation_queue WHERE kind = 'message' AND status = 'queued' AND due_at > ?", now),
+          failed: count("SELECT count(*) AS n FROM automation_queue WHERE kind = 'message' AND status = 'failed'"),
           note: "Failed messages are usually a missing email provider.",
-          failedReason: lastError("SELECT error AS e FROM automation_queue WHERE status = 'failed' AND error IS NOT NULL AND error <> '' ORDER BY id DESC LIMIT 1"),
+          failedReason: lastError("SELECT error AS e FROM automation_queue WHERE kind = 'message' AND status = 'failed' AND error IS NOT NULL AND error <> '' ORDER BY id DESC LIMIT 1"),
         });
         queues.push({
           key: "posts",
@@ -343,7 +343,7 @@ export function retryFailedQueue(tenantId: number, queue: "nurture" | "posts"): 
       if (!raw) return { ok: false as const, error: "Could not reach that database." };
       const sql =
         queue === "nurture"
-          ? "UPDATE automation_queue SET status = 'queued', error = NULL WHERE status = 'failed'"
+          ? "UPDATE automation_queue SET status = 'queued', error = NULL WHERE kind = 'message' AND status = 'failed'"
           : "UPDATE scheduled_posts SET status = 'scheduled', error = NULL WHERE status = 'failed'";
       const result = raw.prepare(sql).run();
       return result.changes === 0

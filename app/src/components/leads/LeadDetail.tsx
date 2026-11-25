@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   ArrowLeft,
+  CalendarClock,
   Check,
   ChevronDown,
   Copy,
   MoreHorizontal,
   Pencil,
   ShoppingBag,
+  PhoneCall,
   PhoneOff,
   PhoneOutgoing,
   Mail,
@@ -44,6 +46,8 @@ import { formatDateTime, relativeTime } from "@/lib/utils";
 import { describeArrival, parseArrival } from "@/lib/arrival";
 import { band, BAND_LABEL, NEXT_STEPS, type NextStep } from "@/lib/leadScoreModel";
 import { LeadScoreBadge } from "./LeadScoreBadge";
+import { CallDialog, type CallMode } from "./CallDialog";
+import { LeadFollowUpsCard, type LeadCallView } from "./LeadFollowUpsCard";
 
 interface Props {
   lead: Lead;
@@ -54,10 +58,20 @@ interface Props {
    *  button explains itself instead of failing on click. Per-LEAD reasons (no
    *  number, do-not-call) are decided here from the lead itself. */
   voice: { available: boolean; reason: string | null };
+  /** Staff the lead can be assigned to. */
+  staff: { userId: number; name: string }[];
+  /** The follow-up flow the lead is in and its next messages. */
+  flow: { flow: string | null; next: { channel: string; dueAt: number }[] };
+  /** Logged and scheduled calls, newest first. */
+  calls: LeadCallView[];
 }
 
-export function LeadDetail({ lead: initialLead, messages: initialMessages, stages, voice }: Props) {
+export function LeadDetail({ lead: initialLead, messages: initialMessages, stages, voice, staff, flow, calls }: Props) {
   const [lead, setLead] = useState(initialLead);
+  // A router.refresh() (e.g. after a call moves the lead) hands in a new prop: adopt it.
+  useEffect(() => {
+    setLead(initialLead);
+  }, [initialLead]);
   const [messages, setMessages] = useState(initialMessages);
   const [drafting, setDrafting] = useState(false);
   const [pending, start] = useTransition();
@@ -72,6 +86,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
     "email" | "sms" | "whatsapp" | "call" | "manual"
   >("email");
   const [calling, setCalling] = useState(false);
+  const [callMode, setCallMode] = useState<CallMode | null>(null);
 
   // Why the Call button can't be pressed, in the order an operator would want
   // to hear it: the lead's own blockers first (they're specific and fixable
@@ -422,6 +437,12 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button variant="secondary" onClick={() => setCallMode("log")} disabled={pending}>
+            <PhoneCall size={14} /> Log a call
+          </Button>
+          <Button variant="secondary" onClick={() => setCallMode("schedule")} disabled={pending}>
+            <CalendarClock size={14} /> Schedule a call
+          </Button>
           <Button onClick={generateDraft} disabled={drafting || pending}>
             <Sparkles size={15} />
             {drafting ? "Drafting…" : hasUnsentDraft ? "Redo the draft" : "Draft a message"}
@@ -613,6 +634,14 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
               </div>
             </dl>
           </Card>
+          <LeadFollowUpsCard
+            leadId={lead.id}
+            assignedUserId={lead.assignedUserId}
+            consentAt={lead.marketingConsentAt}
+            staff={staff}
+            flow={flow}
+            calls={calls}
+          />
 
           {lead.clientId && (
             <Card className="ld-card">
@@ -626,6 +655,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
           )}
         </aside>
       </div>
+      <CallDialog leadId={lead.id} leadName={fullName} open={callMode !== null} mode={callMode ?? "log"} onOpenChange={(o) => !o && setCallMode(null)} />
     </div>
   );
 }

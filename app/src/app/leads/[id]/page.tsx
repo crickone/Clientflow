@@ -4,6 +4,9 @@ import { PersonLinksCard } from "@/components/people/PersonLinksCard";
 import { mapEnabled } from "@/lib/adonisMap/access";
 import { personLinksForLead } from "@/lib/adonisMap/decisions";
 import { getCurrentMembership } from "@/lib/auth";
+import { listAssignableStaff } from "@/lib/leadFlows/assignment";
+import { listLeadCalls } from "@/lib/leadFlows/calls";
+import { leadFlowStatus } from "@/lib/leadFlows/runs";
 import { getLead, getLeadMessages } from "@/lib/leads";
 import { listStages } from "@/lib/pipeline/stageRepo";
 import { voiceAvailability } from "@/lib/voice/dial";
@@ -23,6 +26,16 @@ export default async function LeadDetailPage(
   const stages = listStages(lead.pipelineId);
   const voice = voiceAvailability();
   const membership = getCurrentMembership();
+  const staff = membership ? listAssignableStaff(membership.tenant.id).map((s) => ({ userId: s.userId, name: s.name })) : [];
+  const flow = leadFlowStatus(id);
+  const calls = listLeadCalls(id).map((c) => ({
+    id: c.id,
+    kind: c.kind,
+    outcome: c.outcome,
+    scheduledFor: c.scheduledFor,
+    scheduledDay: c.scheduledDay,
+    createdAt: c.createdAt,
+  }));
   const personLinks = membership && mapEnabled(membership.tenant.id) ? personLinksForLead(membership.tenant.id, id) : null;
   const showLinks = !!personLinks && (personLinks.linked.length > 0 || personLinks.reviews.length > 0);
 
@@ -33,7 +46,7 @@ export default async function LeadDetailPage(
           <PersonLinksCard linked={personLinks.linked} reviews={personLinks.reviews} />
         </div>
       )}
-      <LeadDetail lead={lead} messages={messages} stages={stages} voice={voice} />
+      <LeadDetail lead={lead} messages={messages} stages={stages} voice={voice} staff={staff} flow={flow} calls={calls} />
     </div>
   );
 }
