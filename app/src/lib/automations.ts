@@ -21,6 +21,11 @@ import {
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getTheme } from "@/lib/settings";
 import { renderEmailShell, sendEmail, textToParagraphs } from "@/lib/email";
+import { flowFinish, flowStartColumn } from "@/lib/leadFlows/definitions";
+import { CALL_BOOKED_FLOW, LEAD_FLOW_KEY_SET, columnRefFor, flowDefaults, hasFinishStep, isColumnRef, isColumnStartedFlow } from "@/lib/leadFlows/flowModel";
+import { defaultMessagesFor } from "@/lib/leadFlows/presets";
+import { flowTenant } from "@/lib/leadFlows/tenant";
+import { listStages } from "@/lib/pipeline/stageRepo";
 
 const VALID_KEYS = new Set(TRIGGER_CATALOG.map((t) => t.key));
 
@@ -51,10 +56,26 @@ export function listTriggers(): TriggerListRow[] {
   }));
 }
 
+/** The flow settings the editor offers for a lead flow. */
+export interface FlowEditorInfo {
+  /** "Starts when a lead enters" is offered. */
+  columnStarted: boolean;
+  /** "If they have not replied by the end, move them to" is offered. */
+  finishable: boolean;
+  /** Call booked: later messages are counted back from the call. */
+  beforeCall: boolean;
+  /** The main board's columns, as column references. */
+  columns: { ref: string; name: string }[];
+}
+
 export interface TriggerDetail extends TriggerInput {
   label: string;
   description: string;
   status: TriggerStatus;
+  /** Lead flows only. */
+  flow: FlowEditorInfo | null;
+  /** This business's starter wording (its preset, else the neutral default), for "Use the default wording". */
+  defaults: MessageInput[];
 }
 
 export function getTrigger(key: string): TriggerDetail | null {
@@ -67,7 +88,8 @@ export function getTrigger(key: string): TriggerDetail | null {
     .where(eq(automationMessages.triggerKey, key))
     .orderBy(asc(automationMessages.position))
     .all();
-  // No message configured yet → offer a ready-made starter template.
+  const defaults = defaultMessagesFor(key, flowTenant()?.slug);
+  // No message configured yet → offer the ready-made starter messages.
   const mapped =
     messages.length > 0
       ? messages.map((m) => ({
@@ -79,8 +101,12 @@ export function getTrigger(key: string): TriggerDetail | null {
           attachmentOriginal: m.attachmentOriginal,
           delayValue: m.delayValue,
           delayUnit: m.delayUnit as IntervalUnit,
+          matchInterest: m.matchInterest ?? null,
         }))
-      : (DEFAULT_MESSAGES[key] ?? []).map((m) => ({ ...m }));
+      : defaults.map((m) => ({ ...m }));
+  const isFlow = LEAD_FLOW_KEY_SET.has(key);
+  const finish = isFlow ? flowFinish(key, state) : null;
+  const fd = flowDefaults(key);
   return {
     key,
     label: def.label,
@@ -89,6 +115,19 @@ export function getTrigger(key: string): TriggerDetail | null {
     enabled: isTriggerEnabled(key, state),
     externalEnabled: state?.externalEnabled ?? false,
     messages: mapped,
+    startColumn: isFlow ? (flowStartColumn(key, state) ?? "") : null,
+    finishColumn: isFlow ? (finish?.column ?? "") : null,
+    finishAfterValue: state?.finishAfterValue ?? fd.finishAfter?.value ?? 7,
+    finishAfterUnit: (state?.finishAfterUnit as IntervalUnit | null | undefined) ?? fd.finishAfter?.unit ?? "days",
+    flow: isFlow
+      ? {
+          columnStarted: isColumnStartedFlow(key),
+          finishable: hasFinishStep(key),
+          beforeCall: key === CALL_BOOKED_FLOW,
+          columns: listStages().map((s) => ({ ref: columnRefFor(s), name: s.name })),
+        }
+      : null,
+    defaults,
   };
 }
 
@@ -116,6 +155,26 @@ export function setTriggerEnabled(key: string, enabled: boolean) {
   upsertTriggerState(key, { enabled: persisted });
 }
 
+/** A column reference to store: "" = none, a valid ref, else null (the default). */
+function storedRef(v: string | null | undefined): string | null {
+  if (v == null) return null;
+  const t = v.trim();
+  if (t === "") return "";
+  return isColumnRef(t) ? t : null;
+}
+
+/** The flow columns of automation_triggers for a save (empty for a trigger that is not a lead flow). */
+function flowColumns(input: TriggerInput) {
+  if (!LEAD_FLOW_KEY_SET.has(input.key)) return {};
+  const finishable = hasFinishStep(input.key);
+  return {
+    startColumn: isColumnStartedFlow(input.key) ? storedRef(input.startColumn) : null,
+    finishColumn: finishable ? storedRef(input.finishColumn) : null,
+    finishAfterValue: finishable && input.finishAfterValue != null ? Math.max(0, Math.min(1000, Math.round(input.finishAfterValue))) : null,
+    finishAfterUnit: finishable && input.finishAfterUnit ? input.finishAfterUnit : null,
+  };
+}
+
 export function saveTrigger(input: TriggerInput) {
   if (!VALID_KEYS.has(input.key)) return;
   const enabled = input.enabled && ACTIVE_TRIGGER_KEYS.has(input.key); // see setTriggerEnabled's comment
@@ -123,12 +182,12 @@ export function saveTrigger(input: TriggerInput) {
     const existing = tx.select().from(automationTriggers).where(eq(automationTriggers.key, input.key)).get();
     if (existing) {
       tx.update(automationTriggers)
-        .set({ enabled, externalEnabled: input.externalEnabled, updatedAt: new Date() })
+        .set({ enabled, externalEnabled: input.externalEnabled, ...flowColumns(input), updatedAt: new Date() })
         .where(eq(automationTriggers.key, input.key))
         .run();
     } else {
       tx.insert(automationTriggers)
-        .values({ key: input.key, enabled, externalEnabled: input.externalEnabled })
+        .values({ key: input.key, enabled, externalEnabled: input.externalEnabled, ...flowColumns(input) })
         .run();
     }
     tx.delete(automationMessages).where(eq(automationMessages.triggerKey, input.key)).run();
@@ -144,6 +203,7 @@ export function saveTrigger(input: TriggerInput) {
           attachmentOriginal: m.attachmentOriginal,
           delayValue: m.delayValue,
           delayUnit: m.delayUnit,
+          matchInterest: m.matchInterest?.trim() || null,
         })
         .run();
     });
