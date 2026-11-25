@@ -94,7 +94,7 @@ const requireLocal = createRequire(import.meta.url);
       const NOW = Date.parse("2030-01-16T10:00:00Z"); // a Wednesday
       const clock = h.fakeClock(NOW);
       const WINDOW = { days: [1, 2, 3, 4, 5, 6], start: "09:00", end: "18:00" };
-      saveLeadFlowSettings({ window: WINDOW, defaultAssigneeUserId: null, alertWhatsAppTo: "+353870000099" });
+      saveLeadFlowSettings({ window: WINDOW, defaultAssigneeUserId: null, alertUserId: null, alertWhatsAppTo: "+353870000099" });
       // Each person's messages are spread across sending hours by contact id; a fresh start begins on the next sending day.
       const spread = (contactId: string) => spreadMs(contactId, WINDOW);
       const inWindow = (at: number) => {
