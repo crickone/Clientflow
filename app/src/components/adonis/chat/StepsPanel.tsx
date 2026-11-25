@@ -60,16 +60,27 @@ export function StepsPanel({ tools, live, phase, startedAt, durationMs, variant 
   const summary = stepsSummary(durationMs, tools.length);
   const thinking = live && tools.length === 0 && phase !== "writing";
   const [holding, setHolding] = useState(false);
-  const wasLive = useRef(live);
+  const [prevLive, setPrevLive] = useState(live);
+  const reducedRef = useRef(reduced);
+
+  // Decide "the run just ended" during render, so the folded line never mounts for a
+  // frame before the ticked box. Only hold when there are steps to show; an answer
+  // that used no tools has nothing to tick and goes straight to its line.
+  if (prevLive !== live) {
+    setPrevLive(live);
+    setHolding(prevLive && !live && tools.length > 0);
+  }
 
   useEffect(() => {
-    const was = wasLive.current;
-    wasLive.current = live;
-    if (!was || live) return;
-    setHolding(true);
-    const t = setTimeout(() => setHolding(false), reduced ? 0 : FOLD_AFTER_MS);
+    reducedRef.current = reduced;
+  }, [reduced]);
+
+  // Depends on `holding` only: a reduced-motion change mid-hold must not cancel the timer.
+  useEffect(() => {
+    if (!holding) return;
+    const t = setTimeout(() => setHolding(false), reducedRef.current ? 0 : FOLD_AFTER_MS);
     return () => clearTimeout(t);
-  }, [live, reduced]);
+  }, [holding]);
 
   const header = (
     <div className="ax-steps-h">
