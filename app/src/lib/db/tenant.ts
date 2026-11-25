@@ -3467,6 +3467,34 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     addColumn("leads", "marketing_consent_source", "marketing_consent_source TEXT");
     addColumn("leads", "assigned_user_id", "assigned_user_id INTEGER");
     addColumn("notifications", "for_user_id", "for_user_id INTEGER");
+    // GoHighLevel import (lib/ghlImport): do not contact, who placed a run,
+    // and the per-person import record.
+    addColumn("leads", "do_not_contact", "do_not_contact INTEGER NOT NULL DEFAULT 0");
+    addColumn("lead_flow_runs", "source", "source TEXT");
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS ghl_import_people (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ghl_contact_id TEXT NOT NULL,
+        ghl_opportunity_id TEXT,
+        lead_id INTEGER,
+        client_id INTEGER,
+        contact_id INTEGER,
+        outcome TEXT NOT NULL,
+        ghl_stage TEXT,
+        days_in_stage INTEGER,
+        ghl_source TEXT,
+        tags TEXT,
+        treatment TEXT,
+        used_before TEXT,
+        town TEXT,
+        staff_medical_note TEXT,
+        do_not_contact INTEGER NOT NULL DEFAULT 0,
+        imported_at INTEGER NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_ghl_import_people_contact ON ghl_import_people(ghl_contact_id);
+      CREATE INDEX IF NOT EXISTS idx_ghl_import_people_lead ON ghl_import_people(lead_id);
+      CREATE INDEX IF NOT EXISTS idx_ghl_import_people_client ON ghl_import_people(client_id);
+    `);
     // Later lead-flow columns go here.
   }
 }

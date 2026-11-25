@@ -23,6 +23,7 @@ import { dialLead } from "@/lib/voice/dial";
 import { cancelForLead } from "@/lib/voice/queue";
 import { getCurrentTenant, getCurrentTenantDb } from "@/lib/db/tenant";
 import { scoreLead } from "@/lib/leadScore";
+import { allowContactAgain, forgetImportedPerson } from "@/lib/ghlImport/store";
 import type { LeadScore } from "@/lib/leadScoreModel";
 
 /**
@@ -260,9 +261,22 @@ export async function deleteLeadAction(id: number) {
   await requireAdmin();
   const leadId = z.number().int().positive().parse(id);
   db.delete(leadMessages).where(eq(leadMessages.leadId, leadId)).run();
+  forgetImportedPerson({ leadId });
   db.delete(leads).where(eq(leads.id, leadId)).run();
   revalidatePath("/leads");
   redirect("/leads");
+}
+
+/** Clear a lead's do-not-contact (from an import). Admin only, like do not call. */
+export async function allowContactAgainAction(leadId: number): Promise<{ ok: boolean }> {
+  const user = await requireAdmin();
+  const id = z.number().int().positive().parse(leadId);
+  const ok = allowContactAgain(id);
+  if (ok) {
+    await logActivity("lead.contact_allowed", `Lead #${id}: contact allowed again by user #${user.id}`, { leadId: id });
+    revalidatePath(`/leads/${id}`);
+  }
+  return { ok };
 }
 
 /**

@@ -28,6 +28,16 @@ export const STAFF_ALERT_KEY = "alert";
 /** Queue rows that belong to a scheduled call: its staff alerts and the call-back check. */
 export const CALL_ALERT_KEY = "call_alert";
 
+/**
+ * Queue rows still to happen: waiting for their time ("queued"), or an
+ * imported run's rows waiting for their flow to be switched on ("held").
+ * Stopping a flow cancels both.
+ */
+export const PENDING_STATUSES = ["queued", "held"] as const;
+
+/** lead_flow_runs.source of a run the GoHighLevel import placed. */
+export const IMPORTED_RUN_SOURCE = "gohighlevel";
+
 /** Triggers that are on by default (no automation_triggers row yet). Every new flow is off. */
 export const DEFAULT_ENABLED_TRIGGERS: ReadonlySet<string> = new Set(["campaign_signup"]);
 

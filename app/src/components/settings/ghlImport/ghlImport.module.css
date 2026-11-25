@@ -1,0 +1,68 @@
+/* Settings > Import > GoHighLevel. App tokens only, so dark and light both
+   follow the admin theme. Controls keep at least 12px of side padding. */
+
+.stack { display: grid; gap: 16px; }
+.card { border: 1px solid var(--hairline); border-radius: 12px; background: var(--surface-1); padding: 20px; display: grid; gap: 14px; align-content: start; }
+.cardTitle { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+.note { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
+.files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.drop { position: relative; display: grid; gap: 6px; padding: 18px; border: 1px dashed var(--hairline-strong); border-radius: 12px; background: var(--surface-2); cursor: pointer; transition: border-color .15s var(--ease); }
+.drop:hover, .drop:focus-within { border-color: var(--accent); }
+.drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.dropLabel { font-size: 14px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+.dropHint { font-size: 12.5px; color: var(--text-tertiary); overflow-wrap: anywhere; }
+.dropChosen { font-size: 13px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.dateRow { display: grid; gap: 6px; max-width: 280px; }
+.error { margin: 0; padding: 10px 14px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); font-size: 13.5px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.actionsStart { justify-content: flex-start; }
+
+/* Eight tiles: four across, two on a phone, so no empty cell shows. */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; background: var(--hairline); }
+.tile { background: var(--surface-1); padding: 14px 16px; display: grid; gap: 4px; }
+.tileLabel { font-size: 12.5px; color: var(--text-tertiary); }
+.tileValue { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+.lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; }
+.list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--hairline); font-size: 13.5px; color: var(--text-secondary); }
+.list li:first-child { border-top: 0; }
+.list b { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.assignee { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 240px); gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--hairline); font-size: 13.5px; color: var(--text-secondary); }
+.assignee:first-of-type { border-top: 0; }
+.select { width: 100%; height: 40px; padding: 0 36px 0 12px; border-radius: var(--radius); border: 1px solid var(--hairline); background-color: var(--surface-2); color: var(--text-primary); font-size: 14px; font-family: inherit; }
+
+.searchRow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.search { position: relative; flex: 1 1 260px; max-width: 420px; }
+.search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-tertiary); pointer-events: none; }
+.search input { padding-left: 38px !important; }
+.count { font-size: 13px; color: var(--text-tertiary); }
+
+.tableWrap { border: 1px solid var(--hairline); border-radius: 12px; overflow-x: auto; background: var(--surface-1); }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th { text-align: left; font-weight: 600; font-size: 12px; color: var(--text-tertiary); padding: 10px 12px; border-bottom: 1px solid var(--hairline); background: var(--surface-2); }
+.table td { padding: 10px 12px; border-top: 1px solid var(--hairline); color: var(--text-secondary); vertical-align: top; }
+.table tr:first-child td { border-top: 0; }
+.table th:first-child, .table td:first-child { min-width: 190px; }
+.name { color: var(--text-primary); font-weight: 600; }
+.sub { display: block; font-size: 12px; color: var(--text-tertiary); overflow-wrap: anywhere; }
+.more { display: flex; justify-content: center; padding: 12px; border-top: 1px solid var(--hairline); }
+
+@media (max-width: 640px) {
+  .card { padding: 16px; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .files { grid-template-columns: minmax(0, 1fr); }
+  .assignee { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .dateRow { max-width: none; }
+  .actions { justify-content: stretch; }
+  .actions > * { flex: 1 1 100%; }
+  .table thead { display: none; }
+  .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
+  .table tr { padding: 12px 14px; border-top: 1px solid var(--hairline); }
+  .table tr:first-child { border-top: 0; }
+  .table td { border: 0; padding: 2px 0; }
+  .table td:first-child { min-width: 0; }
+  .table td[data-label]::before { content: attr(data-label) ": "; color: var(--text-tertiary); }
+}

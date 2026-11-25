@@ -13,6 +13,7 @@ import { clients } from "@/lib/db/schema";
 import { logActivity } from "@/lib/queries";
 import { fireTrigger } from "@/lib/automations";
 import { sendWhatsApp } from "@/lib/whatsapp/send";
+import { forgetImportedPerson } from "@/lib/ghlImport/store";
 
 export async function sendClientWhatsAppAction(
   clientId: number,
@@ -198,6 +199,7 @@ export async function quickAddClientAction(formData: FormData) {
 
 export async function deleteClientAction(id: number) {
   await requireAdmin();
+  forgetImportedPerson({ clientId: id });
   db.delete(clients).where(eq(clients.id, id)).run();
   await logActivity("client.delete", `Client #${id} deleted`);
   revalidatePath("/clients");

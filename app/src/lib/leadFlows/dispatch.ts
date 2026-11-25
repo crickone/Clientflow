@@ -15,7 +15,7 @@ import { getThemeForTenant } from "@/lib/settings";
 
 import { flowNow } from "./clock";
 import { unsubscribeUrl } from "./consent";
-import { CALL_BACK_FLOW, NURTURE_FLOW, parsePayload, resolveColumn } from "./flowModel";
+import { CALL_BACK_FLOW, IMPORTED_RUN_SOURCE, isTriggerEnabled, NURTURE_FLOW, parsePayload, PENDING_STATUSES, resolveColumn } from "./flowModel";
 import { isRecipientUndeliverable } from "./flowPlan";
 import { startFlow } from "./runs";
 import { endOfLocalDay, fitToWindow } from "./sendingWindow";
@@ -53,7 +53,7 @@ export type RowHandler = (ctx: DispatchContext, row: AutomationQueueRow) => Prom
 export function markRow(
   tdb: TenantDb,
   id: number,
-  patch: { status: "queued" | "sent" | "failed" | "cancelled"; error?: string | null; sentAt?: Date | null; providerMessageId?: string | null },
+  patch: { status: "queued" | "sent" | "failed" | "cancelled" | "held"; error?: string | null; sentAt?: Date | null; providerMessageId?: string | null },
 ): void {
   tdb.update(schema.automationQueue).set(patch).where(eq(schema.automationQueue.id, id)).run();
 }
@@ -275,7 +275,7 @@ function closeRunIfDone(tdb: TenantDb, runId: number, now: number): void {
   const left = tdb
     .select({ id: schema.automationQueue.id })
     .from(schema.automationQueue)
-    .where(and(eq(schema.automationQueue.runId, runId), eq(schema.automationQueue.status, "queued")))
+    .where(and(eq(schema.automationQueue.runId, runId), inArray(schema.automationQueue.status, [...PENDING_STATUSES])))
     .get();
   if (left) return;
   tdb.update(schema.leadFlowRuns)
@@ -316,6 +316,20 @@ async function dispatchBound(tenantId: number, now: number, baseUrl?: string): P
     : [];
   const leadStatus = new Map(leadRows.map((l) => [l.id, l.status]));
 
+  // Imported runs (lib/ghlImport) only send while their flow is switched on.
+  const runIds = [...new Set(due.map((d) => d.runId).filter((id): id is number => id != null))];
+  const importedRuns = new Set(
+    runIds.length
+      ? tdb
+          .select({ id: schema.leadFlowRuns.id })
+          .from(schema.leadFlowRuns)
+          .where(and(inArray(schema.leadFlowRuns.id, runIds), eq(schema.leadFlowRuns.source, IMPORTED_RUN_SOURCE)))
+          .all()
+          .map((r) => r.id)
+      : [],
+  );
+  const triggerStates = new Map(tdb.select().from(schema.automationTriggers).all().map((t) => [t.key, t]));
+
   let resolvedBase = baseUrl;
   if (!resolvedBase) {
     try {
@@ -349,6 +363,11 @@ async function dispatchBound(tenantId: number, now: number, baseUrl?: string): P
         if (item.runId != null) closeRunIfDone(tdb, item.runId, now);
         continue;
       }
+    }
+    if (item.runId != null && importedRuns.has(item.runId) && !isTriggerEnabled(item.triggerKey, triggerStates.get(item.triggerKey))) {
+      // Waits, untouched, until the flow is switched on (lib/leadFlows/importedRuns.ts releaseHeldImportRows).
+      markRow(tdb, item.id, { status: "held" });
+      continue;
     }
     const handler = HANDLERS[item.kind] ?? unknownRow;
     try {

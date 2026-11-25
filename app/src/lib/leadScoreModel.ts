@@ -103,8 +103,14 @@ const DONE_ROLES = new Set(["sale", "repeat_customer", "lapsed", "lost"]);
  * Whether a lead needs scoring: never scored, something happened since the
  * last score, or the last score is over a day old (time alone cools a lead).
  * Leads that have become clients, bought, or been closed are left alone.
+ *
+ * `importedUntouched`: a lead brought in by the GoHighLevel import that has
+ * not replied yet (no inbound message on file). The import must not set off
+ * thousands of Jev calls, and neither must its follow-ups going out; such a
+ * lead is scored once they reply.
  */
-export function scoreDue(l: { scoredAt: number | null; lastActivity: number; stageRole: string | null; isClient: boolean }, now: number): boolean {
+export function scoreDue(l: { scoredAt: number | null; lastActivity: number; stageRole: string | null; isClient: boolean; importedUntouched?: boolean }, now: number): boolean {
+  if (l.importedUntouched) return false;
   if (l.isClient || (l.stageRole && DONE_ROLES.has(l.stageRole))) return false;
   if (l.scoredAt === null) return true;
   return l.lastActivity > l.scoredAt || now - l.scoredAt > 24 * 3_600_000;
