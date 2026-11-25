@@ -114,6 +114,35 @@ const requireLocal = createRequire(import.meta.url);
       stage.setStageToId(old.id, nurture.id);
       stage.onLeadEmailReply(s.tid, "oldmail@example.com", new Date(Date.now() - 3 * 3_600_000), "old");
       ok(queued(old.id).some((q) => q.kind === "message") && getLead(old.id)!.stageId === nurture.id, "an email from hours ago (a first sync) changes nothing");
+      stage.onLeadEmailReply(s.tid, "oldmail@example.com", new Date(Date.now() + 30 * MIN), "from the future");
+      ok(queued(old.id).some((q) => q.kind === "message") && getLead(old.id)!.stageId === nurture.id, "an email dated well in the future changes nothing");
+
+      // A high score never pulls a lead out of a follow-up column; only a reply or a booking does.
+      h.setFlowEnabled(s.tid, "lead_no_answer", true);
+      const noAnswer = cols.find((c) => c.systemKey === "no_answer")!;
+      const { lead: scored } = upsertLead({ source: "manual", actor: "user", fullName: "Scored Lead", email: "scored@example.com", phone: "+353870000021" });
+      stage.setStageToId(scored.id, noAnswer.id);
+      const before = queued(scored.id).map((q) => q.id).sort();
+      ok(before.length > 0, "No answer flow is running");
+      stage.onLeadScored(scored.id, 85, "book");
+      ok(getLead(scored.id)!.stageId === noAnswer.id, "a score of 85 leaves a lead in No answer");
+      ok(JSON.stringify(queued(scored.id).map((q) => q.id).sort()) === JSON.stringify(before), "and its flow keeps running");
+      const { lead: fresh } = upsertLead({ source: "manual", actor: "user", fullName: "Fresh Score", email: "freshscore@example.com" });
+      stage.onLeadScored(fresh.id, 85, "book");
+      ok(getLead(fresh.id)!.stageId === engaged, "a score of 85 still makes an entry-column lead hot");
+      stage.onInboundFromLead(scored.id, { text: "Yes please", messageId: 107 });
+      ok(getLead(scored.id)!.stageId === engaged, "a reply does pull them out of No answer");
+
+      // A reply from the client side stops the linked lead's flows and makes it hot.
+      const client = tdb.insert(schema.clients).values({ firstName: "Client", lastName: "Reply", phone: "+353870000022" }).returning().get();
+      const { lead: linked } = upsertLead({ source: "manual", actor: "user", fullName: "Client Reply", email: "clientreply@example.com", phone: "+353870000022" });
+      tdb.update(schema.leads).set({ clientId: client.id }).where(eq(schema.leads.id, linked.id)).run();
+      stage.setStageToId(linked.id, noAnswer.id);
+      ok(queued(linked.id).some((q) => q.kind === "message"), "the linked lead is in a flow");
+      ok(stage.onInboundFromClient(client.id, { text: "Hi, got your message", channel: "whatsapp" }) === true, "the client reply finds its lead");
+      ok(queued(linked.id).filter((q) => q.kind === "message").length === 0, "the flow stops on a client-side reply");
+      ok(getLead(linked.id)!.stageId === engaged, "and the lead is hot");
+      ok(stage.onInboundFromClient(client.id + 999, { text: "x" }) === false, "a client with no lead is reported as unlinked");
     });
     console.log(`replies: ${n} checks passed.`);
   } finally {

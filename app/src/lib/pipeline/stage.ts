@@ -11,7 +11,7 @@ import { KEEP_ON_REPLY } from "@/lib/automationModel";
 import { alertHotLead } from "@/lib/leadFlows/alerts";
 import { applyColumnEntry } from "@/lib/leadFlows/columnEntry";
 import { stopFlows } from "@/lib/leadFlows/runs";
-import { getCurrentTenant, runWithTenant } from "@/lib/db/tenant";
+import { boundTenantId, getCurrentTenant, runWithTenant } from "@/lib/db/tenant";
 import { EMAIL_MAX_AGE_MS } from "@/lib/notifications/model";
 import { isPositiveReply } from "@/lib/leadFlows/flowPlan";
 import { beginThinkingReplyCheck, queueThinkingNurtureMove, takeReplyCheck } from "@/lib/leadFlows/replies";
@@ -90,7 +90,7 @@ export function writeStageId(leadId: number, stageId: number, note: string, acto
   if (stage?.role && before?.stageId !== stageId) {
     try {
       const lead = db.select({ source: schema.leads.source, sourceLeadId: schema.leads.sourceLeadId }).from(schema.leads).where(eq(schema.leads.id, leadId)).get();
-      if (lead) queueCrmStage(getCurrentTenant().id, lead, stage.role);
+      if (lead) queueCrmStage(boundTenantId() ?? getCurrentTenant().id, lead, stage.role);
     } catch (err) {
       console.error(`[pipeline] conversion-lead event for lead #${leadId} not queued:`, err);
     }
@@ -252,6 +252,9 @@ export function resolveThinkingReply(leadId: number, text: string, positive: boo
   queueThinkingNurtureMove(leadId);
 }
 
+/** A message dated further ahead than this is not treated as a reply (same bound as notifications/model.ts emailNotifies). */
+const EMAIL_FUTURE_SKEW_MS = 5 * 60 * 1000;
+
 /**
  * An email arrived from a lead's address (Gmail or IMAP sync): a reply like
  * any other, when it is recent (a first sync of old mail changes nothing).
@@ -259,7 +262,11 @@ export function resolveThinkingReply(leadId: number, text: string, positive: boo
  */
 export function onLeadEmailReply(tenantId: number, fromEmail: string | null, at: Date | null, snippet: string | null): void {
   const email = (fromEmail ?? "").trim().toLowerCase();
-  if (!email || !at || Date.now() - at.getTime() > EMAIL_MAX_AGE_MS) return;
+  if (!email || !at) return;
+  const age = Date.now() - at.getTime();
+  // Too old (a first sync of old mail) or dated in the future (a bad clock
+  // or a forged date): same bounds as notifications/model.ts emailNotifies.
+  if (age > EMAIL_MAX_AGE_MS || age < -EMAIL_FUTURE_SKEW_MS) return;
   runWithTenant(tenantId, () => {
     const rows = db.select({ id: schema.leads.id }).from(schema.leads).where(sql`lower(${schema.leads.email}) = ${email}`).all();
     for (const r of rows) {
@@ -271,15 +278,29 @@ export function onLeadEmailReply(tenantId: number, fromEmail: string | null, at:
     }
   });
 }
-export function onInboundFromClient(clientId: number): void {
+/**
+ * A client replied. The lead linked to that client is treated exactly like a
+ * lead replying: its flows stop and it becomes a Hot lead. `reply` carries the
+ * text for the alert; pass `messageId` only when it is a LEAD message (a
+ * client message id means nothing to the Thinking about it reply check).
+ * Returns true when a lead is linked to the client (so the reply was handled).
+ */
+export function onInboundFromClient(clientId: number, reply?: LeadReply): boolean {
   const leadId = leadIdForClient(clientId);
-  if (leadId) advanceStage(leadId, "engaged", "replied");
+  if (!leadId) return false;
+  onInboundFromLead(leadId, reply);
+  return true;
 }
 /** A fresh lead score: 70 or more moves the lead to Hot lead (forward-only). */
 export function onLeadScored(leadId: number, score: number, nextStep: string | null | undefined): void {
   const source = db.select({ source: schema.leads.source }).from(schema.leads).where(eq(schema.leads.id, leadId)).get()?.source ?? null;
   const reason = hotReasonFromScore(score, nextStep, source);
-  if (reason) advanceStage(leadId, "engaged", reason);
+  if (!reason) return;
+  // A lead a person or a flow put in a follow-up column (No answer, Thinking
+  // about it, ...) stays there while its flow runs: only a reply or a
+  // booking pulls it out, never a score.
+  if (currentStageRecord(leadId)?.systemKey) return;
+  advanceStage(leadId, "engaged", reason);
 }
 export function onAppointmentBooked(clientId: number, status: string): void {
   const leadId = leadIdForClient(clientId);

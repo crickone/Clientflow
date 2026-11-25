@@ -7,6 +7,7 @@ import { runWithTenant, type TenantDb } from "@/lib/db/tenant";
 import { KEEP_ON_REPLY } from "@/lib/automationModel";
 import type { SuppressionReason } from "@/lib/marketing/suppress";
 import { createUnsubscribeToken } from "@/lib/marketing/unsubscribeToken";
+import { isStopReply } from "@/lib/whatsappBroadcastModel";
 
 import { flowNow } from "./clock";
 import type { ConsentSource } from "./consentModel";
@@ -99,6 +100,21 @@ export function setLeadMarketingConsent(
   db.update(schema.leads).set({ marketingConsentAt: flowNow(), marketingConsentSource: source }).where(eq(schema.leads.id, leadId)).run();
   if (lead.email) ensureLeadContact(db, { email: lead.email, firstName: lead.firstName, lastName: lead.lastName, phone: lead.phone });
   return { ok: true };
+}
+
+/**
+ * A lead replied "STOP" (or another opt-out word) on WhatsApp: marketing
+ * consent is withdrawn, so Long-term nurture stops and never starts. Ambient
+ * tenant. Fail-soft; returns true when consent was withdrawn.
+ */
+export function withdrawConsentOnStopReply(leadId: number, text: string): boolean {
+  if (!isStopReply(text)) return false;
+  try {
+    return setLeadMarketingConsent(leadId, false, "api").ok;
+  } catch (err) {
+    console.error(`[lead flows] consent for lead #${leadId} not withdrawn:`, err);
+    return false;
+  }
 }
 
 /**

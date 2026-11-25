@@ -99,6 +99,17 @@ const requireLocal = createRequire(import.meta.url);
       consent.setLeadMarketingConsent(noSecret.id, false, "staff");
       ok(queued(noSecret.id).length === 0, "a no stops Long-term nurture");
 
+      // A STOP on WhatsApp withdraws the lead's marketing consent and stops nurture.
+      const { lead: stopper } = upsertLead({ source: "manual", fullName: "Stop Per", email: "stopper@example.com", phone: "+353870000016" });
+      consent.setLeadMarketingConsent(stopper.id, true, "form");
+      runs.startFlow(stopper.id, "lead_nurture");
+      ok(queued(stopper.id).length > 0, "nurture is queued before the STOP");
+      ok(!consent.withdrawConsentOnStopReply(stopper.id, "Thanks, see you Thursday"), "an ordinary reply changes nothing");
+      ok(getLead(stopper.id)!.marketingConsentAt !== null, "consent stays after an ordinary reply");
+      ok(consent.withdrawConsentOnStopReply(stopper.id, " Stop. "), "STOP withdraws consent");
+      ok(getLead(stopper.id)!.marketingConsentAt === null && getLead(stopper.id)!.marketingConsentSource === null, "consent cleared");
+      ok(queued(stopper.id).length === 0, "and nurture stopped");
+
       // Posted in with consent.
       const { lead: posted } = upsertLead({ source: "website", sourceLeadId: "website:posted@example.com", fullName: "Posted In", email: "posted@example.com", marketingConsent: "api" });
       ok(getLead(posted.id)!.marketingConsentSource === "api", "a lead posted in with consent has it");

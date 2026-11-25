@@ -28,6 +28,7 @@ import { isOptedIn } from "@/lib/whatsappBroadcasts";
 import { isStopReply } from "@/lib/whatsappBroadcastModel";
 import { notifyInboundMessage } from "@/lib/notifications/notify";
 import { onWhatsAppDeliveryFailed } from "@/lib/leadFlows/undelivered";
+import { withdrawConsentOnStopReply } from "@/lib/leadFlows/consent";
 
 /**
  * Distinguishes an expected "tenant is over its monthly AI cap" skip from a
@@ -145,7 +146,14 @@ export async function POST(req: NextRequest) {
           }
         }
         try {
-          onInboundFromClient(client.id);
+          // The reply carries no messageId: the id is a client message's, which the
+          // Thinking about it reply check cannot match (its 15-minute fallback covers it).
+          const reply = { text: inbound.text, channel: "whatsapp" };
+          if (!onInboundFromClient(client.id, reply)) {
+            // No lead is linked to this client, but a lead may share the number.
+            const sameNumber = findLeadByPhone(inbound.fromPhone);
+            if (sameNumber) onInboundFromLead(sameNumber.id, reply);
+          }
         } catch (err) {
           console.error("[pipeline] client inbound hook failed:", err);
         }
@@ -184,6 +192,8 @@ export async function POST(req: NextRequest) {
           sentAt: new Date(inbound.timestamp),
         });
         setLeadStatus(lead.id, "replied");
+        // STOP withdraws the lead's marketing consent (fail-soft).
+        withdrawConsentOnStopReply(lead.id, inbound.text);
         try {
           onInboundFromLead(lead.id, { text: inbound.text, messageId: inboundMsg.id, channel: "whatsapp" });
         } catch (err) {

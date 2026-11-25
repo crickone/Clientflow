@@ -96,7 +96,7 @@ export async function POST(req: Request) {
         if (!inbound) return;
         try {
           if (inbound.ownerType === "lead") onInboundFromLead(inbound.ownerId, { text: ev.text, messageId: inbound.messageId, channel: ev.channel });
-          else onInboundFromClient(inbound.ownerId);
+          else onInboundFromClient(inbound.ownerId, { text: ev.text, channel: ev.channel });
         } catch (err) {
           console.error("[pipeline] DM inbound hook failed:", err);
         }
