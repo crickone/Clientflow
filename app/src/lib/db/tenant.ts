@@ -3415,4 +3415,39 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     if (cols.length && !cols.some((c) => c.name === "system_key")) sqlite.exec("ALTER TABLE pipeline_stages ADD COLUMN system_key TEXT");
     sqlite.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_pipeline_stages_pipeline_key ON pipeline_stages(pipeline_id, system_key)");
   }
+
+  // Lead follow-up flows (lib/leadFlows): runs, and the queue/trigger/message
+  // columns they use. Additive and idempotent. NOT swallowed, for the same
+  // reason as the system_key column above.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS lead_flow_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lead_id INTEGER NOT NULL,
+      trigger_key TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      stop_reason TEXT,
+      started_at INTEGER NOT NULL,
+      ended_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_lead_flow_runs_lead ON lead_flow_runs(lead_id, status);
+  `);
+  {
+    const addColumn = (table: string, column: string, ddl: string) => {
+      const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+      if (cols.length && !cols.some((c) => c.name === column)) sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+    };
+    addColumn("automation_queue", "run_id", "run_id INTEGER");
+    addColumn("automation_queue", "step", "step INTEGER");
+    addColumn("automation_queue", "kind", "kind TEXT NOT NULL DEFAULT 'message'");
+    addColumn("automation_queue", "payload", "payload TEXT");
+    addColumn("automation_queue", "provider_message_id", "provider_message_id TEXT");
+    addColumn("automation_triggers", "start_column", "start_column TEXT");
+    addColumn("automation_triggers", "finish_column", "finish_column TEXT");
+    addColumn("automation_triggers", "finish_after_value", "finish_after_value INTEGER");
+    addColumn("automation_triggers", "finish_after_unit", "finish_after_unit TEXT");
+    addColumn("automation_messages", "match_interest", "match_interest TEXT");
+    sqlite.exec("CREATE INDEX IF NOT EXISTS idx_automation_queue_lead ON automation_queue(lead_id, status)");
+    sqlite.exec("CREATE INDEX IF NOT EXISTS idx_automation_queue_provider ON automation_queue(provider_message_id)");
+    // Later lead-flow columns go here.
+  }
 }

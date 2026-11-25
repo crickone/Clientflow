@@ -5,80 +5,27 @@ import { and, asc, eq, inArray, lte, ne } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getTenantDbById } from "@/lib/db/tenant";
 import type { Lead } from "@/lib/db/schema";
-import {
-  DEFAULT_MESSAGES,
-  TRIGGER_LABELS,
-  applyShortcodes,
-  delayToMs,
-  inSendingHours,
-  isMessageLive,
-  type Channel,
-} from "@/lib/automationModel";
-import { getBusinessProfile, getBusinessProfileForTenant } from "@/lib/businessProfile";
+import { TRIGGER_LABELS, inSendingHours } from "@/lib/automationModel";
+import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { getThemeForTenant } from "@/lib/settings";
 import { renderEmailShell, sendEmailForTenant, textToParagraphs } from "@/lib/email";
 import { isStopped } from "@/lib/platform/killSwitch";
 import { isTriggerEnabled } from "@/lib/leadFlows/flowModel";
+import { startFlow, stopFlows } from "@/lib/leadFlows/runs";
 
 /**
- * The campaign nurture sequence: one follow-up series, every campaign.
+ * The lead follow-up sequences, kept under their old names for their
+ * callers (leads.upsertLead, offers/fulfil, lib/automations, the ticker).
+ * The engine is lib/leadFlows: runs.ts starts and stops flows,
+ * definitions.ts says what a flow is in this business.
  *
- * A lead that arrives on a campaign is ENROLLED here at creation
- * (leads.upsertLead): each message of the "campaign_signup" trigger is
- * rendered for that person there and then, and parked in automation_queue
- * with the time it is due -- now for the first, now plus its delay for the
- * rest. The dispatch ticker (lib/dispatch/ticker.ts) sends whatever is due,
- * one tenant at a time, and writes the outcome to automation_log, the same
- * log an immediate automation writes to, so the Sent view shows both.
- *
- * Rendering at enrolment rather than at send time is deliberate: the message
- * the operator approved is the message that goes, even if they edit the
- * sequence next week. Editing changes future enrolments, not people already
- * in the funnel.
- *
- * The trigger is ON unless the operator has switched it off. Every other
- * trigger is off until switched on, but this one exists because the operator
- * asked for a sequence that runs for every campaign -- a nurture that had to
- * be discovered and enabled first would not be that.
+ * The campaign sign-up sequence is ON unless the operator has switched it
+ * off; every other flow is off until switched on.
  */
 export const NURTURE_TRIGGER_KEY = "campaign_signup";
 
 // Which triggers are on with no saved row lives with the flow vocabulary now.
 export { DEFAULT_ENABLED_TRIGGERS, isTriggerEnabled } from "@/lib/leadFlows/flowModel";
-
-interface QueuedMessage {
-  channel: Channel;
-  subject: string | null;
-  template: string;
-  delayValue: number;
-  delayUnit: "minutes" | "hours" | "days";
-}
-
-function sequenceMessages(triggerKey: string): QueuedMessage[] {
-  const saved = db
-    .select()
-    .from(schema.automationMessages)
-    .where(eq(schema.automationMessages.triggerKey, triggerKey))
-    .orderBy(asc(schema.automationMessages.position))
-    .all();
-  const messages: QueuedMessage[] =
-    saved.length > 0
-      ? saved.map((m) => ({
-          channel: m.channel as Channel,
-          subject: m.subject,
-          template: m.template ?? "",
-          delayValue: m.delayValue,
-          delayUnit: m.delayUnit,
-        }))
-      : (DEFAULT_MESSAGES[triggerKey] ?? []).map((m) => ({
-          channel: m.channel,
-          subject: m.subject,
-          template: m.template,
-          delayValue: m.delayValue,
-          delayUnit: m.delayUnit,
-        }));
-  return messages.filter((m) => isMessageLive(m, triggerKey) && m.template.trim());
-}
 
 /** Whether a sequence is switched on for the ambient tenant (campaign sign-up is on unless switched off). */
 export function sequenceEnabled(triggerKey: string): boolean {
@@ -90,82 +37,29 @@ export function sequenceEnabled(triggerKey: string): boolean {
   return isTriggerEnabled(triggerKey, state);
 }
 
-/**
- * Queue a sequence for one lead. Runs in the ambient tenant. Nothing is sent
- * here. Each message goes by its own channel: an email needs an email
- * address, a WhatsApp a phone number; a message the lead cannot receive is
- * skipped, the rest still go. A lead already in this sequence is not
- * enrolled twice (moving to booked, out and back, does not double the
- * reminders).
- */
+/** Put a lead on a sequence unless it is already on it. Returns how many messages were queued. */
 export function enrolLeadInSequence(
-  lead: Pick<Lead, "id" | "firstName" | "lastName" | "email" | "phone">,
+  lead: Pick<Lead, "id">,
   triggerKey: string,
   extra: { offerName?: string | null; offerLink?: string | null } = {},
 ): number {
-  if (!sequenceEnabled(triggerKey)) return 0;
-  const already = db
-    .select({ id: schema.automationQueue.id })
-    .from(schema.automationQueue)
-    .where(and(eq(schema.automationQueue.leadId, lead.id), eq(schema.automationQueue.triggerKey, triggerKey), eq(schema.automationQueue.status, "queued")))
-    .get();
-  if (already) return 0;
-
-  const messages = sequenceMessages(triggerKey);
-  if (messages.length === 0) return 0;
-
-  const businessName = getBusinessProfile().businessName;
-  const vars = { firstName: lead.firstName, lastName: lead.lastName, businessName, ...extra };
-  const now = Date.now();
-  let queued = 0;
-  for (const m of messages) {
-    const sendTo = m.channel === "whatsapp" ? lead.phone : lead.email;
-    if (!sendTo) continue;
-    const subject = m.channel === "email" ? applyShortcodes((m.subject ?? "").trim() || `A message from ${businessName}`, vars) : null;
-    const body = applyShortcodes(m.template, vars);
-    db.insert(schema.automationQueue)
-      .values({
-        triggerKey,
-        leadId: lead.id,
-        channel: m.channel,
-        subject,
-        body,
-        sendTo,
-        dueAt: new Date(inSendingHours(now + delayToMs(m.delayValue, m.delayUnit), m.channel)),
-      })
-      .run();
-    queued++;
-  }
-  return queued;
+  return startFlow(lead.id, triggerKey, { ifNotActive: true, extra }).queued;
 }
 
 /** The campaign sign-up sequence (kept for its callers). */
-export function enrolLeadInNurture(lead: Pick<Lead, "id" | "firstName" | "lastName" | "email" | "phone" | "campaign">): number {
+export function enrolLeadInNurture(lead: Pick<Lead, "id">): number {
   return enrolLeadInSequence(lead, NURTURE_TRIGGER_KEY);
 }
 
-/** Stop what is still queued for a lead in the named sequences only. */
+/** Stop the named sequences for a lead. Returns the runs stopped. */
 export function cancelSequences(leadId: number, triggerKeys: readonly string[]): number {
   if (triggerKeys.length === 0) return 0;
-  return db
-    .update(schema.automationQueue)
-    .set({ status: "cancelled" })
-    .where(and(eq(schema.automationQueue.leadId, leadId), eq(schema.automationQueue.status, "queued"), inArray(schema.automationQueue.triggerKey, [...triggerKeys])))
-    .run().changes;
+  return stopFlows(leadId, "stopped", { only: triggerKeys });
 }
 
-/**
- * Stop what is still queued for a lead. Called when the lead is won or lost:
- * a customer does not need "still thinking it over?", and someone who said
- * no does not need anything.
- */
+/** Stop every sequence for a lead (won or lost). */
 export function cancelNurtureForLead(leadId: number): number {
-  const result = db
-    .update(schema.automationQueue)
-    .set({ status: "cancelled" })
-    .where(and(eq(schema.automationQueue.leadId, leadId), eq(schema.automationQueue.status, "queued")))
-    .run();
-  return result.changes;
+  return stopFlows(leadId, "won or lost", "all");
 }
 
 /** Queued messages for a lead, soonest first -- for the lead's detail view. */
@@ -173,7 +67,7 @@ export function listQueuedForLead(leadId: number) {
   return db
     .select()
     .from(schema.automationQueue)
-    .where(and(eq(schema.automationQueue.leadId, leadId), eq(schema.automationQueue.status, "queued")))
+    .where(and(eq(schema.automationQueue.leadId, leadId), eq(schema.automationQueue.status, "queued"), eq(schema.automationQueue.kind, "message")))
     .orderBy(asc(schema.automationQueue.dueAt))
     .all();
 }
@@ -200,6 +94,7 @@ export async function dispatchDueAutomationQueue(tenantId: number, now: number =
     .where(
       and(
         eq(schema.automationQueue.status, "queued"),
+        eq(schema.automationQueue.kind, "message"),
         lte(schema.automationQueue.dueAt, new Date(now)),
         ...(emailHeld ? [ne(schema.automationQueue.channel, "email")] : []),
       ),
