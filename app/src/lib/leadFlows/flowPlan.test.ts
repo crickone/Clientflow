@@ -5,7 +5,7 @@
 // happens, and which replies count as wanting to book or talk.
 import assert from "node:assert/strict";
 
-import { cascadeDueTimes, columnEntryEffect, finishDueAt, interestMatches, isPositiveReply, pickForInterest } from "./flowPlan";
+import { cascadeDueTimes, columnEntryEffect, finishDueAt, interestMatches, isPositiveReply, isRecipientUndeliverable, pickForInterest } from "./flowPlan";
 
 let n = 0;
 const ok = (cond: boolean, name: string) => {
@@ -76,5 +76,26 @@ ok(isPositiveReply({ category: "new_lead", priority: "high" }), "a hot, urgent m
 ok(!isPositiveReply({ category: "faq", priority: "normal" }), "a question is not a yes");
 ok(!isPositiveReply({ category: "sensitive", priority: "high" }), "sensitive is never a yes");
 ok(!isPositiveReply({ category: "spam", priority: "high" }), "nor spam");
+
+// Which send failures mean "this number can't be reached".
+ok(isRecipientUndeliverable("This number is not on WhatsApp."), "the fake transport's failure");
+ok(isRecipientUndeliverable('WhatsApp send failed (400): {"error":{"code":400,"message":"Number is not registered on WhatsApp"}}'), "400, not registered");
+ok(isRecipientUndeliverable("WhatsApp send failed (404): Chat not found"), "404, chat not found");
+ok(isRecipientUndeliverable("WhatsApp send failed (400): Invalid phone number"), "400, invalid phone number");
+ok(isRecipientUndeliverable("WhatsApp send failed (422): recipient is not a WhatsApp user"), "422, recipient");
+ok(isRecipientUndeliverable("Recipient phone is empty after normalization."), "an empty number");
+ok(isRecipientUndeliverable("No phone number on file for this contact."), "no number on file");
+ok(!isRecipientUndeliverable("fetch failed"), "a network error");
+ok(!isRecipientUndeliverable("The operation was aborted due to timeout"), "a timeout");
+ok(!isRecipientUndeliverable("connect ETIMEDOUT 10.0.0.1:443"), "a connect timeout");
+ok(!isRecipientUndeliverable("WhatsApp send failed (401): Invalid token"), "an expired token");
+ok(!isRecipientUndeliverable("WhatsApp send failed (403): channel is not authorized"), "403");
+ok(!isRecipientUndeliverable("WhatsApp send failed (429): Too many requests"), "a rate limit");
+ok(!isRecipientUndeliverable("WhatsApp send failed (500): Internal server error"), "a 500");
+ok(!isRecipientUndeliverable("WhatsApp send failed (503): service unavailable"), "a 503");
+ok(!isRecipientUndeliverable("WhatsApp send failed (400): Bad request"), "a 400 that says nothing about the recipient");
+ok(!isRecipientUndeliverable("WhatsApp send: provider returned no message id."), "no message id");
+ok(!isRecipientUndeliverable("Lead not found."), "a missing lead is not a number problem");
+ok(!isRecipientUndeliverable(""), "empty");
 
 console.log(`flowPlan: ${n} checks passed.`);

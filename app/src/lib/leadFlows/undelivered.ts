@@ -34,10 +34,13 @@ export function isFirstWhatsAppOfRun(tdb: TenantDb, row: AutomationQueueRow): bo
 export async function handleUndelivered(tenantId: number, row: AutomationQueueRow, reason: string): Promise<void> {
   const tdb = getTenantDbById(tenantId);
   if (row.leadId == null || !isFirstWhatsAppOfRun(tdb, row)) return;
+  // A late "failed" status after a reply, a booking, a person's move or a
+  // restart (each of which ended the run) must change nothing.
+  const run = tdb.select({ status: schema.leadFlowRuns.status }).from(schema.leadFlowRuns).where(eq(schema.leadFlowRuns.id, row.runId!)).get();
+  if (run?.status !== "active") return;
   // Once per message: a webhook can report the same failure twice.
   const current = tdb.select({ error: schema.automationQueue.error }).from(schema.automationQueue).where(eq(schema.automationQueue.id, row.id)).get();
   if (current?.error?.startsWith(MARK)) return;
-  tdb.update(schema.automationQueue).set({ status: "failed", error: `${MARK} ${reason}`.slice(0, 300) }).where(eq(schema.automationQueue.id, row.id)).run();
 
   const lead = tdb
     .select({ id: schema.leads.id, email: schema.leads.email, pipelineId: schema.leads.pipelineId, stageId: schema.leads.stageId })
@@ -91,6 +94,8 @@ export async function handleUndelivered(tenantId: number, row: AutomationQueueRo
       ? `The first WhatsApp of the ${label} follow-up could not be delivered. The rest of it goes by email.`
       : `The first WhatsApp of the ${label} follow-up could not be delivered, and there is no email address, so its WhatsApps are stopped.`,
   });
+  // The mark goes on last: a throw above leaves it off, so a repeated report retries.
+  tdb.update(schema.automationQueue).set({ status: "failed", error: `${MARK} ${reason}`.slice(0, 300) }).where(eq(schema.automationQueue.id, row.id)).run();
 }
 
 /** The WhatsApp webhook reported a message as failed. */

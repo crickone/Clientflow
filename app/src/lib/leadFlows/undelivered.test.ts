@@ -95,6 +95,53 @@ const requireLocal = createRequire(import.meta.url);
       const five = enquiry("five", { email: "five@example.com", phone: "+353870000015" });
       await dispatch(WED_10 + 2 * DAY + 2);
       ok(getLead(five.id)!.stageId !== undelivered.id && msgRows(five.id).some((r) => r.status === "failed"), "not connected: a visible failure, no move");
+      fake.restore();
+      fake = h.installFakeTransport();
+
+      // An outage, a rate limit or an expired token is not the lead's fault: a failed row, no move.
+      const t0 = WED_10 + 2 * DAY + 10;
+      for (const [tag, text, phone] of [
+        ["six", "WhatsApp send failed (503): service unavailable", "+353870000031"],
+        ["sixb", "fetch failed", "+353870000032"],
+        ["sixc", "WhatsApp send failed (429): Too many requests", "+353870000033"],
+      ] as const) {
+        const lead = enquiry(tag, { email: `${tag}@example.com`, phone });
+        fake.failWhatsAppWith.set(lead.id, text);
+        await dispatch(t0);
+        ok(msgRows(lead.id).some((r) => r.channel === "whatsapp" && r.status === "failed" && r.error === text), `${tag}: the row fails with the provider's reason`);
+        ok(getLead(lead.id)!.stageId !== undelivered.id, `${tag}: the card does not move`);
+        ok(msgRows(lead.id).filter((r) => r.status === "queued" && r.channel === "whatsapp").length > 0, `${tag}: the rest of the flow stays on WhatsApp`);
+      }
+
+      // A late "failed" status after the lead replied (the run is over) changes nothing.
+      const stage = requireLocal("../pipeline/stage") as typeof import("../pipeline/stage");
+      const seven = enquiry("seven", { email: "seven@example.com", phone: "+353870000018" });
+      await dispatch(t0 + 1);
+      const sevenWa = msgRows(seven.id).find((r) => r.channel === "whatsapp" && r.status === "sent")!;
+      stage.onInboundFromLead(seven.id, { text: "Hi, yes I saw it", channel: "whatsapp" });
+      const sevenStage = getLead(seven.id)!.stageId;
+      await onWhatsAppDeliveryFailed(s.tid, sevenWa.providerMessageId!);
+      ok(getLead(seven.id)!.stageId === sevenStage && sevenStage !== undelivered.id, "a failed status after a reply does not move the card");
+      ok(notes(seven.id).length === 0, "and adds no note");
+      ok(!tdb.select().from(schema.automationQueue).where(eq(schema.automationQueue.id, sevenWa.id)).get()!.error?.startsWith("Undelivered:"), "nor marks the message");
+
+      // Two due WhatsApps of one run in one batch: the first is undeliverable, so the second goes by email, not WhatsApp.
+      tdb.delete(schema.automationMessages).where(eq(schema.automationMessages.triggerKey, "new_lead")).run();
+      tdb.insert(schema.automationMessages)
+        .values([
+          { triggerKey: "new_lead", position: 0, channel: "whatsapp", template: "First message for [FIRST_NAME].", delayValue: 0, delayUnit: "days" },
+          { triggerKey: "new_lead", position: 1, channel: "whatsapp", template: "Second message for [FIRST_NAME].", delayValue: 0, delayUnit: "days" },
+        ])
+        .run();
+      const eight = enquiry("eight", { email: "eight@example.com", phone: "+353870000019" });
+      fake.failWhatsAppFor.add(eight.id);
+      const sentBefore = fake.sent.length;
+      await dispatch(t0 + 2);
+      const eightRows = msgRows(eight.id).sort((a, b) => (a.step ?? 0) - (b.step ?? 0));
+      ok(eightRows.length === 2 && eightRows[0].status === "failed" && /^Undelivered:/.test(eightRows[0].error ?? ""), "the first WhatsApp is marked undelivered");
+      ok(eightRows[1].channel === "email" && eightRows[1].status === "sent" && eightRows[1].sendTo === "eight@example.com", "the second row went by email, from its fresh state");
+      ok(fake.sent.slice(sentBefore).filter((x) => x.to === "lead" && x.leadId === eight.id).length === 0, "no WhatsApp reached the lead");
+      ok(fake.sent.slice(sentBefore).some((x) => x.to === "email" && x.address === "eight@example.com" && /Second message/.test(x.text)), "the email carries the second message");
     });
     console.log(`undelivered: ${n} checks passed.`);
   } finally {

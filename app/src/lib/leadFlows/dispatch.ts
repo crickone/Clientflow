@@ -16,6 +16,7 @@ import { getThemeForTenant } from "@/lib/settings";
 import { flowNow } from "./clock";
 import { unsubscribeUrl } from "./consent";
 import { CALL_BACK_FLOW, NURTURE_FLOW, parsePayload, resolveColumn } from "./flowModel";
+import { isRecipientUndeliverable } from "./flowPlan";
 import { startFlow } from "./runs";
 import { endOfLocalDay, fitToWindow } from "./sendingWindow";
 import { getLeadFlowSettingsForTenant } from "./settings";
@@ -88,13 +89,15 @@ async function sendWhatsAppRow(ctx: DispatchContext, item: AutomationQueueRow): 
       providerMessageId = (await transport.sendWhatsAppToLead(item.leadId, item.body)).providerMessageId;
     } catch (err) {
       error = err instanceof Error ? err.message : "WhatsApp send failed.";
-      undeliverable = true;
+      // Only a recipient-level failure (not on WhatsApp, a bad number) counts. An
+      // outage, timeout, expired token or rate limit stays a plain failed row.
+      undeliverable = isRecipientUndeliverable(error);
     }
   }
   markRow(ctx.tdb, item.id, { status: error ? "failed" : "sent", error, sentAt: new Date(ctx.now), providerMessageId });
   logSend(ctx, item, "whatsapp", null, item.sendTo, error);
   if (error) console.error(`[lead flows] tenant ${ctx.tenantId} WhatsApp ${item.id} failed: ${error}`);
-  // A provider failure on the run's first WhatsApp: Message undelivered, the rest by email.
+  // The recipient can't be reached on the run's first WhatsApp: Message undelivered, the rest by email.
   if (undeliverable && error) await handleUndelivered(ctx.tenantId, { ...item, status: "failed", error }, error);
   return !error;
 }
@@ -152,10 +155,15 @@ async function sendEmailRow(ctx: DispatchContext, item: AutomationQueueRow): Pro
 }
 
 async function sendMessageRow(ctx: DispatchContext, item: AutomationQueueRow): Promise<boolean> {
+  // A call reminder is useless once the call time has passed, inside sending hours or not.
+  const notAfter = parsePayload(item.payload).notAfter;
+  if (notAfter != null && ctx.now >= notAfter) {
+    markRow(ctx.tdb, item.id, { status: "cancelled", error: "Too late: the call time has passed." });
+    return false;
+  }
   // Sending hours: a row that became due outside them waits for the next window.
   const allowed = fitToWindow(ctx.now, item.channel, ctx.settings.window);
   if (allowed > ctx.now) {
-    const notAfter = parsePayload(item.payload).notAfter;
     if (notAfter != null && allowed >= notAfter) {
       markRow(ctx.tdb, item.id, { status: "cancelled", error: "Too late: sending hours would put it after the call." });
       return false;
@@ -231,7 +239,6 @@ async function unknownRow(ctx: DispatchContext, item: AutomationQueueRow): Promi
   return false;
 }
 
-/** What each kind of row does when it is due. */
 /** The triage never answered: treat the reply as wanting to talk, so a person looks. */
 async function runReplyCheckRow(ctx: DispatchContext, item: AutomationQueueRow): Promise<boolean> {
   markRow(ctx.tdb, item.id, { status: "sent", error: "No triage answer in time: treated as wanting to talk.", sentAt: new Date(ctx.now) });
@@ -255,6 +262,7 @@ async function runCallbackCheckRow(ctx: DispatchContext, item: AutomationQueueRo
   return false;
 }
 
+/** What each kind of row does when it is due. */
 const HANDLERS: Record<string, RowHandler> = {
   callback_check: runCallbackCheckRow,
   message: sendMessageRow,
@@ -327,7 +335,13 @@ async function dispatchBound(tenantId: number, now: number, baseUrl?: string): P
   };
 
   let sent = 0;
-  for (const item of due) {
+  for (const batchItem of due) {
+    // The batch is a snapshot and every handler awaits: an earlier row of this
+    // pass (an undelivered first WhatsApp switching the rest to email), a
+    // reply or a person's move may have changed this row since. Re-read it and
+    // handle only a row that is still queued, as it is now.
+    const item = tdb.select().from(schema.automationQueue).where(eq(schema.automationQueue.id, batchItem.id)).get();
+    if (!item || item.status !== "queued" || item.dueAt.getTime() > now) continue;
     if (item.leadId != null) {
       const status = leadStatus.get(item.leadId);
       if (status === undefined || status === "lost") {

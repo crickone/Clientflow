@@ -75,13 +75,17 @@ export interface FakeSend {
 }
 
 /** Record every send instead of making it. `failWhatsAppFor` makes WhatsApps to those lead ids fail like an undeliverable number. */
-export function installFakeTransport(opts: { connected?: boolean } = {}): { sent: FakeSend[]; failWhatsAppFor: Set<number>; restore(): void } {
+export function installFakeTransport(opts: { connected?: boolean } = {}): { sent: FakeSend[]; failWhatsAppFor: Set<number>; failWhatsAppWith: Map<number, string>; restore(): void } {
   const sent: FakeSend[] = [];
   const failWhatsAppFor = new Set<number>();
+  /** Lead id to the exact error text the bridge throws (an outage, a rate limit...). */
+  const failWhatsAppWith = new Map<number, string>();
   let count = 0;
   const fake: FlowTransport = {
     whatsAppConnected: () => opts.connected ?? true,
     async sendWhatsAppToLead(leadId, text) {
+      const custom = failWhatsAppWith.get(leadId);
+      if (custom !== undefined) throw new Error(custom);
       if (failWhatsAppFor.has(leadId)) throw new Error("This number is not on WhatsApp.");
       sent.push({ to: "lead", leadId, text });
       return { providerMessageId: `fake-${++count}` };
@@ -96,5 +100,5 @@ export function installFakeTransport(opts: { connected?: boolean } = {}): { sent
     },
   };
   setFlowTransportForTests(fake);
-  return { sent, failWhatsAppFor, restore: () => setFlowTransportForTests(undefined) };
+  return { sent, failWhatsAppFor, failWhatsAppWith, restore: () => setFlowTransportForTests(undefined) };
 }

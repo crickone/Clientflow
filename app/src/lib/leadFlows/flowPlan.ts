@@ -111,3 +111,28 @@ export function isPositiveReply(t: { category: string; priority?: string | null 
   if (t.category === "sensitive" || t.category === "spam") return false;
   return t.priority === "high";
 }
+
+/**
+ * Did a WhatsApp send fail because of the RECIPIENT (not on WhatsApp, a bad
+ * or unknown number, no number on file)? Only that moves a card to Message
+ * undelivered. An outage, a timeout, an expired token, a rate limit or a
+ * server error is the business's side or temporary: the row just stays
+ * failed, visibly, and no lead is moved.
+ *
+ * `message` is the error text the bridge threw. lib/whatsapp/whapi.ts
+ * throws "WhatsApp send failed (<http status>): <provider detail>".
+ */
+export function isRecipientUndeliverable(message: string): boolean {
+  const text = (message ?? "").trim();
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  // Not about the number whatever else it says.
+  if (/(fetch failed|econn|etimedout|enotfound|eai_again|timed? ?out|socket|network|abort|rate.?limit|too many requests|quota|token|unauthori[sz]ed|forbidden|channel (is )?not (connected|authori[sz]ed)|not authenticated|subscription|payment)/.test(lower)) return false;
+  const status = /\((\d{3})\)/.exec(text);
+  const code = status ? Number(status[1]) : null;
+  if (code != null && (code === 401 || code === 402 || code === 403 || code === 408 || code === 429 || code >= 500)) return false;
+  const aboutRecipient =
+    /(not (on|a|registered (on|with)|using) whatsapp|no whatsapp|isn'?t (on|a) whatsapp|invalid (number|phone|recipient|chat|wid|jid)|unknown (number|phone|recipient|chat)|phone (number )?(is )?(not valid|invalid|not registered)|number (is )?(not valid|invalid|not registered)|wrong number|recipient|chat not found|contact not found|no phone number|not a valid (phone|number))/.test(lower);
+  if (code != null) return (code === 400 || code === 404 || code === 422) && aboutRecipient;
+  return aboutRecipient;
+}

@@ -69,6 +69,16 @@ const requireLocal = createRequire(import.meta.url);
       ok(rows(lead.id).find((r) => r.id === late)?.status === "cancelled", "a reminder that would land after the call is dropped");
       saveLeadFlowSettings({ window: null, defaultAssigneeUserId: null, alertWhatsAppTo: null });
 
+      // A reminder whose call time has already passed is dropped even inside sending hours.
+      const stale = tdb.insert(schema.automationQueue)
+        .values({ triggerKey: "lead_call_booked", leadId: lead.id, kind: "message", channel: "whatsapp", body: "stale reminder", sendTo: lead.phone, dueAt: new Date(WED_10), payload: JSON.stringify({ notAfter: WED_10 + 1_000 }) })
+        .returning({ id: schema.automationQueue.id })
+        .get().id;
+      const sentBefore = fake.sent.length;
+      await dispatch(WED_10 + 5_000);
+      const staleRow = rows(lead.id).find((r) => r.id === stale)!;
+      ok(staleRow.status === "cancelled" && /call time has passed/.test(staleRow.error ?? "") && fake.sent.length === sentBefore, "a reminder after the call time is dropped inside sending hours too");
+
       // An unsubscribed address is never mailed.
       tdb.insert(schema.suppressions).values({ email: "dispatch@example.com", reason: "unsubscribe" }).run();
       const mail = tdb.insert(schema.automationQueue)
