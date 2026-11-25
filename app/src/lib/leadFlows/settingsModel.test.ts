@@ -41,4 +41,9 @@ ok(!shortPhone.ok && /area code/.test(shortPhone.error), "a too-short number ref
 const badUser = validateLeadFlowSettings({ window: null, defaultAssigneeUserId: 0, alertWhatsAppTo: null });
 ok(!badUser.ok, "a non-positive assignee refused");
 
+for (const bad of [null, undefined, "x", 5]) {
+  const r = validateLeadFlowSettings(bad as never);
+  ok(!r.ok && r.error === "Nothing to save.", `${String(bad)} is refused, not thrown`);
+}
+
 console.log(`settingsModel: ${n} checks passed.`);

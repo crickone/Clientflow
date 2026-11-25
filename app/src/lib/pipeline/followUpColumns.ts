@@ -62,6 +62,8 @@ export function planFollowUpColumns(stages: ColumnSlot[]): FollowUpPlan {
 
   let after = ordered.findIndex((x) => x.kind === "stage" && x.s.role === "engaged");
   if (after < 0) after = ordered.findIndex((x) => x.kind === "stage" && x.s.role === "new");
+  // A board with neither: after its first column, so a follow-up column is never the entry column.
+  if (after < 0 && ordered.length > 0) after = 0;
   ordered.splice(after + 1, 0, ...early.map((key): Slot => ({ kind: "new", key })));
 
   let before = ordered.findIndex((x) => x.kind === "stage" && x.s.role != null && OUT_OF_BAND.has(x.s.role));

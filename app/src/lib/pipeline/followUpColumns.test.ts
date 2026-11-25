@@ -54,7 +54,8 @@ const bare = planFollowUpColumns([
   { id: 1, position: 0, role: null, systemKey: null },
   { id: 2, position: 1, role: null, systemKey: null },
 ]);
-ok(bare.inserts.find((i) => i.key === "no_answer")?.position === 0, "no new or engaged column: the early ones go first");
+ok(bare.inserts.find((i) => i.key === "no_answer")?.position === 1, "no new or engaged column: the early ones go after the first column, never before the entry column");
+ok(bare.inserts.every((i) => i.position !== 0) && !bare.moves.some((m) => m.id === 1), "the first column stays first");
 ok(bare.inserts.find((i) => i.key === "undelivered")?.position === 6, "no lapsed or lost column: the late ones go last");
 
 ok(isFollowUpKey("thinking") && !isFollowUpKey("booked"), "isFollowUpKey");

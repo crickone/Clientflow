@@ -57,7 +57,10 @@ export function LeadFollowUpsForm({ initial, staff }: { initial: LeadFlowSetting
   const [days, setDays] = useState<number[]>(initial.window?.days ?? [0, 1, 2, 3, 4, 5, 6]);
   const [start, setStart] = useState(initial.window?.start ?? "09:00");
   const [end, setEnd] = useState(initial.window?.end ?? "21:00");
-  const [assignee, setAssignee] = useState(initial.defaultAssigneeUserId != null ? String(initial.defaultAssigneeUserId) : "");
+  // A saved assignee who has left the team is not in the list: show "Nobody" so Save does not fail invisibly.
+  const [assignee, setAssignee] = useState(
+    initial.defaultAssigneeUserId != null && staff.some((s) => s.userId === initial.defaultAssigneeUserId) ? String(initial.defaultAssigneeUserId) : "",
+  );
   const [alertTo, setAlertTo] = useState(initial.alertWhatsAppTo ?? "");
   const [hoursSaved, setHoursSaved] = useState(initial.window != null);
   const [saving, startSave] = useTransition();

@@ -26,6 +26,7 @@ const requireLocal = createRequire(import.meta.url);
   const { runWithTenant } = requireLocal("../../db/tenant") as typeof import("../../db/tenant");
   const { db, schema } = requireLocal("../../db") as typeof import("../../db");
   const q = requireLocal("./salesQueries") as typeof import("./salesQueries");
+  const { eq } = requireLocal("drizzle-orm") as typeof import("drizzle-orm");
 
   const slug = "dashboard-sales-test";
   controlSqlite.prepare("DELETE FROM tenants WHERE slug = ?").run(slug);
@@ -107,6 +108,13 @@ const requireLocal = createRequire(import.meta.url);
       ]).run();
 
       assert.equal(q.slaBreachCount(now), 2, "breach + draft-only; replied, fresh and non-entry stages excluded");
+
+      // A lead worked into a follow-up column (no role, a system_key) is not an uncontacted entry lead.
+      const followUpStage = db.select().from(schema.pipelineStages).all().find((s) => s.pipelineId === pid && s.systemKey === "no_answer")
+        ?? db.insert(schema.pipelineStages).values({ pipelineId: pid, name: "No answer", colour: "#000", position: 7, role: null, systemKey: "no_answer" }).returning().get();
+      const followUpLead = mkLead({ first: "Followed up", stageId: followUpStage.id, createdMs: now - 3 * H });
+      assert.equal(q.slaBreachCount(now), 2, "a lead in a follow-up column is not counted as uncontacted");
+      db.delete(schema.leads).where(eq(schema.leads.id, followUpLead.id)).run();
 
       assert.equal(q.countLeadsIn(from, to), 8);
       const created = q.leadsCreatedIn(from, to);

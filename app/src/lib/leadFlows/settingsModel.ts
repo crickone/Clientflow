@@ -60,6 +60,7 @@ export function parseLeadFlowSettings(raw: unknown): LeadFlowSettings {
 export function validateLeadFlowSettings(
   input: LeadFlowSettingsInput,
 ): { ok: true; value: LeadFlowSettings } | { ok: false; error: string } {
+  if (!input || typeof input !== "object") return { ok: false, error: "Nothing to save." };
   let window: SendingWindow | null = null;
   if (input.window) {
     const days = cleanDays(input.window.days);
