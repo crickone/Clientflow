@@ -65,6 +65,8 @@ import { consentsFor } from "@/lib/marketingConsent";
 import { CONSENT_CHANNELS, CONSENT_LABEL, photoNames } from "@/lib/memberChoicesModel";
 import { CancelNoticeCard } from "@/components/clients/CancelNoticeCard";
 import { PersonLinksCard } from "@/components/people/PersonLinksCard";
+import { GhlImportCard } from "@/components/people/GhlImportCard";
+import { getImportedPerson } from "@/lib/ghlImport/store";
 import { mapEnabled } from "@/lib/adonisMap/access";
 import { personLinksForClient } from "@/lib/adonisMap/decisions";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
@@ -98,6 +100,7 @@ export default async function ClientProfile(
   const client = await getClient(id);
   if (!client) notFound();
   const journey = getClientJourney(client.id);
+  const imported = getImportedPerson({ clientId: client.id });
   const [stats, appointments, sessions, packages, payments, therapyMap] =
     await Promise.all([
       getClientStats(id),
@@ -813,6 +816,8 @@ export default async function ClientProfile(
             )}
           </Card>
         )}
+
+        {imported && <GhlImportCard person={imported} />}
       </aside>
       </div>
     </div>

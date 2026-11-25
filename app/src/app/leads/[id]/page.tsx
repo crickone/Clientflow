@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import { LeadDetail } from "@/components/leads/LeadDetail";
+import { GhlImportCard } from "@/components/people/GhlImportCard";
 import { PersonLinksCard } from "@/components/people/PersonLinksCard";
 import { mapEnabled } from "@/lib/adonisMap/access";
 import { personLinksForLead } from "@/lib/adonisMap/decisions";
 import { getCurrentMembership } from "@/lib/auth";
+import { getImportedPerson } from "@/lib/ghlImport/store";
 import { listAssignableStaff } from "@/lib/leadFlows/assignment";
 import { listLeadCalls } from "@/lib/leadFlows/calls";
 import { leadFlowStatus } from "@/lib/leadFlows/runs";
@@ -37,6 +39,7 @@ export default async function LeadDetailPage(
     createdAt: c.createdAt,
   }));
   const personLinks = membership && mapEnabled(membership.tenant.id) ? personLinksForLead(membership.tenant.id, id) : null;
+  const imported = getImportedPerson({ leadId: id });
   const showLinks = !!personLinks && (personLinks.linked.length > 0 || personLinks.reviews.length > 0);
 
   return (
@@ -47,6 +50,11 @@ export default async function LeadDetailPage(
         </div>
       )}
       <LeadDetail lead={lead} messages={messages} stages={stages} voice={voice} staff={staff} flow={flow} calls={calls} />
+      {imported && (
+        <div style={{ maxWidth: 560, marginTop: 16 }}>
+          <GhlImportCard person={imported} leadId={id} />
+        </div>
+      )}
     </div>
   );
 }

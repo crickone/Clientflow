@@ -680,4 +680,5 @@ const SOURCE_NAME: Record<string, string> = {
   whatsapp: "WhatsApp",
   manual: "Added by the team",
   voice: "Phone call",
+  gohighlevel: "GoHighLevel import",
 };
