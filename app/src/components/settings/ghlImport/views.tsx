@@ -161,10 +161,10 @@ export function DryRunView(props: {
           ["Added to email contacts", t.emailContactsAdded],
           ["Do not contact", t.doNotContact],
           ["Matched to someone here", t.duplicates],
-          ["Already imported", t.alreadyImported],
           ["Messages in the next 7 days", t.messagesNext7Days],
         ]}
       />
+      {t.alreadyImported > 0 && <p className={styles.note}>{num(t.alreadyImported)} people were imported before. Nothing changes for them.</p>}
       <div className={styles.lists}>
         <section className={styles.card} aria-labelledby="ghl-columns">
           <h2 className={styles.cardTitle} id="ghl-columns">Where leads go</h2>
@@ -198,7 +198,7 @@ export function DryRunView(props: {
                     {!f.enabled && (
                       <>
                         {" "}
-                        <Badge tone="warning">Off: waits until you switch it on</Badge>
+                        <Badge tone="warning">Off</Badge>
                       </>
                     )}
                   </span>
@@ -207,6 +207,7 @@ export function DryRunView(props: {
               ))}
             </ul>
           )}
+          {t.flows.some((f) => !f.enabled) && <p className={styles.note}>A follow-up that is off waits: its people start when you switch it on, and steps whose time passed are skipped.</p>}
           <p className={styles.note}>Steps GoHighLevel already sent are not sent again. A step whose time has passed is skipped, and nobody gets more than one message today. Messages are spread across your sending hours.</p>
         </section>
       </div>

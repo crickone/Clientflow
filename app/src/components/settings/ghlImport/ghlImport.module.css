@@ -2,12 +2,13 @@
    follow the admin theme. Controls keep at least 12px of side padding. */
 
 .stack { display: grid; gap: 16px; }
-.card { border: 1px solid var(--hairline); border-radius: 12px; background: var(--surface-1); padding: 20px; display: grid; gap: 14px; }
+.card { border: 1px solid var(--hairline); border-radius: 12px; background: var(--surface-1); padding: 20px; display: grid; gap: 14px; align-content: start; }
 .cardTitle { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
 .note { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
 .files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .drop { position: relative; display: grid; gap: 6px; padding: 18px; border: 1px dashed var(--hairline-strong); border-radius: 12px; background: var(--surface-2); cursor: pointer; transition: border-color .15s var(--ease); }
 .drop:hover, .drop:focus-within { border-color: var(--accent); }
+.drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .dropLabel { font-size: 14px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
 .dropHint { font-size: 12.5px; color: var(--text-tertiary); overflow-wrap: anywhere; }
@@ -17,7 +18,8 @@
 .actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
 .actionsStart { justify-content: flex-start; }
 
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; background: var(--hairline); }
+/* Eight tiles: four across, two on a phone, so no empty cell shows. */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; background: var(--hairline); }
 .tile { background: var(--surface-1); padding: 14px 16px; display: grid; gap: 4px; }
 .tileLabel { font-size: 12.5px; color: var(--text-tertiary); }
 .tileValue { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-primary); font-variant-numeric: tabular-nums; }
@@ -38,17 +40,19 @@
 .search input { padding-left: 38px !important; }
 .count { font-size: 13px; color: var(--text-tertiary); }
 
-.tableWrap { border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; background: var(--surface-1); }
+.tableWrap { border: 1px solid var(--hairline); border-radius: 12px; overflow-x: auto; background: var(--surface-1); }
 .table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .table th { text-align: left; font-weight: 600; font-size: 12px; color: var(--text-tertiary); padding: 10px 12px; border-bottom: 1px solid var(--hairline); background: var(--surface-2); }
 .table td { padding: 10px 12px; border-top: 1px solid var(--hairline); color: var(--text-secondary); vertical-align: top; }
 .table tr:first-child td { border-top: 0; }
+.table th:first-child, .table td:first-child { min-width: 190px; }
 .name { color: var(--text-primary); font-weight: 600; }
 .sub { display: block; font-size: 12px; color: var(--text-tertiary); overflow-wrap: anywhere; }
 .more { display: flex; justify-content: center; padding: 12px; border-top: 1px solid var(--hairline); }
 
 @media (max-width: 640px) {
   .card { padding: 16px; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .files { grid-template-columns: minmax(0, 1fr); }
   .assignee { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .dateRow { max-width: none; }
@@ -59,5 +63,6 @@
   .table tr { padding: 12px 14px; border-top: 1px solid var(--hairline); }
   .table tr:first-child { border-top: 0; }
   .table td { border: 0; padding: 2px 0; }
+  .table td:first-child { min-width: 0; }
   .table td[data-label]::before { content: attr(data-label) ": "; color: var(--text-tertiary); }
 }
