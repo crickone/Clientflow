@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/layout/PageHeader";
-import { BookingForm } from "@/components/appointments/BookingForm";
+import { NewBooking } from "@/components/appointments/booking/NewBooking";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { db } from "@/lib/db";
@@ -8,6 +8,9 @@ import { eq } from "drizzle-orm";
 import { formatDate, formatEur } from "@/lib/utils";
 import { getVenueType } from "@/lib/settings";
 import { getVocab } from "@/lib/vocabulary";
+import { dublinDay } from "@/lib/cashModel";
+import { blockOutsForDate, dayWindow } from "@/lib/schedule";
+import { STRIP_DAYS, blocksCoverDay, dayStrip, stripStart } from "@/lib/booking/slotModel";
 
 export const dynamic = "force-dynamic";
 
@@ -40,8 +43,17 @@ export default async function NewAppointmentPage(props: Props) {
         .get()
     : null;
 
+  // The booking's date (?date=, else today in Dublin) and the 14-day strip it
+  // sits in, closed days marked from opening hours and block-outs.
+  const today = dublinDay(Date.now());
+  const bookDate = searchParams.date && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date) ? searchParams.date : today;
+  const strip = dayStrip(stripStart(today, bookDate, STRIP_DAYS), STRIP_DAYS, (d) => {
+    const win = dayWindow(d);
+    return win.closed || blocksCoverDay(win.open, win.close, blockOutsForDate(d));
+  });
+
   return (
-    <div className="app-page" style={{ maxWidth: 880 }}>
+    <div className="app-page" style={{ maxWidth: 1240 }}>
       <PageHeader
         eyebrow={voucher ? "Voucher redemption" : "Schedule"}
         title={voucher ? "Redeem voucher" : `New ${vocab.booking.toLowerCase()}`}
@@ -127,12 +139,13 @@ export default async function NewAppointmentPage(props: Props) {
         </Card>
       )}
 
-      <BookingForm
+      <NewBooking
         therapies={allTherapies}
         clients={allClients}
         packageTemplates={allTemplates}
+        strip={strip}
         defaultClientId={searchParams.client ? Number(searchParams.client) : undefined}
-        defaultDate={searchParams.date}
+        defaultDate={bookDate}
         defaultStartTime={searchParams.time}
         defaultVoucherCode={
           voucher && (voucher.balanceEur ?? voucher.valueEur) > 0
