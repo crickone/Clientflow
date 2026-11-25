@@ -96,7 +96,8 @@ const dataTypes = (frames: string[]) =>
   {
     const h = hub();
     const { frames, closed } = await collect(liveStream({ subscribe: h.subscribe, snapshot: () => view(true), heartbeatMs: 20, maxMs: 120 }));
-    assert.ok(frames.some((f) => f.startsWith(": hb")), "a quiet stream sends heartbeats");
+    assert.ok(dataTypes(frames).includes("ping"), "a quiet stream sends heartbeats as ping data frames, which the page can see");
+    assert.ok(!frames.some((f) => f.startsWith(":")), "no comment frames: EventSource would hide them from the page");
     assert.ok(closed, "the time cap closes it");
     assert.ok(!dataTypes(frames).includes("end"), "the cap is not an end: the page reconnects");
     assert.equal(h.count(), 0);
@@ -108,6 +109,37 @@ const dataTypes = (frames: string[]) =>
     setTimeout(() => ac.abort(), 30);
     const { closed } = await collect(liveStream({ subscribe: h.subscribe, snapshot: () => view(true), signal: ac.signal }));
     assert.ok(closed && h.count() === 0, "an aborted request closes and unsubscribes");
+  }
+  // A snapshot that throws: the error surfaces and nothing is left behind.
+  // (A leaked heartbeat interval would also keep this script from exiting.)
+  {
+    const h = hub();
+    assert.throws(
+      () =>
+        liveStream({
+          subscribe: h.subscribe,
+          snapshot: () => {
+            throw new Error("db gone");
+          },
+          heartbeatMs: 10,
+        }),
+      /db gone/,
+    );
+    assert.equal(h.count(), 0, "a throwing snapshot leaves no listener on the bus");
+  }
+  // A subscribe that throws: same.
+  {
+    assert.throws(
+      () =>
+        liveStream({
+          subscribe: () => {
+            throw new Error("bus gone");
+          },
+          snapshot: () => view(true),
+          heartbeatMs: 10,
+        }),
+      /bus gone/,
+    );
   }
   console.log("liveStream: all checks passed");
 })().catch((err) => {

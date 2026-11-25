@@ -14,6 +14,12 @@ const IDLE_MS = 5_000;
 const HIDDEN_MS = 15_000;
 /** EventSource reconnects by itself; after this many errors in a row, poll for the rest of the run. */
 const MAX_STREAM_ERRORS = 2;
+/**
+ * The server sends a ping every 15 s. This long with nothing at all means the
+ * socket died without telling EventSource: close it, read a fresh snapshot,
+ * and reopen it if Adonis is still working.
+ */
+const STALL_MS = 35_000;
 
 export type LiveConversationOptions = {
   /** `/api/agents/<key>/conversations` */
@@ -63,6 +69,7 @@ export function useConversationLive({ base, id, enabled, tenantId, onSettled }: 
   const streamErrors = useRef(0);
   const streamFailed = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idRef = useRef(id);
   // Bumped whenever the following effect starts or is cleaned up. A tick or timer
   // that began under an older generation (another id, `enabled` false, unmounted)
@@ -88,6 +95,8 @@ export function useConversationLive({ base, id, enabled, tenantId, onSettled }: 
   }, []);
 
   const closeStream = useCallback(() => {
+    if (watchdogRef.current) clearTimeout(watchdogRef.current);
+    watchdogRef.current = null;
     esRef.current?.close();
     esRef.current = null;
   }, []);
@@ -103,14 +112,35 @@ export function useConversationLive({ base, id, enabled, tenantId, onSettled }: 
     const convId = idRef.current;
     if (streamFailed.current || !convId || typeof EventSource === "undefined") return false;
     const es = new EventSource(`${base}/${encodeURIComponent(convId)}/stream?stamp=${tenantId}`);
+    const gen = genRef.current;
     esRef.current = es;
     streamErrors.current = 0;
     setTransport("stream");
+    // Restarted by every frame (pings included) and by the open. When it
+    // fires, the stream has gone silent: drop it and let tick() fetch a
+    // fresh snapshot, which reopens the stream if the run is still going
+    // (streamFailed stays false, so openStream may try again).
+    const watch = () => {
+      if (watchdogRef.current) clearTimeout(watchdogRef.current);
+      watchdogRef.current = setTimeout(() => {
+        watchdogRef.current = null;
+        if (esRef.current !== es || gen !== genRef.current || !activeRef.current) return;
+        closeStream();
+        setTransport("poll");
+        void tickRef.current();
+      }, STALL_MS);
+    };
+    watch();
+    es.onopen = () => {
+      if (esRef.current === es) watch();
+    };
     es.onmessage = (msg: MessageEvent<string>) => {
       if (esRef.current !== es || idRef.current !== convId) return;
+      watch();
       const e = parseLiveEvent(msg.data);
       if (!e) return;
       streamErrors.current = 0;
+      if (e.type === "ping") return;
       if (e.type === "end") {
         closeStream();
         setTransport("idle");

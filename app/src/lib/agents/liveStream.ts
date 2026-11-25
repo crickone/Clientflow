@@ -8,8 +8,9 @@
  *
  * Closes on `end` (the run finished), when the request goes away, or after
  * `maxMs` (default 10 minutes; the browser's EventSource reconnects and gets
- * a fresh snapshot). A comment heartbeat every `heartbeatMs` (default 15 s)
- * keeps proxies from closing a quiet stream. Pure enough to test: no Next,
+ * a fresh snapshot). A `ping` data frame every `heartbeatMs` (default 15 s)
+ * keeps proxies from closing a quiet stream and tells the page it is still
+ * alive, so a silently dead socket can be noticed. Pure enough to test: no Next,
  * no database; the route hands it the bus and the snapshot.
  */
 
@@ -32,7 +33,13 @@ export function liveStream(o: LiveStreamOptions): ReadableStream<Uint8Array> {
       let closed = false;
       let unsubscribe = () => {};
       const send = (s: string) => {
-        if (!closed) controller.enqueue(enc.encode(s));
+        if (closed) return;
+        try {
+          controller.enqueue(enc.encode(s));
+        } catch {
+          // The reader went away between checks: stop for good.
+          close();
+        }
       };
       const close = () => {
         if (closed) return;
@@ -55,24 +62,31 @@ export function liveStream(o: LiveStreamOptions): ReadableStream<Uint8Array> {
       };
       o.signal?.addEventListener("abort", onAbort);
 
-      send(SSE_RETRY);
-      unsubscribe = o.subscribe((e) => {
-        send(formatSse(e));
-        if (e.type === "end") close();
-      });
-      const snap = o.snapshot();
-      if (!snap) {
-        send(formatSse({ type: "end" }));
+      // A throwing subscribe or snapshot must not leave the heartbeat, the
+      // cap or a bus listener behind.
+      try {
+        send(SSE_RETRY);
+        unsubscribe = o.subscribe((e) => {
+          send(formatSse(e));
+          if (e.type === "end") close();
+        });
+        const snap = o.snapshot();
+        if (!snap) {
+          send(formatSse({ type: "end" }));
+          close();
+          return;
+        }
+        send(formatSse({ type: "state", conversation: snap }));
+        if (!snap.running) {
+          send(formatSse({ type: "end" }));
+          close();
+          return;
+        }
+        if (o.signal?.aborted) close();
+      } catch (err) {
         close();
-        return;
+        throw err;
       }
-      send(formatSse({ type: "state", conversation: snap }));
-      if (!snap.running) {
-        send(formatSse({ type: "end" }));
-        close();
-        return;
-      }
-      if (o.signal?.aborted) close();
     },
     cancel() {
       cleanup();
