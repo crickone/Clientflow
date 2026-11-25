@@ -46,7 +46,7 @@ const requireLocal = createRequire(import.meta.url);
       const engaged = resolveStageIdByRole("engaged")!;
       const queued = (leadId: number) =>
         tdb.select().from(schema.automationQueue).where(and(eq(schema.automationQueue.leadId, leadId), eq(schema.automationQueue.status, "queued"))).all();
-      saveLeadFlowSettings({ window: null, defaultAssigneeUserId: null, alertWhatsAppTo: "+353870000099" });
+      saveLeadFlowSettings({ window: null, defaultAssigneeUserId: null, alertWhatsAppTo: "+353870000099", alertUserId: null });
       h.setFlowEnabled(s.tid, "lead_thinking", true);
       const thinker = (tag: string) => {
         const { lead } = upsertLead({ source: "manual", actor: "user", fullName: `Think ${tag}`, email: `${tag}@example.com`, phone: "+353870000020" });

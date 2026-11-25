@@ -17,6 +17,9 @@ export async function saveLeadFollowUpsAction(input: LeadFlowSettingsInput): Pro
   if (checked.value.defaultAssigneeUserId != null && !isAssignable(tenantId, checked.value.defaultAssigneeUserId)) {
     return { ok: false, error: "That person is not on this account." };
   }
+  if (checked.value.alertUserId != null && !isAssignable(tenantId, checked.value.alertUserId)) {
+    return { ok: false, error: "That team member is not on this account." };
+  }
   saveLeadFlowSettings(checked.value);
   revalidatePath("/settings/lead-follow-ups");
   return { ok: true };

@@ -48,7 +48,7 @@ const requireLocal = createRequire(import.meta.url);
         tdb.select().from(schema.automationQueue).where(and(eq(schema.automationQueue.leadId, leadId), eq(schema.automationQueue.status, "queued"))).all();
       const active = (leadId: number) => runs.leadFlowStatus(leadId).flow;
       for (const k of ["lead_no_answer", "lead_call_back", "lead_call_booked", "lead_thinking"]) h.setFlowEnabled(s.tid, k, true);
-      saveLeadFlowSettings({ window: { days: [1, 2, 3, 4, 5, 6], start: "09:00", end: "18:00" }, defaultAssigneeUserId: null, alertWhatsAppTo: "+353870000099" });
+      saveLeadFlowSettings({ window: { days: [1, 2, 3, 4, 5, 6], start: "09:00", end: "18:00" }, defaultAssigneeUserId: null, alertWhatsAppTo: "+353870000099", alertUserId: null });
       const newLead = (tag: string) => upsertLead({ source: "manual", actor: "user", fullName: `Call ${tag}`, email: `${tag}@example.com`, phone: "+353870000030" }).lead;
 
       // Log a call: each outcome moves the card and starts the column's flow.

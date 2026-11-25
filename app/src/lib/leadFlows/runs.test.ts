@@ -78,14 +78,14 @@ const requireLocal = createRequire(import.meta.url);
       ok(cancelled.length > 0 && cancelled.every((q) => (q.error ?? "").startsWith("Stopped:")), "cancelled rows say why");
 
       // Sending hours push the first step back and the rest follow it.
-      saveLeadFlowSettings({ window: { days: [1, 2, 3, 4, 5, 6], start: "09:00", end: "18:00" }, defaultAssigneeUserId: null, alertWhatsAppTo: null });
+      saveLeadFlowSettings({ window: { days: [1, 2, 3, 4, 5, 6], start: "09:00", end: "18:00" }, defaultAssigneeUserId: null, alertWhatsAppTo: null, alertUserId: null });
       clock.set(Date.parse("2030-01-19T19:00:00Z")); // Saturday evening
       runs.startFlow(lead.id, "lead_no_answer");
       const held = queued(lead.id).filter((q) => q.kind === "message").map((q) => q.dueAt.getTime()).sort((a, b) => a - b);
       ok(held[0] === Date.parse("2030-01-21T09:00:00Z"), "Saturday evening: Monday at 9");
       ok(held[1] === Date.parse("2030-01-23T09:00:00Z"), "the second step two days after the first");
       runs.stopFlows(lead.id, "reset");
-      saveLeadFlowSettings({ window: null, defaultAssigneeUserId: null, alertWhatsAppTo: null });
+      saveLeadFlowSettings({ window: null, defaultAssigneeUserId: null, alertWhatsAppTo: null, alertUserId: null });
       clock.set(WED_10);
 
       // An email-only lead skips the WhatsApps but still moves on at the end.

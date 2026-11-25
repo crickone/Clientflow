@@ -52,7 +52,7 @@ const requireLocal = createRequire(import.meta.url);
       ok(tdb.select().from(schema.automationLog).where(eq(schema.automationLog.channel, "whatsapp")).all().length === 1, "the Sent view shows it");
 
       // Sending hours: the second message comes due on a Saturday evening.
-      saveLeadFlowSettings({ window: { days: [1, 2, 3, 4, 5, 6], start: "09:00", end: "18:00" }, defaultAssigneeUserId: null, alertWhatsAppTo: null });
+      saveLeadFlowSettings({ window: { days: [1, 2, 3, 4, 5, 6], start: "09:00", end: "18:00" }, defaultAssigneeUserId: null, alertWhatsAppTo: null, alertUserId: null });
       const second = rows(lead.id).find((r) => r.kind === "message" && r.status === "queued")!;
       const satEvening = Date.parse("2030-01-19T19:00:00Z");
       tdb.update(schema.automationQueue).set({ dueAt: new Date(satEvening) }).where(eq(schema.automationQueue.id, second.id)).run();
@@ -67,7 +67,7 @@ const requireLocal = createRequire(import.meta.url);
         .get().id;
       await dispatch(satEvening);
       ok(rows(lead.id).find((r) => r.id === late)?.status === "cancelled", "a reminder that would land after the call is dropped");
-      saveLeadFlowSettings({ window: null, defaultAssigneeUserId: null, alertWhatsAppTo: null });
+      saveLeadFlowSettings({ window: null, defaultAssigneeUserId: null, alertWhatsAppTo: null, alertUserId: null });
 
       // A reminder whose call time has already passed is dropped even inside sending hours.
       const stale = tdb.insert(schema.automationQueue)

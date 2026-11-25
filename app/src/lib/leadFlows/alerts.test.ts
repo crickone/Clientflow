@@ -64,7 +64,7 @@ const requireLocal = createRequire(import.meta.url);
       ok(getLead(plain.id)!.assignedUserId === null && alertRows().length === 0, "nothing set: no assignee, no alert");
 
       // The business default and the alert number.
-      saveLeadFlowSettings({ window: null, defaultAssigneeUserId: one, alertWhatsAppTo: "+353870000099" });
+      saveLeadFlowSettings({ window: null, defaultAssigneeUserId: one, alertWhatsAppTo: "+353870000099", alertUserId: null });
       const { lead } = upsertLead({ source: "website", sourceLeadId: "website:ann@example.com", fullName: "Ann Example", email: "ann@example.com", phone: "+353870000010" });
       ok(getLead(lead.id)!.assignedUserId === one, "new leads go to the default assignee");
       const mine = listForUser(one, "staff");
@@ -95,7 +95,7 @@ const requireLocal = createRequire(import.meta.url);
       ok(alertRows().length === 1, "already hot: no second alert");
 
       // No number set: no WhatsApp alert is queued, and a queued one is not sent.
-      saveLeadFlowSettings({ window: null, defaultAssigneeUserId: null, alertWhatsAppTo: null });
+      saveLeadFlowSettings({ window: null, defaultAssigneeUserId: null, alertWhatsAppTo: null, alertUserId: null });
       await dispatchDueAutomationQueue(s.tid, WED_10 + 1, "http://app.test");
       const cancelled = tdb.select().from(schema.automationQueue).where(and(eq(schema.automationQueue.kind, "staff_alert"), eq(schema.automationQueue.status, "cancelled"))).all();
       ok(cancelled.length === 1 && /No WhatsApp alert number/.test(cancelled[0].error ?? ""), "a queued alert with no number set is dropped, not sent");

@@ -53,7 +53,7 @@ const requireLocal = createRequire(import.meta.url);
       const q = schema.automationQueue;
       const DAY = 86_400_000;
       const OH = { days: [1, 2, 3, 4, 5, 6], start: "09:00", end: "18:00" };
-      saveLeadFlowSettings({ window: OH, defaultAssigneeUserId: staffId, alertWhatsAppTo: "+353870000099" });
+      saveLeadFlowSettings({ window: OH, defaultAssigneeUserId: staffId, alertWhatsAppTo: "+353870000099", alertUserId: null });
       for (const k of ["new_lead", "lead_no_answer", "lead_call_back", "lead_call_booked", "lead_thinking", "lead_nurture"]) h.setFlowEnabled(s.tid, k, true);
       const clock = h.fakeClock(Date.parse("2030-01-19T19:30:00Z")); // a Saturday evening
       const col = (k: string) => listStages().find((c) => c.systemKey === k)!.id;

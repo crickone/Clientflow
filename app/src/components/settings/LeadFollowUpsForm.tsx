@@ -23,6 +23,8 @@ const DAYS: { d: number; label: string }[] = [
 export interface StaffOption {
   userId: number;
   name: string;
+  /** Their mobile from the Staff roster, when it has one. */
+  phone?: string | null;
 }
 
 const section: CSSProperties = { display: "flex", flexDirection: "column", gap: 12, padding: 20 };
@@ -62,6 +64,18 @@ export function LeadFollowUpsForm({ initial, staff }: { initial: LeadFlowSetting
     initial.defaultAssigneeUserId != null && staff.some((s) => s.userId === initial.defaultAssigneeUserId) ? String(initial.defaultAssigneeUserId) : "",
   );
   const [alertTo, setAlertTo] = useState(initial.alertWhatsAppTo ?? "");
+  const [alertMember, setAlertMember] = useState(
+    initial.alertUserId != null && staff.some((s) => s.userId === initial.alertUserId) ? String(initial.alertUserId) : "",
+  );
+  const alertPerson = staff.find((s) => String(s.userId) === alertMember) ?? null;
+  function pickAlertMember(value: string) {
+    setAlertMember(value);
+    const person = staff.find((s) => String(s.userId) === value);
+    // Their saved number if it's the same person, else the Staff roster's.
+    if (!person) setAlertTo("");
+    else if (String(initial.alertUserId ?? "") === value && initial.alertWhatsAppTo) setAlertTo(initial.alertWhatsAppTo);
+    else setAlertTo(person.phone ?? "");
+  }
   const [hoursSaved, setHoursSaved] = useState(initial.window != null);
   const [saving, startSave] = useTransition();
 
@@ -72,7 +86,8 @@ export function LeadFollowUpsForm({ initial, staff }: { initial: LeadFlowSetting
       const res = await saveLeadFollowUpsAction({
         window: { days, start, end },
         defaultAssigneeUserId: assignee ? Number(assignee) : null,
-        alertWhatsAppTo: alertTo.trim() || null,
+        alertWhatsAppTo: alertMember ? alertTo.trim() || null : null,
+        alertUserId: alertMember ? Number(alertMember) : null,
       });
       if (res.ok) {
         setHoursSaved(true);
@@ -146,13 +161,31 @@ export function LeadFollowUpsForm({ initial, staff }: { initial: LeadFlowSetting
             <CardLabel style={{ marginBottom: 0 }}>WhatsApp alerts</CardLabel>
           </div>
           <p style={note}>
-            New-lead and hot-lead alerts, and call-back reminders, go to this number by WhatsApp from your business WhatsApp. Use a mobile other than the
-            business WhatsApp number itself. Leave it empty for no WhatsApp alerts.
+            New-lead and hot-lead alerts, and call-back reminders, go to this team member by WhatsApp from your business WhatsApp. Pick someone whose
+            mobile isn't the business WhatsApp number itself.
           </p>
-          <Label htmlFor="lfu-alert" srOnly>
-            WhatsApp alerts to
+          <Label htmlFor="lfu-alert-member" srOnly>
+            Send WhatsApp alerts to
           </Label>
-          <Input id="lfu-alert" inputMode="tel" placeholder="WhatsApp number for alerts" value={alertTo} onChange={(e) => setAlertTo(e.target.value)} />
+          <select id="lfu-alert-member" value={alertMember} onChange={(e) => pickAlertMember(e.target.value)} style={selectStyle}>
+            <option value="">No WhatsApp alerts</option>
+            {staff.map((s) => (
+              <option key={s.userId} value={String(s.userId)}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          {alertPerson && (
+            <div style={{ display: "grid", gap: 6 }}>
+              <Label htmlFor="lfu-alert">{alertPerson.name}&apos;s mobile</Label>
+              <Input id="lfu-alert" inputMode="tel" placeholder="Mobile number, for example 087 000 0000" value={alertTo} onChange={(e) => setAlertTo(e.target.value)} />
+              {!alertPerson.phone && (
+                <p style={{ ...note, fontSize: 12.5, color: "var(--text-tertiary)" }}>
+                  There's no mobile for {alertPerson.name} on the Staff page, so type it here.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </Card>
 

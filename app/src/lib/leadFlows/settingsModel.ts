@@ -14,17 +14,20 @@ export interface LeadFlowSettings {
   defaultAssigneeUserId: number | null;
   /** The number staff alerts go to by WhatsApp, from the business WhatsApp; null = none. */
   alertWhatsAppTo: string | null;
+  /** The team member that number belongs to (control-plane user id); null for an older number saved without one. */
+  alertUserId: number | null;
 }
 
 export interface LeadFlowSettingsInput {
   window: { days: number[]; start: string; end: string } | null;
   defaultAssigneeUserId: number | null;
   alertWhatsAppTo: string | null;
+  alertUserId?: number | null;
 }
 
 export const LEAD_FLOW_SETTINGS_KEY = "lead_flow_settings";
 
-export const DEFAULT_LEAD_FLOW_SETTINGS: LeadFlowSettings = { window: null, defaultAssigneeUserId: null, alertWhatsAppTo: null };
+export const DEFAULT_LEAD_FLOW_SETTINGS: LeadFlowSettings = { window: null, defaultAssigneeUserId: null, alertWhatsAppTo: null, alertUserId: null };
 
 function cleanDays(raw: unknown): number[] {
   if (!Array.isArray(raw)) return [];
@@ -53,6 +56,7 @@ export function parseLeadFlowSettings(raw: unknown): LeadFlowSettings {
     window: readWindow(r.window),
     defaultAssigneeUserId: readUserId(r.defaultAssigneeUserId),
     alertWhatsAppTo: alert || null,
+    alertUserId: alert ? readUserId(r.alertUserId) : null,
   };
 }
 
@@ -74,12 +78,22 @@ export function validateLeadFlowSettings(
   if (input.defaultAssigneeUserId !== null && readUserId(input.defaultAssigneeUserId) === null) {
     return { ok: false, error: "Pick someone from the list, or nobody." };
   }
+  const alertUserId = input.alertUserId ?? null;
+  if (alertUserId !== null && readUserId(alertUserId) === null) {
+    return { ok: false, error: "Pick a team member for WhatsApp alerts, or nobody." };
+  }
   const alert = (input.alertWhatsAppTo ?? "").trim();
+  if (alertUserId !== null && !alert) {
+    return { ok: false, error: "Add that team member's mobile number for WhatsApp alerts." };
+  }
   if (alert) {
     const digits = normalizePhone(alert);
     if (digits.length < 8 || digits.length > 15) {
       return { ok: false, error: "Enter the WhatsApp number with its area code, for example 087 000 0000." };
     }
   }
-  return { ok: true, value: { window, defaultAssigneeUserId: input.defaultAssigneeUserId, alertWhatsAppTo: alert || null } };
+  return {
+    ok: true,
+    value: { window, defaultAssigneeUserId: input.defaultAssigneeUserId, alertWhatsAppTo: alert || null, alertUserId: alert ? alertUserId : null },
+  };
 }
