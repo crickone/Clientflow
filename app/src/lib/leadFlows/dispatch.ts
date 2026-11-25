@@ -15,8 +15,9 @@ import { getThemeForTenant } from "@/lib/settings";
 
 import { flowNow } from "./clock";
 import { unsubscribeUrl } from "./consent";
-import { NURTURE_FLOW, parsePayload, resolveColumn } from "./flowModel";
-import { fitToWindow } from "./sendingWindow";
+import { CALL_BACK_FLOW, NURTURE_FLOW, parsePayload, resolveColumn } from "./flowModel";
+import { startFlow } from "./runs";
+import { endOfLocalDay, fitToWindow } from "./sendingWindow";
 import { getLeadFlowSettingsForTenant } from "./settings";
 import type { LeadFlowSettings } from "./settingsModel";
 import { getFlowTransport } from "./transport";
@@ -240,7 +241,22 @@ async function runReplyCheckRow(ctx: DispatchContext, item: AutomationQueueRow):
   return false;
 }
 
+/** End of the picked call-back day: still in Call back later, so nobody reached them. Start its flow the next morning. */
+async function runCallbackCheckRow(ctx: DispatchContext, item: AutomationQueueRow): Promise<boolean> {
+  const { day } = parsePayload(item.payload);
+  markRow(ctx.tdb, item.id, { status: "sent", error: null, sentAt: new Date(ctx.now) });
+  if (item.leadId == null || !day) return false;
+  const lead = ctx.tdb.select({ pipelineId: schema.leads.pipelineId, stageId: schema.leads.stageId }).from(schema.leads).where(eq(schema.leads.id, item.leadId)).get();
+  if (!lead) return false;
+  const { listStages } = await import("@/lib/pipeline/stageRepo");
+  const current = listStages(lead.pipelineId).find((s) => s.id === lead.stageId);
+  if (current?.systemKey !== "call_back") return false;
+  startFlow(item.leadId, CALL_BACK_FLOW, { firstAt: fitToWindow(endOfLocalDay(day) + 1, "whatsapp", ctx.settings.window), now: ctx.now });
+  return false;
+}
+
 const HANDLERS: Record<string, RowHandler> = {
+  callback_check: runCallbackCheckRow,
   message: sendMessageRow,
   move: runMoveRow,
   reply_check: runReplyCheckRow,

@@ -3430,6 +3430,19 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       ended_at INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_lead_flow_runs_lead ON lead_flow_runs(lead_id, status);
+    CREATE TABLE IF NOT EXISTS lead_calls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lead_id INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      outcome TEXT,
+      scheduled_for INTEGER,
+      scheduled_day TEXT,
+      calendar_event_id INTEGER,
+      note TEXT,
+      user_id INTEGER,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_lead_calls_lead ON lead_calls(lead_id, created_at);
   `);
   {
     const addColumn = (table: string, column: string, ddl: string) => {

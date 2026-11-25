@@ -2819,6 +2819,31 @@ export const leadFlowRuns = sqliteTable(
 );
 export type LeadFlowRun = typeof leadFlowRuns.$inferSelect;
 
+/**
+ * Calls with a lead: logged after the fact (Log a call), or booked ahead
+ * (Schedule a call). A timed call also has a diary entry.
+ */
+export const leadCalls = sqliteTable(
+  "lead_calls",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    leadId: integer("lead_id").notNull(),
+    kind: text("kind", { enum: ["logged", "scheduled"] }).notNull(),
+    /** Log a call outcome (lib/leadFlows/callPlan CallOutcome). */
+    outcome: text("outcome"),
+    /** A timed call, epoch ms. */
+    scheduledFor: integer("scheduled_for"),
+    /** A call-back day with no time, "YYYY-MM-DD". */
+    scheduledDay: text("scheduled_day"),
+    calendarEventId: integer("calendar_event_id"),
+    note: text("note"),
+    userId: integer("user_id"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => ({ byLead: index("idx_lead_calls_lead").on(t.leadId, t.createdAt) }),
+);
+export type LeadCall = typeof leadCalls.$inferSelect;
+
 // ── Forms (Kahunas — questionnaires, check-ins, habits, contact, terms) ────────
 
 export const forms = sqliteTable(
