@@ -27,6 +27,8 @@ const requireLocal = createRequire(import.meta.url);
   const ghl = requireLocal("./run") as typeof import("./run");
   const store = requireLocal("./store") as typeof import("./store");
   const { GHL_CONSENT_SOURCE } = requireLocal("./mapping") as typeof import("./mapping");
+  const { spreadMs } = requireLocal("./plan") as typeof import("./plan");
+  const { localParts } = requireLocal("../leadFlows/sendingWindow") as typeof import("../leadFlows/sendingWindow");
 
   const s = h.makeScratchTenant("ghl-import-e2e-test");
   const fake = h.installFakeTransport();
@@ -91,7 +93,16 @@ const requireLocal = createRequire(import.meta.url);
       const DAY = 86_400_000;
       const NOW = Date.parse("2030-01-16T10:00:00Z"); // a Wednesday
       const clock = h.fakeClock(NOW);
-      saveLeadFlowSettings({ window: { days: [1, 2, 3, 4, 5, 6], start: "09:00", end: "18:00" }, defaultAssigneeUserId: null, alertWhatsAppTo: "+353870000099" });
+      const WINDOW = { days: [1, 2, 3, 4, 5, 6], start: "09:00", end: "18:00" };
+      saveLeadFlowSettings({ window: WINDOW, defaultAssigneeUserId: null, alertWhatsAppTo: "+353870000099" });
+      // Each person's messages are spread across sending hours by contact id; a fresh start begins on the next sending day.
+      const spread = (contactId: string) => spreadMs(contactId, WINDOW);
+      const inWindow = (at: number) => {
+        const lp = localParts(at);
+        return WINDOW.days.includes(lp.weekday) && lp.minutes >= 9 * 60 && lp.minutes < 18 * 60;
+      };
+      const TOMORROW_OPEN = Date.parse("2030-01-17T09:00:00Z"); // Thursday, a sending day
+      const IMPORT_DAY_ENDS = Date.parse("2030-01-17T00:00:00Z");
       // Optimal Health's copy, saved the way the editor saves it; Call back later is off.
       for (const key of ["new_lead", "lead_no_answer", "lead_call_back", "lead_thinking", "lead_nurture"]) {
         saveTrigger({ key, enabled: key !== "lead_call_back", externalEnabled: false, messages: FLOW_PRESETS["optimal-health"][key] });
@@ -134,13 +145,14 @@ const requireLocal = createRequire(import.meta.url);
       const lead = (contactId: string) => tdb.select().from(schema.leads).where(eq(schema.leads.sourceLeadId, contactId)).get()!;
       const queued = (leadId: number) => tdb.select().from(schema.automationQueue).where(eq(schema.automationQueue.leadId, leadId)).all();
 
-      // Aoife: nurture, week 3 infrared WhatsApp first, on Monday 21 January at 09:00 (the 20th is a Sunday).
+      // Aoife: nurture, week 3 infrared WhatsApp first, on Monday 21 January at the opening plus her spread (the 20th is a Sunday).
       const aoife = lead("g-aoife");
       ok(aoife.source === "gohighlevel" && aoife.stageId === col("nurture") && aoife.assignedUserId === staffId, "Aoife: nurture, assigned to Sandra");
       ok(aoife.marketingConsentSource === GHL_CONSENT_SOURCE && aoife.marketingConsentAt === NOW, "consent carried over, with the operator's decision as the source");
       ok(aoife.createdAt.getTime() === Date.parse("2029-10-01T10:00:00+01:00"), "created date from GoHighLevel");
       const aMsgs = queued(aoife.id).filter((x) => x.kind === "message").sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
-      ok(aMsgs.length === 5 && aMsgs[0].dueAt.getTime() === Date.parse("2030-01-21T09:00:00Z") && aMsgs[0].channel === "whatsapp" && /infrared/i.test(aMsgs[0].body), "week 3 infrared WhatsApp first, Monday 09:00");
+      ok(aMsgs.length === 5 && aMsgs[0].dueAt.getTime() === Date.parse("2030-01-21T09:00:00Z") + spread("g-aoife") && aMsgs[0].channel === "whatsapp" && /infrared/i.test(aMsgs[0].body), "week 3 infrared WhatsApp first, Monday at her spread");
+      ok(aMsgs.every((x) => inWindow(x.dueAt.getTime())), "all her messages inside sending hours");
       const ev = tdb.select().from(schema.leadStageEvents).where(eq(schema.leadStageEvents.leadId, aoife.id)).all();
       ok(ev.length === 1 && ev[0].at.getTime() === Date.parse("2030-01-06T09:00:00Z"), "the stage event is dated when she entered the stage in GoHighLevel");
       ok(!!tdb.select().from(schema.contacts).where(sql`lower(${schema.contacts.email}) = 'aoife@example.com'`).get(), "she is on the marketing contacts");
@@ -149,10 +161,12 @@ const requireLocal = createRequire(import.meta.url);
       const brian = lead("g-brian");
       ok(brian.stageId === col("call_back") && queued(brian.id).length === 2 && queued(brian.id).every((x) => x.status === "held"), "Brian: held until Call back later is switched on");
 
-      // Ciara: stale, nurture from week 1 now; one message today.
+      // Ciara: stale, nurture from week 1, starting on the next sending day; nothing on the import day.
       const ciara = lead("g-ciara");
-      const cMsgs = queued(ciara.id).filter((x) => x.kind === "message");
-      ok(ciara.stageId === col("nurture") && cMsgs.filter((x) => x.dueAt.getTime() < NOW + DAY).length === 1, "Ciara: nurture week 1, one message today");
+      const cMsgs = queued(ciara.id).filter((x) => x.kind === "message").sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
+      ok(ciara.stageId === col("nurture") && cMsgs.length > 0 && cMsgs.every((x) => x.dueAt.getTime() >= IMPORT_DAY_ENDS), "Ciara: nurture week 1, no message on the import day");
+      ok(cMsgs[0].dueAt.getTime() === TOMORROW_OPEN + spread("g-ciara") && inWindow(cMsgs[0].dueAt.getTime()), "Ciara: week 1 tomorrow at her spread");
+      ok(spread("g-aoife") !== spread("g-ciara"), "two contact ids get different minutes");
 
       // Declan: won, a client; Eimear: lost; Fiona: do not contact.
       const declan = lead("g-declan");
@@ -171,6 +185,8 @@ const requireLocal = createRequire(import.meta.url);
       // Ivan: matched, moved to nurture; Joan: still in her own flow, email filled.
       const ivan = tdb.select().from(schema.leads).where(eq(schema.leads.id, ivanId)).get()!;
       ok(ivan.stageId === col("nurture") && ivan.source === "manual" && queued(ivanId).some((x) => x.kind === "message"), "Ivan: moved to nurture, keeps his own source");
+      const iMsgs = queued(ivanId).filter((x) => x.kind === "message").sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
+      ok(iMsgs.every((x) => x.dueAt.getTime() >= IMPORT_DAY_ENDS) && iMsgs[0].dueAt.getTime() === TOMORROW_OPEN + spread("g-ivan"), "Ivan: Call back later ended, nurture from week 1 tomorrow at his spread");
       const joan = tdb.select().from(schema.leads).where(eq(schema.leads.id, joanId)).get()!;
       ok(joan.email === "joan@example.com" && runs.activeRun(joanId, "lead_no_answer") != null, "Joan: email filled, her flow untouched");
 

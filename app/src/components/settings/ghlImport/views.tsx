@@ -158,6 +158,7 @@ export function DryRunView(props: {
           ["On the lead board", t.leads],
           ["Clients", t.clients],
           ["Email contacts only", t.contactsOnly],
+          ["Added to email contacts", t.emailContactsAdded],
           ["Do not contact", t.doNotContact],
           ["Matched to someone here", t.duplicates],
           ["Already imported", t.alreadyImported],
@@ -206,7 +207,7 @@ export function DryRunView(props: {
               ))}
             </ul>
           )}
-          <p className={styles.note}>Steps GoHighLevel already sent are not sent again. A step whose time has passed is skipped, and nobody gets more than one message today.</p>
+          <p className={styles.note}>Steps GoHighLevel already sent are not sent again. A step whose time has passed is skipped, and nobody gets more than one message today. Messages are spread across your sending hours.</p>
         </section>
       </div>
       <Assignees rows={props.data.assignees} staff={props.data.staff} defaultName={props.data.defaultAssigneeName} busy={props.busy} onChange={props.onAssignee} />
@@ -290,7 +291,7 @@ export function ResultView({ result, onAgain }: { result: ApplyResult; onAgain: 
           <CheckCircle2 size={16} aria-hidden /> Imported
         </h2>
         <p className={styles.note}>
-          Nothing was sent. Follow-up messages go at their times while each follow-up is switched on.
+          Nothing was sent. Follow-up messages go at their times while each follow-up is switched on. Email contacts added counts people with no opportunity; leads with marketing consent are on your email contacts too.
           {result.runsWaiting > 0 ? ` ${num(result.runsWaiting)} people wait for a follow-up that is off.` : ""}
           {result.holdingCreated ? " A Holding column was added to the board." : ""}
         </p>

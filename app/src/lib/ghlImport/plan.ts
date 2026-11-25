@@ -7,7 +7,7 @@
 import { splitFullName } from "@/lib/humanName";
 import { columnMatches, NEW_LEAD_FLOW, NURTURE_FLOW, resolveColumn, type ColumnRef } from "@/lib/leadFlows/flowModel";
 import { pickForInterest } from "@/lib/leadFlows/flowPlan";
-import { addDays, fitToWindow, morningOf, todayIn, type SendingWindow } from "@/lib/leadFlows/sendingWindow";
+import { addDays, fitToWindow, hhmmToMinutes, morningOf, todayIn, type SendingWindow } from "@/lib/leadFlows/sendingWindow";
 import type { FollowUpKey } from "@/lib/pipeline/followUpColumns";
 import { resolveEntryStage, type StageRole } from "@/lib/pipeline/roles";
 import { normalizePhone } from "@/lib/whatsapp/phone";
@@ -219,6 +219,8 @@ export interface PlanTotals {
   leads: number;
   clients: number;
   contactsOnly: number;
+  /** Put on the email contacts: contacts-only people, and leads whose consent is recorded and who have an email. */
+  emailContactsAdded: number;
   doNotContact: number;
   /** Matched to someone already in Adonis. */
   duplicates: number;
@@ -298,6 +300,33 @@ function flowForColumn(snap: Snapshot, col: SnapshotColumn): SnapshotFlow | null
   return snap.flows.find((f) => f.startColumn != null && columnMatches(f.startColumn, col)) ?? null;
 }
 
+/** FNV-1a, 32-bit: a small stable hash, so a person's spread is the same on every run. */
+function hash32(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/**
+ * How far into the sending window a person's messages go, by GoHighLevel
+ * contact id: a whole number of minutes, at least an hour before the window
+ * closes. Without it every imported message would be due at the minute the
+ * window opens. No hours saved: the 09:00-21:00 WhatsApp window.
+ */
+export function spreadMs(contactId: string, window: SendingWindow | null): number {
+  const windowMinutes = window ? hhmmToMinutes(window.end) - hhmmToMinutes(window.start) : 12 * 60;
+  const slots = Math.max(1, windowMinutes - 60);
+  return (hash32(contactId) % slots) * 60_000;
+}
+
+/** The opening of sending hours on the next sending day after today. */
+function nextSendingDayOpen(now: number, window: SendingWindow | null): number {
+  return fitToWindow(morningOf(addDays(todayIn(now), 1), window), "whatsapp", window);
+}
+
 function schedule(
   p: ImportPerson,
   interest: string | null,
@@ -306,13 +335,19 @@ function schedule(
   o: { from: FlowIntent["from"]; emailOnly: boolean; entry: number; now: number; suppressed: boolean },
 ): StepPlan {
   const picked = pickForInterest(flow.messages, interest);
+  const spread = spreadMs(p.ghlContactId, snap.window);
   return planSteps({
     messages: picked.map((m) => ({ channel: o.emailOnly && m.channel === "whatsapp" ? "email" : m.channel, delayMs: m.delayMs })),
-    startAt: o.from === "start" ? o.now : o.entry,
+    // A fresh start begins on the next sending day, so it sends nothing on the import day.
+    startAt: (o.from === "start" ? nextSendingDayOpen(o.now, snap.window) : o.entry) + spread,
     doneThroughMs: o.from === "start" ? null : (p.daysInStage ?? 0) * DAY_MS,
     now: o.now,
     finishAfterMs: flow.finish?.afterMs ?? null,
-    fit: (at, ch) => fitToWindow(at, ch, snap.window),
+    // A time pushed to the opening of sending hours moves on by the person's spread.
+    fit: (at, ch) => {
+      const t = fitToWindow(at, ch, snap.window);
+      return t !== at ? t + spread : t;
+    },
     dayOf: (at) => todayIn(at),
     canReceive: (ch) => (ch === "whatsapp" ? !!p.phone : ch === "email" ? !!p.email && !o.suppressed : false),
   });
@@ -343,6 +378,8 @@ function planPerson(p: ImportPerson, snap: Snapshot, ix: Index, opts: PlanOption
   const suppressed = !!p.email && snap.suppressedEmails.has(p.email);
   const dnc = d.doNotContact;
   const withDnc = { ...base, match, doNotContact: dnc };
+  // A matched lead whose fields are only filled still has its follow-ups stopped by do not contact (apply.ts).
+  const dncFill = dnc ? " Marked do not contact: follow-ups stopped." : "";
   const pl = d.placement;
 
   if (pl.kind === "contact") {
@@ -365,7 +402,7 @@ function planPerson(p: ImportPerson, snap: Snapshot, ix: Index, opts: PlanOption
       client: { existingId: lead?.clientId ?? null },
       lead: lead ? { mode: "fill", existingId: lead.id, assigneeUserId: assignee } : null,
       outcome: lead ? "update" : "create",
-      note: `${d.rule}.`,
+      note: `${d.rule}.${lead ? dncFill : ""}`,
       to: "Clients",
     };
   }
@@ -374,14 +411,17 @@ function planPerson(p: ImportPerson, snap: Snapshot, ix: Index, opts: PlanOption
   if (client && !lead && !pl.won) {
     return { ...withDnc, outcome: dnc ? "update" : "unchanged", note: "Already a client here: not put on the lead board.", to: "No change" };
   }
-  const ghlStageAt = p.daysInStage != null ? morningOf(addDays(opts.exportDay, -p.daysInStage), snap.window) : (p.createdAt ?? opts.now);
-  if (lead && (lead.inActiveFlow || lead.pipelineId !== snap.pipelineId || lead.lastStageAt >= ghlStageAt)) {
+  // When they entered the GoHighLevel stage. Unknown (no days, no created date) counts as the
+  // oldest for the comparison below, so a matched Adonis lead keeps its own column.
+  const knownStageAt = p.daysInStage != null ? morningOf(addDays(opts.exportDay, -p.daysInStage), snap.window) : p.createdAt;
+  const ghlStageAt = knownStageAt ?? opts.now;
+  if (lead && (lead.inActiveFlow || lead.pipelineId !== snap.pipelineId || lead.lastStageAt >= (knownStageAt ?? 0))) {
     const why = lead.inActiveFlow
       ? "In an Adonis follow-up already: only missing details filled."
       : lead.pipelineId !== snap.pipelineId
         ? "On another board here: only missing details filled."
         : "Moved more recently in Adonis: only missing details filled.";
-    return { ...withDnc, lead: { mode: "fill", existingId: lead.id, assigneeUserId: assignee }, outcome: "update", note: why, to: "No change" };
+    return { ...withDnc, lead: { mode: "fill", existingId: lead.id, assigneeUserId: assignee }, outcome: "update", note: `${why}${dncFill}`, to: "No change" };
   }
 
   let note = d.rule;
@@ -449,6 +489,7 @@ function totalsFor(plans: PersonPlan[], now: number): PlanTotals {
     leads: 0,
     clients: 0,
     contactsOnly: 0,
+    emailContactsAdded: 0,
     doNotContact: 0,
     duplicates: 0,
     alreadyImported: 0,
@@ -477,7 +518,9 @@ function totalsFor(plans: PersonPlan[], now: number): PlanTotals {
     }
     if (p.client) t.clients++;
     if (p.contact) t.contactsOnly++;
-    if (p.doNotContact) t.doNotContact++;
+    if (p.contact || (p.lead?.mode === "place" && p.lead.consent && p.person.email)) t.emailContactsAdded++;
+    // A skipped person is not imported, so nothing is marked (already imported is counted above).
+    if (p.doNotContact && p.outcome !== "skip") t.doNotContact++;
     if (p.run) {
       const f = flows.get(p.run.flowKey) ?? { key: p.run.flowKey, label: p.run.flowLabel, enabled: p.run.enabled, people: 0 };
       f.people++;
@@ -505,7 +548,11 @@ function assigneeRows(people: ImportPerson[], snap: Snapshot, opts: PlanOptions)
 export function buildPlan(people: ImportPerson[], snap: Snapshot, opts: PlanOptions): ImportPlan {
   const ix = indexSnapshot(snap);
   const seen = new Set<string>();
-  const plans = people.map((p) => planPerson(p, snap, ix, opts, seen));
+  // Of two people with the same email or phone, the one with an opportunity is imported:
+  // they are planned first. The plans stay in file order.
+  const order = people.map((_, i) => i).sort((a, b) => Number(people[a].ghlStage == null) - Number(people[b].ghlStage == null) || a - b);
+  const plans: PersonPlan[] = new Array(people.length);
+  for (const i of order) plans[i] = planPerson(people[i], snap, ix, opts, seen);
   return { people: plans, totals: totalsFor(plans, opts.now), assignees: assigneeRows(people, snap, opts) };
 }
 

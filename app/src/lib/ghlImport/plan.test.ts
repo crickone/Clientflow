@@ -3,13 +3,19 @@
 // The whole dry run on a made-up business and made-up people: where each
 // person goes, which follow-up and which step, duplicates, re-runs, do not
 // contact, the totals, and that the dry run carries no medical note.
+//
+// Times: each person's messages are spread across the sending window by
+// their GoHighLevel contact id (spreadMs), and a fresh start begins on the
+// next sending day, so the checks add the person's spread to the time the
+// step would have had at the opening of sending hours.
 import assert from "node:assert/strict";
 
 import { delayToMs, TRIGGER_LABELS } from "../automationModel";
 import { FLOW_DEFAULTS } from "../leadFlows/flowModel";
 import { FLOW_PRESETS } from "../leadFlows/presets";
+import { localParts } from "../leadFlows/sendingWindow";
 import type { GhlContact, GhlOpportunity } from "./csv";
-import { buildPlan, dryRunCsv, dryRunRows, joinPeople, type Snapshot, type SnapshotFlow, type SnapshotLead } from "./plan";
+import { buildPlan, dryRunCsv, dryRunRows, joinPeople, spreadMs, type Snapshot, type SnapshotFlow, type SnapshotLead } from "./plan";
 
 let n = 0;
 const ok = (cond: boolean, name: string) => {
@@ -22,6 +28,14 @@ const NOW = Date.parse("2030-01-16T10:00:00Z"); // Wednesday, 10:00 Irish time
 const EXPORT_DAY = "2030-01-16";
 const MORNING = (daysAgo: number) => Date.parse("2030-01-16T09:00:00Z") - daysAgo * DAY;
 const MEDICAL = "FAKE-MEDICAL-SENTINEL";
+// The next sending day after the import: Thursday, sending hours open at 09:00 (no hours saved).
+const TOMORROW_OPEN = Date.parse("2030-01-17T09:00:00Z");
+const IMPORT_DAY_ENDS = Date.parse("2030-01-17T00:00:00Z");
+// No hours saved: WhatsApp 09:00-21:00 every day.
+const inWindow = (at: number) => {
+  const m = localParts(at).minutes;
+  return m >= 9 * 60 && m < 21 * 60;
+};
 
 // The default board: the nine columns and the five follow-up columns.
 const columns: Snapshot["columns"] = [
@@ -90,6 +104,8 @@ const snap: Snapshot = {
   defaultAssigneeUserId: 2,
   window: null,
 };
+
+const spread = (c: { contactId: string }) => spreadMs(c.contactId, snap.window);
 
 let id = 0;
 const contact = (first: string, over: Partial<GhlContact> = {}): GhlContact => ({
@@ -171,32 +187,46 @@ const of = (c: GhlContact) => plan.people.find((p) => p.person.ghlContactId === 
 ok(persons.length === Object.keys(people).length, "one person per contact");
 ok(of(people.aoife).person.staffMedicalNote === MEDICAL, "the medical note is carried for the write");
 
-// Aoife: 10 days into nurture, infrared: week 3's infrared WhatsApp is next, 14 days after she entered.
+// Aoife: 10 days into nurture, infrared: week 3's infrared WhatsApp is next, 14 days after she entered, at her spread.
 {
   const p = of(people.aoife);
   ok(p.outcome === "create" && p.lead?.mode === "place" && p.lead.columnName === "Long-term nurture", "nurture column");
-  ok(p.lead?.mode === "place" && p.lead.consent && p.lead.enteredAt === MORNING(10), "consent, entered 10 days ago");
-  ok(p.run?.flowKey === "lead_nurture" && p.run.steps[0].dueAt === MORNING(10) + 14 * DAY && p.run.steps[0].channel === "whatsapp", "week 3 WhatsApp next");
+  ok(p.lead?.mode === "place" && p.lead.consent && p.lead.enteredAt === MORNING(10), "consent, entered 10 days ago (no spread on the stage time)");
+  ok(p.run?.flowKey === "lead_nurture" && p.run.steps[0].dueAt === MORNING(10) + 14 * DAY + spread(people.aoife) && p.run.steps[0].channel === "whatsapp", "week 3 WhatsApp next, at her spread");
+  ok(localParts(p.run!.steps[0].dueAt).date === "2030-01-20" && inWindow(p.run!.steps[0].dueAt), "on the expected day, inside sending hours");
   ok(p.run!.steps.length === 5, "weeks 3, 6, 8, 10 and 12 left");
   ok(p.lead?.mode === "place" && p.lead.assigneeUserId === 1, "assigned to Sandra by name");
 }
-// Brian: 3 days into Call back later: the 4-day WhatsApp tomorrow, then the move at 6 days.
+// Brian: 3 days into Call back later: the 4-day WhatsApp tomorrow, then the move at 6 days, both at his spread.
 {
   const p = of(people.brian);
   ok(p.lead?.mode === "place" && p.lead.columnName === "Call back later" && p.run?.flowKey === "lead_call_back", "call back column and flow");
-  ok(p.run!.steps.length === 1 && p.run!.steps[0].dueAt === MORNING(3) + 4 * DAY && p.run!.finishAt === MORNING(3) + 6 * DAY, "one WhatsApp, then the move");
+  ok(p.run!.steps.length === 1 && p.run!.steps[0].dueAt === MORNING(3) + 4 * DAY + spread(people.brian) && p.run!.finishAt === MORNING(3) + 6 * DAY + spread(people.brian), "one WhatsApp, then the move");
+  ok(localParts(p.run!.steps[0].dueAt).date === "2030-01-17" && inWindow(p.run!.steps[0].dueAt), "tomorrow, inside sending hours");
 }
-// Ciara: 40 days thinking: stale, Long-term nurture from week 1, now. Her week-1 email is the only message today.
+// Two people get different minutes, and the same person the same minute on every run.
+{
+  const a = of(people.aoife).run!.steps[0].dueAt;
+  const b = of(people.brian).run!.steps[0].dueAt;
+  ok(spread(people.aoife) !== spread(people.brian) && localParts(a).minutes !== localParts(b).minutes, "two contact ids get different minutes");
+  const again = buildPlan(persons, snap, { exportDay: EXPORT_DAY, now: NOW });
+  ok(again.people.find((p) => p.person.ghlContactId === people.aoife.contactId)!.run!.steps[0].dueAt === a, "the spread is the same on a second dry run");
+  ok(spreadMs("c-x", { days: [1], start: "09:00", end: "09:30" }) === 0, "a window under an hour has no spread");
+  ok(spreadMs("c-x", { days: [1], start: "09:00", end: "18:00" }) < 8 * 60 * 60_000 && spreadMs("c-x", null) < 11 * 60 * 60_000, "the spread ends an hour before the window closes");
+}
+// Ciara: 40 days thinking: stale, Long-term nurture from week 1, entered now. Week 1 starts on the next sending day.
 {
   const p = of(people.ciara);
   ok(p.lead?.mode === "place" && p.lead.columnName === "Long-term nurture" && p.lead.enteredAt === NOW, "stale: nurture, entered now");
-  ok(p.run?.flowKey === "lead_nurture" && p.run.steps[0].dueAt === NOW && p.run.steps[0].step === 0, "week 1 now");
-  ok(p.run!.steps.filter((s) => s.dueAt < NOW + DAY).length === 1, "one message on the import day");
+  ok(p.run?.flowKey === "lead_nurture" && p.run.steps[0].dueAt === TOMORROW_OPEN + spread(people.ciara) && p.run.steps[0].step === 0, "week 1 tomorrow, at her spread");
+  ok(inWindow(p.run!.steps[0].dueAt), "inside sending hours");
+  ok(p.run!.steps.every((s) => s.dueAt >= IMPORT_DAY_ENDS), "no message on the import day");
 }
 // Dara: 10 days into Call back later: the flow ended at 6 days, so she moves on to nurture from week 1.
 {
   const p = of(people.dara);
-  ok(p.lead?.mode === "place" && p.lead.columnName === "Long-term nurture" && p.run?.flowKey === "lead_nurture" && p.run.steps[0].dueAt === NOW, "past its end: nurture from week 1");
+  ok(p.lead?.mode === "place" && p.lead.columnName === "Long-term nurture" && p.lead.enteredAt === NOW && p.run?.flowKey === "lead_nurture" && p.run.steps[0].step === 0, "past its end: nurture from week 1, entered now");
+  ok(p.run!.steps[0].dueAt === TOMORROW_OPEN + spread(people.dara) && p.run!.steps.every((s) => s.dueAt >= IMPORT_DAY_ENDS), "week 1 tomorrow at her spread, nothing on the import day");
 }
 // Eve: booked 14 days ago: Consultation booked, no flow.
 ok(of(people.eve).lead?.mode === "place" && (of(people.eve).lead as { columnName: string }).columnName === "Consultation booked" && of(people.eve).run === null, "booked, no flow");
@@ -213,6 +243,7 @@ ok(of(people.hannah).contact && of(people.hannah).to === "Email contacts", "cont
 {
   const p = of(people.ivan);
   ok(p.match?.kind === "lead" && p.match.id === 501 && p.lead?.mode === "place" && p.lead.existingId === 501 && p.outcome === "update", "matched by phone and moved");
+  ok(p.run?.flowKey === "lead_nurture" && p.run.steps.every((s) => s.dueAt >= IMPORT_DAY_ENDS), "his fresh nurture start sends nothing on the import day");
 }
 // Joan: in an Adonis flow: only missing details.
 ok(of(people.joan).lead?.mode === "fill" && of(people.joan).run === null && /follow-up/.test(of(people.joan).note), "in a flow: fill only");
@@ -280,7 +311,50 @@ ok(of(people.won).client?.existingId === null && (of(people.won).lead as { colum
   const csv = dryRunCsv(rows, (ms) => new Date(ms).toISOString());
   ok(!csv.includes(MEDICAL) && csv.startsWith("Name,"), "no medical note in the download");
   const aoifeRow = rows.find((r) => r.id === people.aoife.contactId)!;
-  ok(aoifeRow.to === "Long-term nurture" && aoifeRow.flow === "Long-term nurture" && aoifeRow.nextAt === MORNING(10) + 14 * DAY && aoifeRow.fromStage === "Long Term Nurture" && aoifeRow.days === 10, "a dry-run row says where, which flow and when");
+  ok(aoifeRow.to === "Long-term nurture" && aoifeRow.flow === "Long-term nurture" && aoifeRow.nextAt === MORNING(10) + 14 * DAY + spread(people.aoife) && aoifeRow.fromStage === "Long Term Nurture" && aoifeRow.days === 10, "a dry-run row says where, which flow and when");
+}
+
+// Twins: the person with an opportunity is imported, whatever the file order; plans stay in file order.
+{
+  const early = contact("Una"); // no opportunity, first in the file
+  const late = { ...contact("Una"), phone: early.phone }; // same email and phone, with an opportunity
+  const p = buildPlan(joinPeople([early, late], [opp(late, "Call Back Later", 3)]), snap, { exportDay: EXPORT_DAY, now: NOW });
+  ok(p.people[0].person.ghlContactId === early.contactId && p.people[0].outcome === "skip", "the twin with no opportunity is skipped");
+  ok(p.people[1].person.ghlContactId === late.contactId && p.people[1].lead?.mode === "place" && p.people[1].run?.flowKey === "lead_call_back", "the twin with an opportunity is imported");
+}
+
+// Do not contact is counted only for people who are imported.
+{
+  const vera = contact("Vera", { dnd: true, email: "", phone: "" });
+  const p = buildPlan(joinPeople([vera], []), snap, { exportDay: EXPORT_DAY, now: NOW });
+  ok(p.people[0].outcome === "skip" && p.people[0].doNotContact && p.totals.doNotContact === 0, "a skipped do-not-contact person is not counted");
+}
+
+// No days in stage and no created date: a matched Adonis lead keeps its column.
+{
+  const xena = contact("Xena", { createdAt: null });
+  const s2: Snapshot = { ...snap, leads: [...snap.leads, existing({ id: 505, email: "xena@example.com" })] };
+  const p = buildPlan(joinPeople([xena], [opp(xena, "Call Back Later", null, { createdAt: null, updatedAt: null })]), s2, { exportDay: EXPORT_DAY, now: NOW });
+  ok(p.people[0].lead?.mode === "fill" && p.people[0].run === null, "an unknown stage time counts as the oldest: fill only");
+}
+
+// A matched lead in fill mode that is also do not contact.
+{
+  const yvonne = contact("Yvonne", { dnd: true });
+  const s2: Snapshot = { ...snap, leads: [...snap.leads, existing({ id: 506, email: "yvonne@example.com", inActiveFlow: true })] };
+  const p = buildPlan(joinPeople([yvonne], [opp(yvonne, "Long Term Nurture", 30)]), s2, { exportDay: EXPORT_DAY, now: NOW });
+  ok(p.people[0].lead?.mode === "fill" && p.people[0].doNotContact && p.people[0].note.endsWith(" Marked do not contact: follow-ups stopped."), "the note says follow-ups stopped");
+  ok(!of(people.joan).note.includes("do not contact"), "a fill without do not contact says nothing of it");
+}
+
+// Added to email contacts: the contacts-only people plus the placed leads whose consent is recorded and who have an email.
+{
+  // Hannah has no opportunity; the rest are leads with consent. Ivan (no email), Fiona (do not contact) and the fill-only matches are not.
+  const added = [people.aoife, people.brian, people.ciara, people.dara, people.eve, people.hannah, people.quinn, people.won].map((c) => c.contactId).sort();
+  const counted = plan.people.filter((p) => p.contact || (p.lead?.mode === "place" && p.lead.consent && !!p.person.email)).map((p) => p.person.ghlContactId).sort();
+  assert.deepEqual(counted, added);
+  n++;
+  ok(plan.totals.emailContactsAdded === added.length && plan.totals.contactsOnly === 1, "email contacts added counts both");
 }
 
 console.log(`ghlImport plan: ${n} checks passed.`);
