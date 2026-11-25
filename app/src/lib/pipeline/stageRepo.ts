@@ -4,6 +4,7 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import type { TenantDb } from "@/lib/db/tenant";
+import { isFollowUpKey } from "./followUpColumns";
 import { resolveEntryStage, type StageRecord, type StageRole } from "./roles";
 import { defaultPipelineId, defaultPipelineIdOnConn } from "./pipelineRepo";
 import { recordStageEvent } from "./stageEvents";
@@ -26,12 +27,13 @@ const SELECT = {
   colour: schema.pipelineStages.colour,
   position: schema.pipelineStages.position,
   role: schema.pipelineStages.role,
+  systemKey: schema.pipelineStages.systemKey,
 } as const;
 
 function normalize(
-  rows: Array<{ id: number; pipelineId: number; name: string; colour: string; position: number; role: string | null }>,
+  rows: Array<{ id: number; pipelineId: number; name: string; colour: string; position: number; role: string | null; systemKey: string | null }>,
 ): StageRecord[] {
-  return rows.map((r) => ({ ...r, role: r.role as StageRole | null }));
+  return rows.map((r) => ({ ...r, role: r.role as StageRole | null, systemKey: isFollowUpKey(r.systemKey) ? r.systemKey : null }));
 }
 
 export function listStages(pipelineId: number = defaultPipelineId()): StageRecord[] {

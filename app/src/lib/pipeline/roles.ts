@@ -7,6 +7,8 @@
  * boardMetrics.ts / humanName.ts).
  */
 
+import type { FollowUpKey } from "./followUpColumns";
+
 export type StageRole =
   | "new"
   | "engaged"
@@ -89,6 +91,8 @@ export const ROLE_HINTS: Record<StageRole, string> = {
 export interface StageLike {
   position: number;
   role: StageRole | null;
+  /** Set on the five follow-up columns (lib/pipeline/followUpColumns.ts). */
+  systemKey?: FollowUpKey | null;
 }
 
 /**
@@ -99,13 +103,16 @@ export interface StageLike {
  *  - among funnel stages, advance only if candidate.position > current.position;
  *  - a candidate that is itself out-of-band (lapsed/lost) is never reached via
  *    this fn (the lapse job / manual override set those directly);
- *  - a null-role stage (manual-only) never auto-advances in or out.
+ *  - a null-role stage (manual-only) never auto-advances in or out, EXCEPT a
+ *    follow-up column (No answer, Call back later, Thinking about it,
+ *    Long-term nurture, Message undelivered): like `lapsed`, any forward
+ *    funnel event pulls the lead out of one, except a move back to `new`.
  */
 export function shouldAdvance(current: StageLike, candidate: StageLike): boolean {
   if (candidate.role == null || OUT_OF_BAND.has(candidate.role)) return false;
   if (current.role === "lost") return false;
   if (current.role === "lapsed") return true; // pull-out to any funnel stage
-  if (current.role == null) return false;
+  if (current.role == null) return current.systemKey != null && candidate.role !== "new";
   return candidate.position > current.position;
 }
 
@@ -135,6 +142,8 @@ export interface StageRecord {
   colour: string;
   position: number;
   role: StageRole | null;
+  /** Set on the five follow-up columns; absent on bare test fixtures. */
+  systemKey?: FollowUpKey | null;
 }
 
 /** The stage new leads enter: the `role:new` stage, else the lowest position, else null. */

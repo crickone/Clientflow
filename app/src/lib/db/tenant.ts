@@ -3405,4 +3405,14 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
   } catch (err) {
     console.error("[recorder:page_views] could not purge old visitor hashes", err);
   }
+
+  // Lead follow-up flows (lib/leadFlows): the follow-up columns carry a stable
+  // key so flows find them on every board whatever they are renamed to.
+  // Additive. NOT swallowed: drizzle selects every schema column, so a
+  // connection cached without this column would fail every stage read.
+  {
+    const cols = sqlite.prepare("PRAGMA table_info(pipeline_stages)").all() as Array<{ name: string }>;
+    if (cols.length && !cols.some((c) => c.name === "system_key")) sqlite.exec("ALTER TABLE pipeline_stages ADD COLUMN system_key TEXT");
+    sqlite.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_pipeline_stages_pipeline_key ON pipeline_stages(pipeline_id, system_key)");
+  }
 }

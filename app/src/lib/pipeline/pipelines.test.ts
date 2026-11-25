@@ -75,21 +75,21 @@ const requireLocal = createRequire(import.meta.url);
       assert.equal(boards[0].isDefault, true);
       assert.equal(defaultPipelineId(), boards[0].id);
       const defaultStages = listStages();
-      assert.equal(defaultStages.length, 9, "the nine seeded stages belong to the default board");
+      assert.equal(defaultStages.length, 14, "the nine seeded stages and the five follow-up columns belong to the default board");
       assert.ok(defaultStages.every((s) => s.pipelineId === boards[0].id));
 
       // ── a second board, cloned ──
       const summer = createPipeline({ name: "Summer Shape Up", campaignId: 4242 });
       assert.notEqual(summer.id, boards[0].id);
       const summerStages = listStages(summer.id);
-      assert.equal(summerStages.length, 9, "the new board gets a copy of every default stage");
+      assert.equal(summerStages.length, 14, "the new board gets a copy of every default stage");
       assert.deepEqual(
         summerStages.map((s) => [s.name, s.role]),
         defaultStages.map((s) => [s.name, s.role]),
         "names and roles are cloned in order",
       );
       assert.ok(summerStages.every((s) => !defaultStages.some((d) => d.id === s.id)), "cloned stages have their own ids");
-      assert.equal(listStages().length, 9, "the default board is untouched");
+      assert.equal(listStages().length, 14, "the default board is untouched");
 
       const defaultEntry = resolveEntryStageId();
       const summerEntry = resolveEntryStageId(summer.id);
@@ -132,7 +132,7 @@ const requireLocal = createRequire(import.meta.url);
       const board = pipelineForCampaign(campaign.id);
       assert.ok(board, "create_campaign made a pipeline for the campaign");
       assert.equal(board!.name, "Autumn Reset");
-      assert.equal(listStages(board!.id).length, 9);
+      assert.equal(listStages(board!.id).length, 14);
       assert.equal(listPipelines().length, 3);
 
       // ── deleting a pipeline keeps its leads (2026-10-14) ──

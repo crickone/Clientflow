@@ -108,6 +108,7 @@ export function createPipeline(input: { name: string; campaignId?: number | null
         colour: schema.pipelineStages.colour,
         position: schema.pipelineStages.position,
         role: schema.pipelineStages.role,
+        systemKey: schema.pipelineStages.systemKey,
       })
       .from(schema.pipelineStages)
       .where(eq(schema.pipelineStages.pipelineId, sourceId))
@@ -117,7 +118,14 @@ export function createPipeline(input: { name: string; campaignId?: number | null
 
     for (const s of template) {
       tx.insert(schema.pipelineStages)
-        .values({ pipelineId: row.id, name: s.name, colour: s.colour, position: s.position, role: s.role })
+        .values({
+          pipelineId: row.id,
+          name: s.name,
+          colour: s.colour,
+          position: s.position,
+          role: s.role,
+          systemKey: "systemKey" in s ? (s.systemKey ?? null) : null,
+        })
         .run();
     }
     return row;
@@ -144,20 +152,23 @@ export function deletePipeline(id: number): { moved: number } {
     if (target.isDefault) throw new Error("The main pipeline can't be deleted.");
     const mainId = defaultOf(tx.select(SELECT).from(schema.pipelines).orderBy(asc(schema.pipelines.id)).all());
     const mainStages = tx
-      .select({ id: schema.pipelineStages.id, role: schema.pipelineStages.role })
+      .select({ id: schema.pipelineStages.id, role: schema.pipelineStages.role, systemKey: schema.pipelineStages.systemKey })
       .from(schema.pipelineStages)
       .where(eq(schema.pipelineStages.pipelineId, mainId))
       .orderBy(asc(schema.pipelineStages.position))
       .all();
     const first = mainStages[0]?.id ?? null;
     const stages = tx
-      .select({ id: schema.pipelineStages.id, role: schema.pipelineStages.role })
+      .select({ id: schema.pipelineStages.id, role: schema.pipelineStages.role, systemKey: schema.pipelineStages.systemKey })
       .from(schema.pipelineStages)
       .where(eq(schema.pipelineStages.pipelineId, id))
       .all();
     let moved = 0;
     for (const st of stages) {
-      const to = (st.role && mainStages.find((m) => m.role === st.role)?.id) || first;
+      const to =
+        (st.role && mainStages.find((m) => m.role === st.role)?.id) ||
+        (st.systemKey && mainStages.find((m) => m.systemKey === st.systemKey)?.id) ||
+        first;
       moved += tx.update(schema.leads).set({ pipelineId: mainId, stageId: to }).where(and(eq(schema.leads.pipelineId, id), eq(schema.leads.stageId, st.id))).run().changes;
     }
     // Leads on this board with no column (or one not in its list).

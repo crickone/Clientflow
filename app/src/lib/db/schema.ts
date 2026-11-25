@@ -457,11 +457,16 @@ export const pipelineStages = sqliteTable(
     colour: text("colour").notNull(),
     position: integer("position").notNull(),
     role: text("role"), // StageRole | null; app-enforced unique-where-set PER PIPELINE
+    /** FollowUpKey | null (lib/pipeline/followUpColumns.ts); unique per pipeline where set. */
+    systemKey: text("system_key"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
   },
-  (t) => ({ byPipelineRole: uniqueIndex("idx_pipeline_stages_pipeline_role").on(t.pipelineId, t.role) }),
+  (t) => ({
+    byPipelineRole: uniqueIndex("idx_pipeline_stages_pipeline_role").on(t.pipelineId, t.role),
+    byPipelineKey: uniqueIndex("idx_pipeline_stages_pipeline_key").on(t.pipelineId, t.systemKey),
+  }),
 );
 
 /**
