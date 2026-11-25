@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Textarea } from "@/components/ui/Input";
+import { isMediaPlaceholder, type MessageMedia } from "@/lib/inbox/mediaModel";
+import { MessageBody } from "./MessageBody";
 
 export interface ThreadMessage {
   id: number;
@@ -17,6 +19,8 @@ export interface ThreadMessage {
   aiGenerated?: boolean;
   sentAt?: Date | string | null;
   createdAt: Date | string;
+  /** Photos, video, voice notes and files that came with it. */
+  media?: MessageMedia[];
 }
 
 /**
@@ -133,7 +137,7 @@ export function ConversationThread({
                   <div style={{ alignSelf: inbound ? "flex-start" : "flex-end", maxWidth: "78%", display: "flex", flexDirection: "column", alignItems: inbound ? "flex-start" : "flex-end", margin: "3px 0" }}>
                     <div
                       style={{
-                        padding: "9px 13px",
+                        padding: m.media?.length ? 4 : "9px 13px",
                         borderRadius: 18,
                         borderBottomLeftRadius: inbound ? 6 : 18,
                         borderBottomRightRadius: inbound ? 18 : 6,
@@ -146,7 +150,14 @@ export function ConversationThread({
                         opacity: failed ? 0.6 : 1,
                       }}
                     >
-                      {m.content}
+                      {m.media?.length ? (
+                        <div style={{ display: "grid", gap: 0 }}>
+                          <MessageBody content="" media={m.media} />
+                          {m.content.trim() && !isMediaPlaceholder(m.content) && <div style={{ padding: "6px 9px 5px" }}>{m.content}</div>}
+                        </div>
+                      ) : (
+                        m.content
+                      )}
                     </div>
                     <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 3, fontSize: 10.5, color: "var(--text-tertiary)" }}>
                       {m.aiGenerated && !inbound && <span>AI</span>}

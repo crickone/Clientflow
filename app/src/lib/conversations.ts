@@ -10,6 +10,7 @@ import {
   conversationTags,
 } from "./db/schema";
 import type { ThreadMessage } from "@/components/messaging/ConversationThread";
+import { parseMedia } from "@/lib/inbox/mediaModel";
 import { lastInboundChannel, type ReplyChannel } from "@/lib/messaging/reply";
 import { getDmTarget, humanAgentApproved, lateReplyMessage, META_INBOX_URL } from "@/lib/social/dm";
 
@@ -292,6 +293,7 @@ function toThread(rows: Array<{
   aiGenerated: boolean;
   sentAt: Date | null;
   createdAt: Date;
+  media: string | null;
 }>): ThreadMessage[] {
   return rows.map((m) => ({
     id: m.id,
@@ -302,6 +304,7 @@ function toThread(rows: Array<{
     aiGenerated: m.aiGenerated,
     sentAt: m.sentAt,
     createdAt: m.createdAt,
+    ...(m.media ? { media: parseMedia(m.media) } : {}),
   }));
 }
 

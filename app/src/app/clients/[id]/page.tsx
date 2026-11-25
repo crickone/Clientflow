@@ -80,6 +80,7 @@ import { ClientJourney } from "@/components/clients/ClientJourney";
 import { getClientJourney } from "@/lib/clientJourney";
 import { dailyTarget, mealCount, mealsBetween, targetSource } from "@/lib/meals";
 import { weekOf } from "@/lib/mealsModel";
+import { parseMedia } from "@/lib/inbox/mediaModel";
 import { ClientNutrition } from "@/components/clients/ClientNutrition";
 
 export const dynamic = "force-dynamic";
@@ -544,6 +545,7 @@ export default async function ClientProfile(
               aiGenerated: m.aiGenerated,
               sentAt: m.sentAt,
               createdAt: m.createdAt,
+              ...(m.media ? { media: parseMedia(m.media) } : {}),
             }))}
           />
         </TabsContent>

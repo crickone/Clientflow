@@ -28,6 +28,7 @@ import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/DropdownMenu";
 import { Input, Textarea } from "@/components/ui/Input";
+import { MessageBody } from "@/components/messaging/MessageBody";
 import type { StageRecord } from "@/lib/pipeline/roles";
 import {
   callLeadAction,
@@ -520,7 +521,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
                   </div>
                 ) : (
                   <>
-                    <div className="ld-bubble">{m.content}</div>
+                    <div className="ld-bubble"><MessageBody content={m.content} media={m.media} /></div>
                     {isDraft && draftActions(m, m.content)}
                   </>
                 )}
