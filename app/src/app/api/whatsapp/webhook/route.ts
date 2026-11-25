@@ -27,6 +27,7 @@ import { recordConsent } from "@/lib/marketingConsent";
 import { isOptedIn } from "@/lib/whatsappBroadcasts";
 import { isStopReply } from "@/lib/whatsappBroadcastModel";
 import { notifyInboundMessage } from "@/lib/notifications/notify";
+import { ingestWhatsAppMediaLater } from "@/lib/whatsapp/inboundMedia";
 
 /**
  * Distinguishes an expected "tenant is over its monthly AI cap" skip from a
@@ -126,6 +127,7 @@ export async function POST(req: NextRequest) {
           providerMessageId: inbound.providerMessageId,
           sentAt: new Date(inbound.timestamp),
         });
+        ingestWhatsAppMediaLater(tenant.id, "client", inboundMsg.id, bridge, inbound);
         await logActivity(
           "whatsapp.inbound",
           `WhatsApp reply from ${client.firstName} ${client.lastName}`.trim(),
@@ -182,6 +184,7 @@ export async function POST(req: NextRequest) {
           providerMessageId: inbound.providerMessageId,
           sentAt: new Date(inbound.timestamp),
         });
+        ingestWhatsAppMediaLater(tenant.id, "lead", inboundMsg.id, bridge, inbound);
         setLeadStatus(lead.id, "replied");
         try {
           onInboundFromLead(lead.id);

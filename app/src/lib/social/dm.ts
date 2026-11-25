@@ -4,7 +4,9 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { socialContacts } from "@/lib/db/schema";
-import { getCurrentTenant } from "@/lib/db/tenant";
+import { boundTenantId, getCurrentTenant } from "@/lib/db/tenant";
+import { ingestMessageMediaLater } from "@/lib/inbox/media";
+import { nameFromUrl } from "@/lib/inbox/mediaModel";
 import { GRAPH_BASE, metaApiError } from "@/lib/facebook/graph";
 import { notePageRefusal } from "@/lib/facebook/health";
 import { getPageTokenForTenant } from "@/lib/facebook/pages";
@@ -163,6 +165,13 @@ export async function recordDmEvent(ev: MessagingEvent, page: { pageId: string; 
     content: ev.text,
     providerMessageId: ev.messageId,
     sentAt,
+  });
+  // Photos and files (theirs or the business's own echo): fetched after the row exists, never awaited.
+  ingestMessageMediaLater({
+    tenantId: boundTenantId() ?? getCurrentTenant().id,
+    owner: owner.ownerType,
+    messageId: stored.id,
+    attachments: ev.attachments.map((a) => ({ kind: a.type, sources: [{ url: a.url }], name: a.type === "file" ? nameFromUrl(a.url) : undefined })),
   });
   if (ev.isEcho) return null;
 

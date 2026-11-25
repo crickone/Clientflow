@@ -96,6 +96,28 @@ check("entry not an array -> []", parseLeadgenEvents({ entry: "nope" }).length =
   check("leadgen payload yields no messages", parseMessagingEvents({ object: "page", entry: [{ id: "P", changes: [{ field: "leadgen" }] }] }).length === 0);
   check("unknown object -> []", parseMessagingEvents({ object: "user", entry: [] }).length === 0);
   check("garbage never throws", parseMessagingEvents("nope").length === 0 && parseMessagingEvents(null).length === 0);
+  check("text message has no attachments", messenger[0].attachments.length === 0);
+  check("attachment without a link keeps the placeholder and no download", messenger[2].attachments.length === 0);
+}
+
+// ── attachments keep their link (photos and files in the inbox) ──
+{
+  const IMG = "https://cdn.example.test/v/photo.jpg?sig=abc&exp=1";
+  const DOC = "https://cdn.example.test/v/Price%20list.pdf?sig=def";
+  const evs = parseMessagingEvents({
+    object: "page",
+    entry: [{ id: "PAGE1", messaging: [
+      { sender: { id: "PSID1" }, recipient: { id: "PAGE1" }, timestamp: 1, message: { mid: "a1", attachments: [{ type: "image", payload: { url: IMG } }] } },
+      { sender: { id: "PSID1" }, recipient: { id: "PAGE1" }, timestamp: 2, message: { mid: "a2", text: "Here you go", attachments: [{ type: "file", payload: { url: DOC } }, { type: "audio", payload: { url: "https://cdn.example.test/a.mp4" } }] } },
+      { sender: { id: "PAGE1" }, recipient: { id: "PSID1" }, timestamp: 3, message: { mid: "a3", is_echo: true, attachments: [{ type: "video", payload: { url: "https://cdn.example.test/v.mp4" } }] } },
+      { sender: { id: "PSID1" }, recipient: { id: "PAGE1" }, timestamp: 4, message: { mid: "a4", attachments: [{ type: "fallback", payload: { url: "https://example.test/link" } }, { type: "image", payload: { url: "http://cdn.example.test/insecure.jpg" } }] } },
+    ] }],
+  });
+  check("photo-only: placeholder text kept", evs[0].text === "[Photo]");
+  check("photo-only: the CDN link is kept exactly", evs[0].attachments.length === 1 && evs[0].attachments[0].type === "image" && evs[0].attachments[0].url === IMG);
+  check("caption + file + audio: text kept, both links kept", evs[1].text === "Here you go" && evs[1].attachments.map((a) => a.type).join() === "file,audio" && evs[1].attachments[0].url === DOC);
+  check("echo with a video keeps its link", evs[2].isEcho && evs[2].attachments.length === 1 && evs[2].attachments[0].type === "video");
+  check("fallback links and non-https links are not downloaded", evs[3].attachments.length === 0);
 }
 
 console.log(`\nfacebook/webhook.test.ts: ${passed} checks passed.`);

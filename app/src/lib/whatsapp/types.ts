@@ -19,6 +19,20 @@ export interface InboundMessage {
   providerMessageId: string;
   /** Epoch ms. */
   timestamp: number;
+  /** A photo, video, voice note or document that came with it (`text` is then its caption or a placeholder). */
+  media?: InboundMedia[];
+}
+
+/** An inbound attachment as the provider described it, before download. */
+export interface InboundMedia {
+  kind: "image" | "video" | "audio" | "file";
+  /** The provider's media id, for its media endpoint. */
+  mediaId?: string;
+  /** A direct link, when the provider gives one. */
+  link?: string;
+  mime?: string;
+  name?: string;
+  size?: number;
 }
 
 /** A normalized delivery/read status update parsed from a provider webhook. */
@@ -54,6 +68,12 @@ export interface WhatsAppBridge {
 
   /** Map a provider inbound-webhook payload to a normalized message, or null. */
   parseInboundWebhook(payload: unknown): InboundMessage | null;
+
+  /**
+   * Where to download an inbound attachment from, tried in order. A token
+   * header is only ever attached to the provider's own host.
+   */
+  mediaSources?(media: InboundMedia): Array<{ url: string; headers?: Record<string, string> }>;
 
   /** Map a provider status-webhook payload to a normalized status, or null. */
   parseStatusWebhook(payload: unknown): StatusUpdate | null;
