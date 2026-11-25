@@ -20,6 +20,23 @@ export function stickAfterScroll(distance: number, stuck: boolean, userDriven: b
   return userDriven ? distance <= NEAR_BOTTOM_PX : stuck;
 }
 
+/**
+ * Whether a scroll event is the operator's own: their wheel, touch, drag or key
+ * was seen within `intentMs`, and no scroll the page started itself (the pin
+ * glide, "Jump to latest") is still running. Page-started scrolls win until the
+ * operator does something new, which the caller records by clearing
+ * `programmaticUntil`.
+ */
+export function isUserScroll(now: number, intentAt: number, programmaticUntil: number, intentMs: number): boolean {
+  if (now < programmaticUntil) return false;
+  return now - intentAt < intentMs;
+}
+
+/** A pin for an exchange that has not rendered yet stops mattering after `ttlMs`. */
+export function pinLive(now: number, pinnedAt: number, ttlMs: number): boolean {
+  return now - pinnedAt < ttlMs;
+}
+
 export function shouldShowJump(m: ScrollMetrics): boolean {
   return distanceFromBottom(m) > JUMP_AFTER_PX;
 }
