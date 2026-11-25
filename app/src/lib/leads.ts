@@ -14,6 +14,8 @@ import { enqueueCall } from "./voice/queue";
 import type { StageRole } from "./pipeline/roles";
 import { notifyNewLead } from "./notifications/notify";
 import { setLeadMarketingConsent } from "./leadFlows/consent";
+import { defaultAssigneeForNewLead } from "./leadFlows/assignment";
+import { alertNewLead } from "./leadFlows/alerts";
 import type { ConsentSource } from "./leadFlows/consentModel";
 
 export type LeadStatus = "new" | "contacted" | "replied" | "booked" | "lost";
@@ -100,6 +102,7 @@ export function upsertLead(input: NormalizedLeadInput): {
       notes: nz(input.notes),
       rawPayload: input.rawPayload ? JSON.stringify(input.rawPayload) : null,
       arrival: input.arrival ? JSON.stringify(input.arrival) : null,
+      assignedUserId: defaultAssigneeForNewLead(),
       pipelineId,
       stageId: resolveEntryStageId(pipelineId) ?? undefined,
     })
@@ -115,6 +118,8 @@ export function upsertLead(input: NormalizedLeadInput): {
   // Tell the team (not for a lead that came in on a message, which already
   // notified, or one a staff member typed in). Never throws.
   notifyNewLead(lead, input.actor);
+  // The assignee's own alert and the WhatsApp alert (lib/leadFlows/alerts). Never throws.
+  alertNewLead(lead, input.actor);
   return { lead, created: true };
 }
 

@@ -9,6 +9,7 @@ import { TRIGGER_LABELS } from "@/lib/automationModel";
 import { getAppBaseUrl } from "@/lib/appUrl";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { escapeHtml, renderEmailShell, textToParagraphs } from "@/lib/email";
+import { notifyUser } from "@/lib/notifications/notify";
 import { isStopped } from "@/lib/platform/killSwitch";
 import { getThemeForTenant } from "@/lib/settings";
 
@@ -195,6 +196,35 @@ async function runMoveRow(ctx: DispatchContext, item: AutomationQueueRow): Promi
   return false;
 }
 
+async function sendStaffAlertRow(ctx: DispatchContext, item: AutomationQueueRow): Promise<boolean> {
+  const p = parsePayload(item.payload);
+  if (p.userId != null && p.title) {
+    notifyUser(p.userId, { kind: "lead", title: p.title, body: p.body ?? "", href: p.href ?? "/leads", key: `alert:${item.id}` });
+  }
+  if (!p.whatsappText) {
+    markRow(ctx.tdb, item.id, { status: "sent", error: null, sentAt: new Date(ctx.now) });
+    return false;
+  }
+  const to = ctx.settings.alertWhatsAppTo;
+  if (!to) {
+    markRow(ctx.tdb, item.id, { status: "cancelled", error: "No WhatsApp alert number is set." });
+    return false;
+  }
+  const transport = getFlowTransport();
+  let error: string | null = null;
+  if (!transport.whatsAppConnected()) error = WHATSAPP_NOT_CONNECTED;
+  else {
+    try {
+      await transport.sendWhatsAppToNumber(to, p.whatsappText);
+    } catch (err) {
+      error = err instanceof Error ? err.message : "WhatsApp send failed.";
+    }
+  }
+  markRow(ctx.tdb, item.id, { status: error ? "failed" : "sent", error, sentAt: new Date(ctx.now) });
+  logSend(ctx, item, "whatsapp", null, to, error, "Staff alert");
+  return false;
+}
+
 async function unknownRow(ctx: DispatchContext, item: AutomationQueueRow): Promise<boolean> {
   markRow(ctx.tdb, item.id, { status: "failed", error: "Unknown queue row." });
   return false;
@@ -204,6 +234,7 @@ async function unknownRow(ctx: DispatchContext, item: AutomationQueueRow): Promi
 const HANDLERS: Record<string, RowHandler> = {
   message: sendMessageRow,
   move: runMoveRow,
+  staff_alert: sendStaffAlertRow,
 };
 
 function closeRunIfDone(tdb: TenantDb, runId: number, now: number): void {

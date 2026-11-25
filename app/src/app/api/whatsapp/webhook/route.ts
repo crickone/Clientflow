@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
         });
         setLeadStatus(lead.id, "replied");
         try {
-          onInboundFromLead(lead.id);
+          onInboundFromLead(lead.id, { text: inbound.text, messageId: inboundMsg.id, channel: "whatsapp" });
         } catch (err) {
           console.error("[pipeline] lead inbound hook failed:", err);
         }

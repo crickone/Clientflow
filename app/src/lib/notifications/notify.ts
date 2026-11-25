@@ -30,6 +30,8 @@ export interface NotifyInput {
   href: string;
   /** The same key notifies once, however many times the event is seen. */
   key: string;
+  /** A personal alert: in this user's bell and on their devices only. */
+  forUserId?: number;
 }
 
 let pushSender: PushSender | undefined;
@@ -52,12 +54,12 @@ export function notify(input: NotifyInput): number | null {
     const tenantId = boundTenantId() ?? resolveCurrentTenant()?.id;
     if (!tenantId) return null;
     const body = snippet(input.body ?? "", 140);
-    const id = createNotification({ kind: input.kind, title: snippet(input.title, 120), body, href: input.href, key: input.key });
+    const id = createNotification({ kind: input.kind, title: snippet(input.title, 120), body, href: input.href, key: input.key, forUserId: input.forUserId ?? null });
     if (id == null) return null;
 
     // Who gets an alert is worked out now, while the tenant is bound; only
     // the sending happens after the caller has moved on.
-    const people = staffOf(tenantId);
+    const people = staffOf(tenantId).filter((p) => input.forUserId == null || p.userId === input.forUserId);
     const userIds = pushRecipients(people, prefsForUsers(people.map((p) => p.userId)), { kind: input.kind, adminOnly: isAdminOnlyKind(input.kind) });
     const subs = subscriptionsFor(userIds);
     if (subs.length) {
@@ -70,6 +72,11 @@ export function notify(input: NotifyInput): number | null {
     console.error("[notifications] notify failed", err);
     return null;
   }
+}
+
+/** An alert for one person only: their bell and their devices, nobody else's. Never throws. */
+export function notifyUser(userId: number, input: Omit<NotifyInput, "forUserId">): number | null {
+  return notify({ ...input, forUserId: userId });
 }
 
 /** Run `fn` bound to a tenant, swallowing anything it throws. */

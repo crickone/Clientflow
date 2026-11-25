@@ -8,6 +8,7 @@ import { listStages, resolveStageIdByRole, resolveEntryStageId } from "./stageRe
 import { leadPipelineId } from "./pipelineRepo";
 import { recordStageEvent, type StageActor } from "./stageEvents";
 import { KEEP_ON_REPLY } from "@/lib/automationModel";
+import { alertHotLead } from "@/lib/leadFlows/alerts";
 import { applyColumnEntry } from "@/lib/leadFlows/columnEntry";
 import { stopFlows } from "@/lib/leadFlows/runs";
 import { getCurrentTenant } from "@/lib/db/tenant";
@@ -200,7 +201,14 @@ export function leadIdForClient(clientId: number): number | null {
 }
 
 // ── Event hooks (signatures UNCHANGED — call sites in appointments/packages/whatsapp untouched) ──
-export function onInboundFromLead(leadId: number): void {
+/** What a lead said, when the caller has it (for the hot-lead alert and the Thinking about it check). */
+export interface LeadReply {
+  text: string;
+  messageId?: number;
+  channel?: string;
+}
+
+export function onInboundFromLead(leadId: number, reply?: LeadReply): void {
   // They replied: a person takes it from here, so the automatic nudges stop
   // (a booked call's confirmation and reminder carry on).
   try {
@@ -208,7 +216,8 @@ export function onInboundFromLead(leadId: number): void {
   } catch (err) {
     console.error(`[pipeline] could not stop follow-ups for lead #${leadId}:`, err);
   }
-  advanceStage(leadId, "engaged", "replied");
+  // Hot now, and only now: the assignee and the alert number are told.
+  if (advanceStage(leadId, "engaged", "replied")) alertHotLead(leadId, reply?.text ?? null);
 }
 export function onInboundFromClient(clientId: number): void {
   const leadId = leadIdForClient(clientId);

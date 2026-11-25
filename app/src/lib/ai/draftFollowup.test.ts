@@ -94,6 +94,7 @@ const requireLocal = createRequire(import.meta.url);
     hotReason: null,
     marketingConsentAt: null,
     marketingConsentSource: null,
+    assignedUserId: null,
         pipelineId: 1,
     status: "new",
     pipelineStage: "new_lead",

@@ -387,6 +387,8 @@ export const leads = sqliteTable("leads", {
   marketingConsentAt: integer("marketing_consent_at"),
   /** How it was given: "form", "api" (a lead posted in with it), or "staff". */
   marketingConsentSource: text("marketing_consent_source"),
+  /** The staff member (control-plane user id) this lead is assigned to; null = nobody. */
+  assignedUserId: integer("assigned_user_id"),
   status: text("status", {
     enum: ["new", "contacted", "replied", "booked", "lost"],
   })
@@ -3550,6 +3552,8 @@ export const notifications = sqliteTable(
     /** The same event notifies once: a second insert with this key is ignored. */
     dedupeKey: text("dedupe_key").notNull().unique(),
     adminOnly: integer("admin_only", { mode: "boolean" }).notNull().default(false),
+    /** Set for a personal alert: only this user (control-plane id) sees it. Null = the whole business. */
+    forUserId: integer("for_user_id"),
     createdAt: integer("created_at").notNull(),
   },
   (t) => ({ created: index("idx_notifications_created").on(t.createdAt) }),
