@@ -10,7 +10,7 @@ import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { formatCallDay, formatCallTime, scheduleCallMessages } from "./callPlan";
 import { flowNow } from "./clock";
 import { getFlowDefinition } from "./definitions";
-import { CALL_ALERT_KEY, CALL_BOOKED_FLOW, LEAD_FLOW_KEYS, LEAD_FLOW_KEY_SET } from "./flowModel";
+import { CALL_ALERT_KEY, CALL_BOOKED_FLOW, LEAD_FLOW_KEYS, LEAD_FLOW_KEY_SET, NURTURE_FLOW } from "./flowModel";
 import { cascadeDueTimes, finishDueAt, pickForInterest, type FlowScope } from "./flowPlan";
 import { fitToWindow } from "./sendingWindow";
 import { getLeadFlowSettings } from "./settings";
@@ -117,6 +117,8 @@ export function startFlow(leadId: number, triggerKey: string, opts: StartFlowOpt
   if (!def.enabled) return skip("switched off");
   if (opts.ifNotActive && alreadyRunning(leadId, triggerKey)) return skip("already running");
   if (triggerKey === CALL_BOOKED_FLOW && opts.callAt == null) return skip("no call time");
+  // Long-term nurture is marketing: only for leads who agreed to it.
+  if (triggerKey === NURTURE_FLOW && lead.marketingConsentAt == null) return skip("no marketing consent");
 
   const tenant = flowTenant();
   if (!tenant) return skip("no business");

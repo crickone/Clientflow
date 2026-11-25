@@ -3448,6 +3448,8 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     addColumn("automation_messages", "match_interest", "match_interest TEXT");
     sqlite.exec("CREATE INDEX IF NOT EXISTS idx_automation_queue_lead ON automation_queue(lead_id, status)");
     sqlite.exec("CREATE INDEX IF NOT EXISTS idx_automation_queue_provider ON automation_queue(provider_message_id)");
+    addColumn("leads", "marketing_consent_at", "marketing_consent_at INTEGER");
+    addColumn("leads", "marketing_consent_source", "marketing_consent_source TEXT");
     // Later lead-flow columns go here.
   }
 }

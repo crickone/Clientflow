@@ -379,6 +379,14 @@ export const leads = sqliteTable("leads", {
    * intent"). Shown on the card. Null when it got there by hand or not yet.
    */
   hotReason: text("hot_reason"),
+  /**
+   * When the lead agreed to marketing (news and offers), epoch ms; null = no.
+   * Only the Long-term nurture flow needs it (lib/leadFlows/consent.ts).
+   * Cleared by an unsubscribe.
+   */
+  marketingConsentAt: integer("marketing_consent_at"),
+  /** How it was given: "form", "api" (a lead posted in with it), or "staff". */
+  marketingConsentSource: text("marketing_consent_source"),
   status: text("status", {
     enum: ["new", "contacted", "replied", "booked", "lost"],
   })

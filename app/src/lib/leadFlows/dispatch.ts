@@ -8,12 +8,13 @@ import type { AutomationQueueRow } from "@/lib/db/schema";
 import { TRIGGER_LABELS } from "@/lib/automationModel";
 import { getAppBaseUrl } from "@/lib/appUrl";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
-import { renderEmailShell, textToParagraphs } from "@/lib/email";
+import { escapeHtml, renderEmailShell, textToParagraphs } from "@/lib/email";
 import { isStopped } from "@/lib/platform/killSwitch";
 import { getThemeForTenant } from "@/lib/settings";
 
 import { flowNow } from "./clock";
-import { parsePayload, resolveColumn } from "./flowModel";
+import { unsubscribeUrl } from "./consent";
+import { NURTURE_FLOW, parsePayload, resolveColumn } from "./flowModel";
 import { fitToWindow } from "./sendingWindow";
 import { getLeadFlowSettingsForTenant } from "./settings";
 import type { LeadFlowSettings } from "./settingsModel";
@@ -103,8 +104,33 @@ async function sendEmailRow(ctx: DispatchContext, item: AutomationQueueRow): Pro
     return false;
   }
   const subject = item.subject || `A message from ${ctx.businessName}`;
-  const bodyHtml = textToParagraphs(item.body);
-  const text = item.body;
+  let bodyHtml = textToParagraphs(item.body);
+  let text = item.body;
+  // Long-term nurture is marketing: still agreed to, and every email carries the signed unsubscribe link.
+  if (item.triggerKey === NURTURE_FLOW) {
+    const lead = item.leadId == null
+      ? undefined
+      : ctx.tdb
+          .select({ marketingConsentAt: schema.leads.marketingConsentAt, firstName: schema.leads.firstName, lastName: schema.leads.lastName, phone: schema.leads.phone })
+          .from(schema.leads)
+          .where(eq(schema.leads.id, item.leadId))
+          .get();
+    if (!lead || lead.marketingConsentAt == null) {
+      markRow(ctx.tdb, item.id, { status: "cancelled", error: "Not sent: no marketing consent." });
+      return false;
+    }
+    let url: string;
+    try {
+      url = unsubscribeUrl(ctx.tdb, ctx.tenantId, ctx.baseUrl, { email: item.sendTo, firstName: lead.firstName, lastName: lead.lastName, phone: lead.phone });
+    } catch (err) {
+      const error = `Can't add the unsubscribe link: ${err instanceof Error ? err.message : "unknown error"}`.slice(0, 300);
+      markRow(ctx.tdb, item.id, { status: "failed", error, sentAt: new Date(ctx.now) });
+      logSend(ctx, item, "email", item.subject, item.sendTo, error);
+      return false;
+    }
+    bodyHtml += `<p style="margin:20px 0 0;font-size:12px;color:#9ca3af;">Don't want these emails? <a href="${escapeHtml(url)}" style="color:#9ca3af;">Unsubscribe</a>.</p>`;
+    text += `\n\nUnsubscribe: ${url}`;
+  }
   const html = renderEmailShell({ businessName: ctx.businessName, accent: ctx.accent, bodyHtml, footer: `Sent by ${ctx.businessName}.` });
   let error: string | null = null;
   try {
