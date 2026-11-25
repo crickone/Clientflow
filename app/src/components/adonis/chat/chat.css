@@ -123,6 +123,9 @@
 .ax-card { min-width: 0; padding: 12px; border: 1px solid var(--ax-line); border-radius: 12px; background: var(--surface-1); }
 .ax-card-wide { grid-column: 1 / -1; }
 .ax-card-wide .ai-tasks { max-width: none; margin: 0; border-radius: 12px; }
+/* The shared .ai-tasks styles are older: rows 26px, a literal white tick. Raise them here. */
+.ax-card-wide .ai-tasks-list li { min-height: 40px; }
+.ax-card-wide .ai-tasks-list li[data-status="done"] .ai-task-icon { color: var(--accent-contrast); }
 .ax-card-k { font: 500 11px/1.4 var(--font-mono), ui-monospace, monospace; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
 .ax-card-t { margin-top: 4px; font-size: 14px; font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
 .ax-card-m { margin-top: 2px; font-size: 12.5px; color: var(--text-secondary); overflow-wrap: anywhere; }
@@ -296,6 +299,6 @@ a.ax-ti:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 
 @keyframes ax-pulse { 50% { opacity: 0.3; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .ax-w, .ax-step, .ax-cards, .ax-rel, .ax-jump, .ax-thinking::before, .ax-live::before, .ax-appr-h::before, .ax-btn .spin { animation: none !important; }
+  .ax-w, .ax-step, .ax-cards, .ax-rel, .ax-jump, .ax-thinking::before, .ax-live::before, .ax-appr-h::before, .ax-btn .spin, .ax-card-wide .spin { animation: none !important; }
   .ax-step[data-state="running"] .ax-dot { animation: none !important; border-top-color: var(--text-primary); }
 }
