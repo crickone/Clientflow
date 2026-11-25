@@ -5,7 +5,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { LeadFlowRun } from "@/lib/db/schema";
 import { applyShortcodes, TRIGGER_LABELS } from "@/lib/automationModel";
-import { getBusinessProfile } from "@/lib/businessProfile";
+import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 
 import { formatCallDay, formatCallTime, scheduleCallMessages } from "./callPlan";
 import { flowNow } from "./clock";
@@ -14,6 +14,7 @@ import { CALL_ALERT_KEY, CALL_BOOKED_FLOW, LEAD_FLOW_KEYS, LEAD_FLOW_KEY_SET } f
 import { cascadeDueTimes, finishDueAt, pickForInterest, type FlowScope } from "./flowPlan";
 import { fitToWindow } from "./sendingWindow";
 import { getLeadFlowSettings } from "./settings";
+import { flowTenant } from "./tenant";
 
 /**
  * Lead flow runs: starting one lead on one flow, and stopping flows. All in
@@ -117,10 +118,11 @@ export function startFlow(leadId: number, triggerKey: string, opts: StartFlowOpt
   if (opts.ifNotActive && alreadyRunning(leadId, triggerKey)) return skip("already running");
   if (triggerKey === CALL_BOOKED_FLOW && opts.callAt == null) return skip("no call time");
 
-  stopFlows(leadId, `${def.label} started`, "all");
+  const tenant = flowTenant();
+  if (!tenant) return skip("no business");
 
   const { window } = getLeadFlowSettings();
-  const profile = getBusinessProfile();
+  const profile = getBusinessProfileForTenant(tenant.id);
   const picked = pickForInterest(def.messages, lead.therapyInterest);
   const delays = picked.map((m) => m.delayMs);
   const fit = (at: number, i: number) => fitToWindow(at, picked[i].channel, window);
@@ -169,26 +171,32 @@ export function startFlow(leadId: number, triggerKey: string, opts: StartFlowOpt
   const finishAt = def.finish && triggerKey !== CALL_BOOKED_FLOW ? finishDueAt(opts.firstAt ?? now, dues, delays, def.finish.afterMs) : null;
   if (rows.length === 0 && finishAt == null) return skip("nothing this lead can receive");
 
-  const runId = db
-    .insert(schema.leadFlowRuns)
-    .values({ leadId, triggerKey, status: "active", startedAt: new Date(now) })
-    .returning({ id: schema.leadFlowRuns.id })
-    .get().id;
-  for (const r of rows) db.insert(schema.automationQueue).values({ ...r, runId }).run();
-  if (finishAt != null && def.finish) {
-    db.insert(schema.automationQueue)
-      .values({
-        triggerKey,
-        leadId,
-        runId,
-        kind: "move",
-        channel: "chat",
-        body: `Move to ${def.finish.column}`,
-        dueAt: new Date(finishAt),
-        payload: JSON.stringify({ column: def.finish.column }),
-      })
-      .run();
-  }
+  // Everything is worked out above; only now does the lead leave its other flows,
+  // and the stop, the run and its rows land together or not at all.
+  const runId = db.transaction((tx) => {
+    stopFlows(leadId, `${def.label} started`, "all");
+    const id = tx
+      .insert(schema.leadFlowRuns)
+      .values({ leadId, triggerKey, status: "active", startedAt: new Date(now) })
+      .returning({ id: schema.leadFlowRuns.id })
+      .get().id;
+    for (const r of rows) tx.insert(schema.automationQueue).values({ ...r, runId: id }).run();
+    if (finishAt != null && def.finish) {
+      tx.insert(schema.automationQueue)
+        .values({
+          triggerKey,
+          leadId,
+          runId: id,
+          kind: "move",
+          channel: "chat",
+          body: `Move to ${def.finish.column}`,
+          dueAt: new Date(finishAt),
+          payload: JSON.stringify({ column: def.finish.column }),
+        })
+        .run();
+    }
+    return id;
+  });
   return { runId, queued: rows.length, skipped: null };
 }
 

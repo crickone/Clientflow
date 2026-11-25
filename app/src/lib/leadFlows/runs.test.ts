@@ -136,6 +136,16 @@ const requireLocal = createRequire(import.meta.url);
       const noAnswer = defs.getFlowDefinition("lead_no_answer");
       ok(noAnswer.startColumn === "key:no_answer" && noAnswer.finish?.afterMs === 4 * DAY, "no saved settings: the defaults");
 
+      // A flow the lead cannot receive is skipped BEFORE its other flows are stopped. Email Only has no
+      // phone and is on a booked-call run (two emails); Thinking about it is WhatsApp-only, and with no
+      // finish move set there is nothing to queue, so the start is refused and the call emails stay.
+      tdb.update(schema.automationTriggers).set({ finishColumn: "" }).where(eq(schema.automationTriggers.key, "lead_thinking")).run();
+      const callRun = runs.activeRun(emailOnly.id, "lead_call_booked");
+      const callRowsBefore = queued(emailOnly.id).length;
+      const refused = runs.startFlow(emailOnly.id, "lead_thinking");
+      ok(refused.skipped === "nothing this lead can receive" && refused.runId === null, "a WhatsApp-only flow with no finish move is refused for a lead with no phone");
+      ok(callRun != null && runs.activeRun(emailOnly.id, "lead_call_booked")?.id === callRun.id && queued(emailOnly.id).length === callRowsBefore && callRowsBefore === 2, "the refused start leaves the lead's running flow and its queued messages alone");
+
       // Which flow a column starts.
       const cols = listStages();
       const naCol = cols.find((c) => c.systemKey === "no_answer")!;
