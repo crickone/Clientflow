@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles, MessageCircle } from "lucide-react";
+import { Sparkles, MessageCircle, PhoneCall } from "lucide-react";
 import type { LeadWithSla } from "@/lib/leads";
 import { Badge } from "@/components/ui/Badge";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -14,6 +14,8 @@ export interface LeadCardProps {
   now: number;
   onDraft: (id: number) => void;
   onWhatsApp: (id: number) => void;
+  /** Opens Log a call / Schedule a call for this lead. */
+  onCall?: (id: number) => void;
 }
 
 const SLA_HEX = { neutral: "var(--text-tertiary)", amber: "#d29922", red: "#dc2626" } as const;
@@ -31,7 +33,7 @@ function waitLabel(ms: number): string {
  * here — instead a speed-to-lead timer (uncontacted leads only) + a staleness
  * dot. Quick actions deep-link into the lead; they never send from the board.
  */
-export function LeadCard({ lead, now, onDraft, onWhatsApp }: LeadCardProps) {
+export function LeadCard({ lead, now, onDraft, onWhatsApp, onCall }: LeadCardProps) {
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "Anonymous";
   const initials = initialsOf(lead.firstName ?? "?", lead.lastName ?? "") || "??";
   const role = lead.stage?.role ?? null;
@@ -143,6 +145,22 @@ export function LeadCard({ lead, now, onDraft, onWhatsApp }: LeadCardProps) {
         )}
         <LeadNextStep score={lead.leadScore} next={lead.leadNextStep} />
         <span style={{ marginLeft: "auto", display: "inline-flex", gap: 4 }}>
+          {onCall && (
+            <Tooltip label="Log or schedule a call">
+              <button
+                type="button"
+                aria-label="Log or schedule a call"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCall(lead.id);
+                }}
+                style={iconBtn}
+              >
+                <PhoneCall size={14} />
+              </button>
+            </Tooltip>
+          )}
           <Tooltip label="AI draft">
             <button
               type="button"

@@ -28,6 +28,7 @@ import { WON_ROLES, type StageRecord } from "@/lib/pipeline/roles";
 import type { PipelineRecord } from "@/lib/pipeline/pipelineRepo";
 import { computeBoardMetrics, type LeadMetricInput } from "@/lib/pipeline/boardMetrics";
 import { Input } from "@/components/ui/Input";
+import { CallDialog } from "@/components/leads/CallDialog";
 import { LeadList } from "@/components/leads/LeadList";
 import { LeadCard } from "./LeadCard";
 import { PipelineMetrics } from "./PipelineMetrics";
@@ -101,6 +102,7 @@ export function PipelineBoard({
   const [railOpen, setRailOpen] = useState<Record<string, boolean>>({});
   const [activeId, setActiveId] = useState<number | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
+  const [callLead, setCallLead] = useState<{ id: number; name: string } | null>(null);
   const [, startTransition] = useTransition();
   const draggingRef = useRef(false);
   const pendingIds = useRef<Set<number>>(new Set());
@@ -240,6 +242,13 @@ export function PipelineBoard({
   const openLead = useCallback((id: number) => router.push(`/leads/${id}`), [router]);
   const draftLead = useCallback((id: number) => router.push(`/leads/${id}?draft=1`), [router]);
   const whatsappLead = useCallback((id: number) => router.push(`/leads/${id}?reply=whatsapp`), [router]);
+  const callLeadOpen = useCallback(
+    (id: number) => {
+      const l = leads.find((x) => x.id === id);
+      if (l) setCallLead({ id, name: [l.firstName, l.lastName].filter(Boolean).join(" ") || "This lead" });
+    },
+    [leads],
+  );
 
   const move = useCallback(
     (id: number, to: StageRecord, from: StageRecord) => {
@@ -451,7 +460,7 @@ export function PipelineBoard({
                 return (
                   <StageColumn key={stage.id} stageId={stage.id} stage={stage} count={cards.length} total={byStage.totals.get(stage.id)}>
                     {cards.map((lead) => (
-                      <DraggableCard key={lead.id} lead={lead} now={now} onOpen={openLead} onDraft={draftLead} onWhatsApp={whatsappLead} />
+                      <DraggableCard key={lead.id} lead={lead} now={now} onOpen={openLead} onDraft={draftLead} onWhatsApp={whatsappLead} onCall={callLeadOpen} />
                     ))}
                   </StageColumn>
                 );
@@ -470,7 +479,7 @@ export function PipelineBoard({
                     onToggle={() => setRailOpen((r) => ({ ...r, [stage.id]: !r[stage.id] }))}
                   >
                     {cards.map((lead) => (
-                      <DraggableCard key={lead.id} lead={lead} now={now} onOpen={openLead} onDraft={draftLead} onWhatsApp={whatsappLead} />
+                      <DraggableCard key={lead.id} lead={lead} now={now} onOpen={openLead} onDraft={draftLead} onWhatsApp={whatsappLead} onCall={callLeadOpen} />
                     ))}
                   </StageColumn>
                 );
@@ -495,6 +504,13 @@ export function PipelineBoard({
           </DialogContent>
         </Dialog>
       )}
+      <CallDialog
+        leadId={callLead?.id ?? 0}
+        leadName={callLead?.name ?? ""}
+        open={callLead !== null}
+        mode="log"
+        onOpenChange={(o) => !o && setCallLead(null)}
+      />
     </>
   );
 }
@@ -506,12 +522,14 @@ function DraggableCard({
   onOpen,
   onDraft,
   onWhatsApp,
+  onCall,
 }: {
   lead: LeadWithSla;
   now: number;
   onOpen: (id: number) => void;
   onDraft: (id: number) => void;
   onWhatsApp: (id: number) => void;
+  onCall: (id: number) => void;
 }) {
   // The DragOverlay is what follows the pointer. The card itself stays put:
   // moving it too stretched the board's scroll width as it went, so the
@@ -529,7 +547,7 @@ function DraggableCard({
           touchAction: "none",
         }}
       >
-        <LeadCard lead={lead} now={now} onDraft={onDraft} onWhatsApp={onWhatsApp} />
+        <LeadCard lead={lead} now={now} onDraft={onDraft} onWhatsApp={onWhatsApp} onCall={onCall} />
       </div>
     </motion.div>
   );
