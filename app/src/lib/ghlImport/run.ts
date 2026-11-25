@@ -24,6 +24,8 @@ export interface GhlImportInput {
 /** Null when the day is usable, else what to change. */
 export function checkExportDay(day: string, now: number): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day ?? "")) return "Enter the day you exported the files.";
+  const [y, m, d] = day.split("-").map(Number);
+  if (new Date(Date.UTC(y, m - 1, d)).toISOString().slice(0, 10) !== day) return "Enter the day you exported the files.";
   const today = todayIn(now);
   if (day > today) return "The export date can't be in the future.";
   if (day < addDays(today, -365)) return "The export date is more than a year ago. Export the files again.";

@@ -4,12 +4,16 @@
 // by the files that store it and the lead and client pages that show it.
 // Any other file naming it (an AI tool, the inbox triage, a message, an
 // export) fails this test, so a new reader has to be a deliberate change.
+// So does any file that reads the import record (the table, getImportedPerson,
+// ImportedPersonView), since a reader could serialise the note without naming
+// it: each such reader must be listed in ALLOWED on purpose. The staff route,
+// pages and card are added to the list when they are built.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
 const SRC = path.join(process.cwd(), "src");
-const PATTERN = /staffMedicalNote|staff_medical_note|medicalCondition/;
+const PATTERN = /staffMedicalNote|staff_medical_note|medicalCondition|ghlImportPeople|ghl_import_people|getImportedPerson|ImportedPersonView/;
 const ALLOWED = new Set(
   [
     "lib/db/schema.ts",
@@ -17,6 +21,7 @@ const ALLOWED = new Set(
     "lib/ghlImport/csv.ts",
     "lib/ghlImport/plan.ts",
     "lib/ghlImport/apply.ts",
+    "lib/ghlImport/snapshot.ts",
     "lib/ghlImport/store.ts",
     "lib/ghlImport/types.ts",
     "components/people/GhlImportCard.tsx",
@@ -34,7 +39,7 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 const offenders = walk(SRC).filter((f) => !ALLOWED.has(f) && PATTERN.test(fs.readFileSync(f, "utf8")));
-assert.deepEqual(offenders.map((f) => path.relative(SRC, f)), [], "only the import's own files and the staff card may touch the medical note");
+assert.deepEqual(offenders.map((f) => path.relative(SRC, f)), [], "only the import's own files and the staff card may touch the medical note or read the import record");
 for (const f of ALLOWED) {
   const rel = path.relative(SRC, f);
   assert.ok(!NEVER.some((p) => rel.startsWith(p)), `${rel} is in a folder the medical note must never reach`);

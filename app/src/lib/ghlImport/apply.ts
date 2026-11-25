@@ -217,7 +217,7 @@ function applyPerson(plan: PersonPlan, ctx: { tenantId: number; now: number }, p
     else d.leadsCreated = 1;
   }
 
-  if (plan.run && leadId != null) {
+  if (plan.run && leadId != null && !plan.doNotContact) {
     const placed = placeImportedRun(
       leadId,
       { triggerKey: plan.run.flowKey, steps: plan.run.steps.map((s) => ({ step: s.step, dueAt: s.dueAt })), finishAt: plan.run.finishAt, emailOnly: plan.run.emailOnly },
@@ -284,10 +284,17 @@ export function applyPlan(plan: ImportPlan, ctx: { tenantId: number; now: number
       if (r.errors.length < 20) r.errors.push(`GoHighLevel contact ${p.person.ghlContactId}: ${err instanceof Error ? err.message : "failed"}`);
     }
   }
-  void logActivity(
-    "import.gohighlevel",
-    `GoHighLevel import: ${r.leadsCreated} new leads, ${r.leadsUpdated} updated, ${r.clientsCreated} new clients, ${r.contactsAdded} email contacts`,
-    { ...r, errors: undefined },
-  );
+  // A failed log must never surface, as a result or as an unhandled rejection.
+  try {
+    void Promise.resolve(
+      logActivity(
+        "import.gohighlevel",
+        `GoHighLevel import: ${r.leadsCreated} new leads, ${r.leadsUpdated} updated, ${r.clientsCreated} new clients, ${r.contactsAdded} email contacts`,
+        { ...r, errors: undefined },
+      ),
+    ).catch(() => undefined);
+  } catch {
+    // ignored
+  }
   return r;
 }

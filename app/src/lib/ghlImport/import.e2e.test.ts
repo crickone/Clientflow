@@ -102,9 +102,15 @@ const requireLocal = createRequire(import.meta.url);
       const ivanId = tdb.insert(schema.leads).values({ source: "manual", firstName: "Ivan", phone: "087 000 0109", stageId: listStages()[0].id, createdAt: new Date("2029-06-01T00:00:00Z") }).returning({ id: schema.leads.id }).get().id;
       const joanId = tdb.insert(schema.leads).values({ source: "manual", firstName: "Joan", phone: "+353870000110", stageId: listStages()[0].id }).returning({ id: schema.leads.id }).get().id;
       ok(runs.startFlow(joanId, "lead_no_answer").runId != null, "Joan is in an Adonis flow");
+      const updatedBefore = (id: number) => tdb.select({ u: schema.leads.updatedAt }).from(schema.leads).where(eq(schema.leads.id, id)).get()!.u.getTime();
+      const ivanUpdated = updatedBefore(ivanId);
+      const joanUpdated = updatedBefore(joanId);
       const queueBefore = tdb.select().from(schema.automationQueue).all().length;
 
       const input = { contactsText: CONTACTS, opportunitiesText: OPPS, exportDay: "2030-01-16" };
+
+      // Impossible export days are refused.
+      ok(ghl.checkExportDay("2030-02-31", NOW) != null && ghl.checkExportDay("2030-13-01", NOW) != null && ghl.checkExportDay("2030-01-16", NOW) === null, "an impossible export day is refused");
 
       // The dry run writes nothing and carries no medical note.
       const dry = ghl.dryRunGhlImport(s.tid, input);
@@ -167,6 +173,8 @@ const requireLocal = createRequire(import.meta.url);
       ok(ivan.stageId === col("nurture") && ivan.source === "manual" && queued(ivanId).some((x) => x.kind === "message"), "Ivan: moved to nurture, keeps his own source");
       const joan = tdb.select().from(schema.leads).where(eq(schema.leads.id, joanId)).get()!;
       ok(joan.email === "joan@example.com" && runs.activeRun(joanId, "lead_no_answer") != null, "Joan: email filled, her flow untouched");
+
+      ok(updatedBefore(ivanId) === ivanUpdated && updatedBefore(joanId) === joanUpdated, "Ivan and Joan keep their updated time, so nothing is rescored");
 
       // Kevin: the new Holding column. Laura: Message undelivered, no flow there.
       const holding = listStages().find((x) => x.name === "Holding");

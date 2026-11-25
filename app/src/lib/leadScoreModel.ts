@@ -106,7 +106,7 @@ const DONE_ROLES = new Set(["sale", "repeat_customer", "lapsed", "lost"]);
  *
  * `importedUntouched`: a lead brought in by the GoHighLevel import that has
  * no message on file yet. The import must not set off thousands of Jev
- * calls; such a lead is scored once something happens with it.
+ * calls; such a lead is scored once it has a message on file.
  */
 export function scoreDue(l: { scoredAt: number | null; lastActivity: number; stageRole: string | null; isClient: boolean; importedUntouched?: boolean }, now: number): boolean {
   if (l.importedUntouched) return false;
