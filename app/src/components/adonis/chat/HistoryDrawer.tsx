@@ -49,7 +49,8 @@ export function HistoryDrawer({ open, onClose, items, activeId, onOpen, onNew, o
     }
     const focus = setTimeout(() => searchRef.current?.focus(), 60);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCloseRef.current();
+      // A dialog on top (the delete confirm) handles its own Escape first and marks it handled: leave the drawer open.
+      if (e.key === "Escape" && !e.defaultPrevented) onCloseRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => {

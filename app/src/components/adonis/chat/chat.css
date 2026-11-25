@@ -30,6 +30,14 @@
 .ax-top-btn:hover { color: var(--text-primary); background: var(--surface-1); }
 .ax-top-btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
 
+/* Autopilot: "Approve and build everything" is running. The button is an .ax-btn. */
+.ax-autopilot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; flex-shrink: 0;
+  margin: 4px 4px 8px; padding: 8px 8px 8px 14px; border: 1px solid var(--ax-line); border-radius: 14px;
+  background: var(--surface-1); font-size: 13px; line-height: 1.45; color: var(--text-secondary);
+}
+.ax-autopilot > span { flex: 1 1 240px; min-width: 0; }
+
 /* The scrolling thread and its column. */
 .ax-scroll { position: relative; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .ax-col { max-width: 728px; margin: 0 auto; padding: 34px 24px 24px; }
