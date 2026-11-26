@@ -49,6 +49,9 @@ const scratch = makeScratchTenant("wa-contacts-test");
   try {
     await runWithTenant(scratch.tid, async () => {
       db.insert(schema.clients).values({ firstName: "Client", lastName: "Example", phone: "087 000 0001" }).run();
+      // Known only by number: an Inbox conversation, and a lead someone already named.
+      const [nameless] = db.insert(schema.leads).values({ source: "whatsapp", phone: "+353 87 000 0002", inboxOnly: true }).returning().all();
+      const [named] = db.insert(schema.leads).values({ source: "whatsapp", firstName: "Typed", phone: "087 000 0001" }).returning().all();
       const leadsBefore = db.select().from(schema.leads).all().length;
 
       // Two pages of contacts (500 + 1), one page of chats.
@@ -73,6 +76,9 @@ const scratch = makeScratchTenant("wa-contacts-test");
       ok(state.okAt != null && state.count === 502 && state.error == null, "the result is kept for the page");
       ok(db.select().from(schema.leads).all().length === leadsBefore, "no lead made");
       ok(db.select().from(schema.automationQueue).all().length === 0, "nothing queued to send");
+      const nl = db.select().from(schema.leads).where(eq(schema.leads.id, nameless.id)).get()!;
+      ok(nl.firstName === "Chat" && nl.lastName === "Example", "a conversation known only by number is named from WhatsApp");
+      ok(db.select().from(schema.leads).where(eq(schema.leads.id, named.id)).get()!.firstName === "Typed", "a name someone typed is never changed");
 
       const chat = db.select().from(schema.whatsappContacts).where(eq(schema.whatsappContacts.phone, "353870000002")).get()!;
       ok(hideWhatsAppContact(chat.id), "hidden");
@@ -84,8 +90,11 @@ const scratch = makeScratchTenant("wa-contacts-test");
       const people = loadDirectory();
       const client = people.find((p) => p.clientId != null)!;
       ok(client.whatsappId != null && client.name === "Client Example" && client.tags.some((t) => t.kind === "whatsapp"), "the client and their WhatsApp contact are one row, with the client's name");
-      ok(!people.some((p) => p.whatsappId === chat.id), "the hidden one is not listed");
+      ok(people.find((p) => p.inboxLeadId === nameless.id)?.name === "Chat Example", "hidden on WhatsApp but an Inbox conversation: still listed, by its new name");
       ok(filterDirectory(people, { filter: "whatsapp" }).length === 500, "WhatsApp only: the 500 not on file");
+      const onlyWa = db.select().from(schema.whatsappContacts).where(eq(schema.whatsappContacts.phone, "353861000000")).get()!;
+      hideWhatsAppContact(onlyWa.id);
+      ok(!loadDirectory().some((p) => p.whatsappId === onlyWa.id) && filterDirectory(loadDirectory(), { filter: "whatsapp" }).length === 499, "a hidden WhatsApp-only contact is not listed");
     });
     console.log(`whatsapp contacts: ${n} checks passed.`);
   } finally {

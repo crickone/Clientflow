@@ -11,6 +11,7 @@ import {
   setLeadMessageStatus,
   setLeadStatus,
   upsertLead,
+  fillLeadContact,
 } from "@/lib/leads";
 import {
   addClientMessage,
@@ -32,6 +33,8 @@ import { onWhatsAppDeliveryFailed } from "@/lib/leadFlows/undelivered";
 import { withdrawConsentOnStopReply } from "@/lib/leadFlows/consent";
 import { phoneSentFromWebhook } from "@/lib/whatsapp/historyModel";
 import { recordPhoneSent } from "@/lib/whatsapp/history";
+import { whatsappNameFor } from "@/lib/whatsapp/contactsSync";
+import { splitFullName } from "@/lib/humanName";
 
 /**
  * Distinguishes an expected "tenant is over its monthly AI cap" skip from a
@@ -184,10 +187,16 @@ export async function POST(req: NextRequest) {
           lead = upsertLead({
             source: "whatsapp",
             phone: inbound.fromPhone,
+            // The name saved for them on the business's phone, else the one on their own profile.
+            fullName: whatsappNameFor(inbound.fromPhone) ?? inbound.fromName ?? null,
             notes: "Inbound WhatsApp from an unknown number.",
             // A direct message is a conversation, not a lead: it stays in the Inbox until someone adds them.
             inboxOnly: true,
           }).lead;
+        } else if (!lead.firstName?.trim() && !lead.lastName?.trim()) {
+          // Known only by number so far: take the name from WhatsApp (only fills a blank name).
+          const name = whatsappNameFor(inbound.fromPhone) ?? inbound.fromName ?? null;
+          if (name) fillLeadContact(lead.id, splitFullName(name));
         }
         const inboundMsg = addMessage({
           leadId: lead.id,

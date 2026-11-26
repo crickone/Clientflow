@@ -185,6 +185,7 @@ export class WhapiBridge implements WhatsAppBridge {
         providerMessageId: id,
         timestamp: timestamp || Date.now(),
         ...(media ? { media: [media.item] } : {}),
+        ...(typeof getProp(m, "from_name") === "string" && String(getProp(m, "from_name")).trim() ? { fromName: String(getProp(m, "from_name")).trim() } : {}),
       };
     }
     return null;

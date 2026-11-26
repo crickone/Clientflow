@@ -21,6 +21,8 @@ export interface InboundMessage {
   timestamp: number;
   /** A photo, video, voice note or document that came with it (`text` is then its caption or a placeholder). */
   media?: InboundMedia[];
+  /** The name the sender gave their own WhatsApp profile, when the provider sends it. */
+  fromName?: string;
 }
 
 /** An inbound attachment as the provider described it, before download. */

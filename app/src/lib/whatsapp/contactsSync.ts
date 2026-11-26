@@ -5,6 +5,8 @@ import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getCurrentTenant, runWithTenant } from "@/lib/db/tenant";
 import { readKey, setKey } from "@/lib/settings";
+import { fillLeadContact } from "@/lib/leads";
+import { splitFullName } from "@/lib/humanName";
 import { getWhatsAppBridge, isWhatsAppConfigured } from "@/lib/whatsapp";
 import { mergeWaContacts, parseChatsPage, parseContactsPage, type WaContactRow } from "./contactsModel";
 
@@ -90,6 +92,11 @@ export async function syncWhatsAppContacts(): Promise<{ ok: true; count: number 
     const contacts = await readAll((o, c) => bridge.listContactsPage!(o, c), parseContactsPage);
     const chats = await readAll((o, c) => bridge.listChatsPage!(o, c), parseChatsPage);
     const count = storeWhatsAppContacts(mergeWaContacts(contacts, chats, own));
+    try {
+      fillNamesFromWhatsApp();
+    } catch (err) {
+      console.error("[whatsapp contacts] naming leads failed:", err);
+    }
     setKey(SYNC_KEY, { at: Date.now(), okAt: Date.now(), count, error: null } satisfies ContactsSyncState);
     return { ok: true, count };
   } catch (err) {
@@ -108,6 +115,38 @@ export function syncWhatsAppContactsIfNever(): void {
   if (!tenantId) return;
   // Bound to this business: it carries on after the request that started it.
   void runWithTenant(tenantId, () => syncWhatsAppContacts()).catch((err) => console.error("[whatsapp contacts] first import failed:", err));
+}
+
+/** The name for a phone number on the business's WhatsApp (as saved in the phone, else their own), or null. */
+export function whatsappNameFor(phone: string | null | undefined): string | null {
+  const key = (phone ?? "").replace(/\D/g, "").slice(-9);
+  if (key.length < 7) return null;
+  const row = db
+    .select({ name: schema.whatsappContacts.name })
+    .from(schema.whatsappContacts)
+    .where(sql`substr(${schema.whatsappContacts.phone}, -9) = ${key} and ${schema.whatsappContacts.name} is not null`)
+    .orderBy(sql`${schema.whatsappContacts.saved} desc`)
+    .get();
+  return row?.name?.trim() || null;
+}
+
+/**
+ * Give a name to every lead (and Inbox conversation) that has none, from the
+ * WhatsApp contact with the same number. Only blank names are filled; a name
+ * someone typed is never changed. Returns how many were named.
+ */
+export function fillNamesFromWhatsApp(): number {
+  const nameless = db
+    .select({ id: schema.leads.id, phone: schema.leads.phone })
+    .from(schema.leads)
+    .where(sql`coalesce(trim(${schema.leads.firstName}), '') = '' and coalesce(trim(${schema.leads.lastName}), '') = '' and ${schema.leads.phone} is not null`)
+    .all();
+  let named = 0;
+  for (const l of nameless) {
+    const name = whatsappNameFor(l.phone);
+    if (name && fillLeadContact(l.id, splitFullName(name))) named++;
+  }
+  return named;
 }
 
 /** Hide a contact from the Contacts page; later imports keep it hidden. */
