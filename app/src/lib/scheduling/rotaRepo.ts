@@ -122,20 +122,21 @@ export function copyWeek(fromMonday: string, toMonday: string): number {
   const offset = daysBetween(fromMonday, toMonday);
   const source = shiftsBetween(fromMonday, addDaysIso(fromMonday, 6));
   const hours = getSettings().openingHours;
-  let copied = 0;
+  // Build the valid drafts first: when none fit, the target week is left alone.
+  const drafts: { staffId: number; date: string; start: string; end: string }[] = [];
+  for (const s of source) {
+    const draft = { staffId: s.staffId, date: addDaysIso(s.date, offset), start: s.start, end: s.end };
+    if (validateShift(draft, hours, drafts.filter((p) => p.staffId === draft.staffId && p.date === draft.date))) continue;
+    drafts.push(draft);
+  }
+  if (drafts.length === 0) return 0;
   db.transaction((tx) => {
     tx.delete(staffShifts)
       .where(and(gte(staffShifts.date, toMonday), lte(staffShifts.date, addDaysIso(toMonday, 6))))
       .run();
-    const placed: ShiftRow[] = [];
-    for (const s of source) {
-      const draft = { staffId: s.staffId, date: addDaysIso(s.date, offset), start: s.start, end: s.end };
-      if (validateShift(draft, hours, placed.filter((p) => p.staffId === draft.staffId && p.date === draft.date))) continue;
-      const [row] = tx.insert(staffShifts).values(draft).returning({ id: staffShifts.id }).all();
-      placed.push({ id: row!.id, ...draft });
-      copied++;
-    }
+    for (const draft of drafts) tx.insert(staffShifts).values(draft).run();
   });
+  const copied = drafts.length;
   if (copied > 0) switchOnWithFirstShift();
   return copied;
 }

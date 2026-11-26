@@ -15,7 +15,7 @@ import { runWithTenant } from "@/lib/db/tenant";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { makeScratchTenant } from "@/lib/leadFlows/testing/harness";
-import { readKey, setKey } from "@/lib/settings";
+import { getSettings, readKey, setKey } from "@/lib/settings";
 
 import * as repo from "./rotaRepo";
 
@@ -75,6 +75,13 @@ const scratch = makeScratchTenant("rota-repo-test");
         [aId, "2030-01-14", "09:00", "17:00"],
         [bId, "2030-01-15", "13:00", "20:00"],
       ]);
+
+      // When no source shift fits the opening hours, nothing is copied and the target week is left alone.
+      const hoursBefore = getSettings().openingHours;
+      setKey("opening_hours", hoursBefore.map((h) => (h.dow === 1 || h.dow === 2 ? { dow: h.dow, closed: true } : h)));
+      assert.equal(repo.copyWeek("2030-01-07", "2030-01-14"), 0);
+      assert.equal(repo.shiftsBetween("2030-01-14", "2030-01-20").length, 2, "the target week keeps its shifts");
+      setKey("opening_hours", hoursBefore);
 
       // Switching off keeps it off, even when shifts are added later.
       repo.setRotaOn(false);

@@ -137,12 +137,8 @@ function listWords(items: string[]): string {
 export function staffShortfallReason(s: StaffShortfall): string {
   if (s.onShift === 0) return "Nobody is on the rota then.";
   const labels = s.others.map((o) => o.label.trim()).filter(Boolean);
-  const what =
-    labels.length > 0
-      ? `${listWords(labels)} ${s.others.length === 1 ? "is" : "are"}`
-      : s.others.length === 1
-        ? "another booking is"
-        : "other bookings are";
   const people = s.onShift === 1 ? "Only one therapist on" : `Only ${s.onShift} therapists on`;
-  return `${people} at ${hm(s.atMin)} and ${what} booked then.`;
+  const when = `${people} at ${hm(s.atMin)}`;
+  if (labels.length > 0) return `${when} and ${listWords(labels)} ${s.others.length === 1 ? "is" : "are"} booked then.`;
+  return `${when} and ${s.others.length === 1 ? "another booking is" : "other bookings are"} on then.`;
 }

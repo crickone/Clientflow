@@ -104,7 +104,9 @@ assert.equal(staffShortfallReason(many!), "Only 2 therapists on at 10:00 and Dee
 const three = try_("10:00", "11:00", "whole", [massage, span("10:00", "11:00", "whole", "Facial"), hbot], shifts(["09:00", "17:00"], ["09:00", "17:00"], ["09:00", "17:00"]));
 assert.equal(staffShortfallReason(three!), "Only 3 therapists on at 10:00 and Deep tissue massage, Facial and HBOT are booked then.");
 const unnamed = try_("10:00", "11:00", "whole", [span("10:00", "11:00", "whole", "")], ONE);
-assert.equal(staffShortfallReason(unnamed!), "Only one therapist on at 10:00 and another booking is booked then.");
+assert.equal(staffShortfallReason(unnamed!), "Only one therapist on at 10:00 and another booking is on then.");
+const unnamed2 = try_("10:00", "11:00", "whole", [span("10:00", "11:00", "whole", ""), span("10:00", "11:00", "whole", "")], TWO);
+assert.equal(staffShortfallReason(unnamed2!), "Only 2 therapists on at 10:00 and other bookings are on then.");
 
 // An empty or inverted proposal never fails.
 assert.equal(try_("10:00", "10:00", "whole", [massage], shifts()), null);

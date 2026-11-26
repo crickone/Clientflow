@@ -36,6 +36,14 @@ const staffing = z.enum(["whole", "setup"]);
 
 const BAD_TIMES = "Give the times as HH:mm.";
 
+/** The message for the field that failed, not a catch-all. */
+function shiftInputError(error: z.ZodError): string {
+  const field = error.issues[0]?.path[0];
+  if (field === "date") return "Give the date as YYYY-MM-DD.";
+  if (field === "staffId") return "That person is not on the rota.";
+  return BAD_TIMES;
+}
+
 /** The rota changes who can be booked, so the diary and the booking page read it too. */
 function refresh() {
   revalidatePath("/appointments/rota");
@@ -46,7 +54,7 @@ function refresh() {
 export async function addShiftAction(input: { staffId: number; date: string; start: string; end: string }): Promise<ActionResult> {
   await requireUser();
   const parsed = shiftInput.safeParse(input);
-  if (!parsed.success) return { ok: false, error: BAD_TIMES };
+  if (!parsed.success) return { ok: false, error: shiftInputError(parsed.error) };
   const res = addShift(parsed.data);
   if (!res.ok) return res;
   refresh();
@@ -83,6 +91,7 @@ export async function copyLastWeekAction(monday: string): Promise<ActionResult> 
   // empty source must not wipe this week's shifts.
   if (shiftsBetween(from, addDaysIso(from, 6)).length === 0) return { ok: false, error: "Last week has no shifts to copy." };
   const count = copyWeek(from, parsed.data);
+  if (count === 0) return { ok: false, error: "None of last week's shifts fit this week's opening hours." };
   refresh();
   return { ok: true, message: count === 1 ? "Copied 1 shift." : `Copied ${count} shifts.` };
 }

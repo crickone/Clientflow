@@ -225,7 +225,10 @@ function LookAtCard({ items, rotaOn }: { items: LookAtItem[]; rotaOn: boolean })
               </span>
               <div>
                 <b>{item.title}</b>
-                <p>{item.reason} Move one, or add someone to the rota.</p>
+                <p>
+                  {item.reason}{" "}
+                  {item.reason === "Nobody is on the rota then." ? "Move it, or add someone to the rota." : "Move one, or add someone to the rota."}
+                </p>
               </div>
               <Link href={"/appointments/" + item.appointmentId} className="rv-link">
                 Open
@@ -250,17 +253,27 @@ function TreatmentsCard({
   const router = useRouter();
   // Optimistic: the pick shows straight away and goes back if the save is refused.
   const [picked, setPicked] = useState<Record<number, Staffing>>({});
+  // Treatments whose save is in flight: their buttons are off so a second click cannot race the first.
+  const [saving, setSaving] = useState<Record<number, boolean>>({});
 
   const pick = async (t: TreatmentStaffing, value: Staffing) => {
     const before = picked[t.id] ?? t.staffing;
-    if (!isAdmin || before === value) return;
+    if (!isAdmin || saving[t.id] || before === value) return;
+    setSaving((s) => ({ ...s, [t.id]: true }));
     setPicked((p) => ({ ...p, [t.id]: value }));
     const res = await setStaffing(t.id, value);
+    setSaving((s) => ({ ...s, [t.id]: false }));
     if (!res.ok) {
       setPicked((p) => ({ ...p, [t.id]: before }));
       toast.error(res.error);
       return;
     }
+    // Saved: drop the local pick so the server's value shows after the refresh.
+    setPicked((p) => {
+      const rest = { ...p };
+      delete rest[t.id];
+      return rest;
+    });
     router.refresh();
   };
 
@@ -289,8 +302,11 @@ function TreatmentsCard({
                         type="button"
                         role="radio"
                         aria-checked={value === v}
-                        disabled={!isAdmin}
-                        onClick={() => pick(t, v)}
+                        disabled={Boolean(saving[t.id])}
+                        aria-disabled={isAdmin ? undefined : "true"}
+                        onClick={() => {
+                          if (isAdmin) void pick(t, v);
+                        }}
                       >
                         {label}
                       </button>
