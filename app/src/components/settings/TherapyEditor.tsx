@@ -171,6 +171,7 @@ interface TherapyValues {
   defaultPriceEur: string;
   description: string;
   isActive: boolean;
+  staffing: "whole" | "setup";
 }
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
@@ -183,6 +184,7 @@ function toFormData(v: TherapyValues): FormData {
   fd.set("defaultDurationMinutes", v.defaultDurationMinutes);
   fd.set("defaultPriceEur", v.defaultPriceEur);
   fd.set("description", v.description);
+  fd.set("staffing", v.staffing);
   if (v.isActive) fd.set("isActive", "on");
   return fd;
 }
@@ -224,6 +226,7 @@ function TherapyForm({
     defaultPriceEur: String(therapy?.defaultPriceEur ?? 0),
     description: therapy?.description ?? "",
     isActive: therapy?.isActive ?? true,
+    staffing: therapy?.staffing ?? "whole",
   }));
   const [v, setV] = useState<TherapyValues>(opened);
 
@@ -325,6 +328,28 @@ function TherapyForm({
             required
           />
         </div>
+      </div>
+      <div>
+        <Label htmlFor="staffing">Who it needs</Label>
+        <select
+          id="staffing"
+          value={v.staffing}
+          onChange={(e) => set("staffing", e.target.value === "setup" ? "setup" : "whole")}
+          style={{
+            width: "100%",
+            height: 42,
+            padding: "0 12px",
+            borderRadius: "var(--radius)",
+            border: "1px solid var(--hairline)",
+            background: "var(--surface-1)",
+            color: "var(--text-primary)",
+            fontSize: 14,
+            fontFamily: "inherit",
+          }}
+        >
+          <option value="whole">Whole time: a therapist is with the client throughout</option>
+          <option value="setup">Sets it up: one therapist can look after several</option>
+        </select>
       </div>
       <div>
         <Label htmlFor="description" srOnly>Description</Label>

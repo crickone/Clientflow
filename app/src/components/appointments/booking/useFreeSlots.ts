@@ -11,6 +11,7 @@ export interface FreeSlotsDay {
   close: string;
   stepMinutes: number;
   slots: { time: string; free: boolean; reason?: string }[];
+  rota?: { unfilled: boolean; week: string };
 }
 
 export type FreeSlotsState =

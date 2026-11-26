@@ -10,6 +10,7 @@ import { groupByPeriod, onGrid, type StripDay } from "@/lib/booking/slotModel";
 
 import s from "./booking.module.css";
 import { useFreeSlots } from "./useFreeSlots";
+import { RotaUnfilledBanner } from "../rota/RotaUnfilledBanner";
 
 interface Props {
   strip: StripDay[];
@@ -67,6 +68,8 @@ export function WhenCard({ strip, date, onDate, startTime, onStartTime, duration
           </button>
         ))}
       </div>
+
+      {day?.rota?.unfilled && <RotaUnfilledBanner week={day.rota.week} />}
 
       {slots.status === "idle" && <div className={s.muted}>Pick a {vocab.service.toLowerCase()} to see the free times.</div>}
       {slots.status === "loading" && <div className={s.muted}>Finding free times.</div>}

@@ -19,6 +19,8 @@ import { addDays, formatDate, formatTime, startOfWeek } from "@/lib/utils";
 import { getSettings, getVenueType } from "@/lib/settings";
 import { getVocab } from "@/lib/vocabulary";
 import { listBlockOuts, weekWindow } from "@/lib/schedule";
+import { weekUnfilled } from "@/lib/scheduling/rotaRepo";
+import { RotaUnfilledBanner } from "@/components/appointments/rota/RotaUnfilledBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +79,8 @@ export default async function AppointmentsPage(props: Props) {
           </>
         }
       />
+
+      {weekUnfilled(isoStart) && <RotaUnfilledBanner week={isoStart} />}
 
       <div
         style={{

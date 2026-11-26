@@ -6342,6 +6342,7 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .rv-banner { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 11px 14px; border-radius: 12px; background: var(--surface-1); border: 1px solid var(--hairline); color: var(--text-secondary); font-size: 13px; margin-bottom: 16px; }
 .rv-banner > svg { flex: none; }
 .rv-banner.is-warn { background: var(--warning-soft); border-color: color-mix(in srgb, var(--warning) 30%, transparent); color: var(--warning); }
+.rv-banner-link { color: inherit; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
 .rv-panel { background: var(--surface-1); border: 1px solid var(--hairline); border-radius: var(--radius-lg); min-width: 0; }
 .rv-grid { display: grid; grid-template-columns: 170px repeat(7, minmax(0, 1fr)); }
 .rv-hd { padding: 12px; border-bottom: 1px solid var(--hairline); font-size: 12.5px; color: var(--text-tertiary); min-width: 0; }

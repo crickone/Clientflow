@@ -22,6 +22,7 @@ const therapySchema = z.object({
   defaultPriceEur: z.coerce.number().nonnegative(),
   description: z.string().optional().or(z.literal("")),
   isActive: z.coerce.boolean().optional(),
+  staffing: z.enum(["whole", "setup"]).optional(),
 });
 
 function readForm(formData: FormData) {
@@ -32,6 +33,7 @@ function readForm(formData: FormData) {
     defaultPriceEur: Number(formData.get("defaultPriceEur") ?? 0),
     description: String(formData.get("description") ?? "").trim(),
     isActive: formData.get("isActive") === "on",
+    staffing: String(formData.get("staffing") ?? "") || undefined,
   };
 }
 
@@ -46,6 +48,7 @@ export async function createTherapyAction(formData: FormData) {
       defaultPriceEur: parsed.defaultPriceEur,
       description: parsed.description || null,
       isActive: parsed.isActive ?? true,
+      ...(parsed.staffing ? { staffing: parsed.staffing } : {}),
     })
     .run();
   revalidatePath("/settings/therapies");
@@ -62,10 +65,12 @@ export async function updateTherapyAction(id: number, formData: FormData) {
       defaultPriceEur: parsed.defaultPriceEur,
       description: parsed.description || null,
       isActive: parsed.isActive ?? true,
+      ...(parsed.staffing ? { staffing: parsed.staffing } : {}),
     })
     .where(eq(therapies.id, id))
     .run();
   revalidatePath("/settings/therapies");
+  revalidatePath("/appointments/rota");
   // Waiting AI drafts quote the old price until they are rewritten.
   scheduleRedraft(getCurrentTenant().id);
 }
