@@ -116,6 +116,10 @@ export const therapies = sqliteTable("therapies", {
   // Venue-neutral: 1 = a 1:1 service (clinic default); >1 = a class with
   // multiple spots (gym). Behaviour unchanged until class rosters land later.
   capacity: integer("capacity").notNull().default(1),
+  // Staff rota: "whole" = a therapist is with the client the whole time;
+  // "setup" = a therapist sets it up and can look after several at once.
+  // See @/lib/scheduling/staffDemand.
+  staffing: text("staffing", { enum: ["whole", "setup"] }).notNull().default("whole"),
 });
 
 /**
@@ -2371,6 +2375,32 @@ export const staff = sqliteTable("staff", {
 
 export type Staff = typeof staff.$inferSelect;
 export type NewStaff = typeof staff.$inferInsert;
+
+/** One shift on the staff rota: a person on from start to end on a Dublin calendar date. */
+export const staffShifts = sqliteTable(
+  "staff_shifts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    staffId: integer("staff_id")
+      .notNull()
+      .references(() => staff.id, { onDelete: "cascade" }),
+    /** "YYYY-MM-DD" */
+    date: text("date").notNull(),
+    /** "HH:mm" */
+    start: text("start").notNull(),
+    /** "HH:mm" */
+    end: text("end").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({ byDate: index("idx_staff_shifts_date").on(t.date) }),
+);
+export type StaffShift = typeof staffShifts.$inferSelect;
+export type NewStaffShift = typeof staffShifts.$inferInsert;
 
 // ── Nutrition (Kahunas-style diet plans) ──────────────────────────────────────
 

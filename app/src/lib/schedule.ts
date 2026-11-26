@@ -5,6 +5,8 @@ import { appointments, blockOuts, type BlockOut } from "./db/schema";
 import { getSettings, type OpeningHour } from "./settings";
 import { conflictReason, firstConflict } from "./scheduling/resourceDemand";
 import { demandForTherapies, demandResolver, resourceLimits } from "./scheduling/resourceRepo";
+import { firstStaffShortfall, staffShortfallReason } from "./scheduling/staffDemand";
+import { staffCoverFor, staffingForTherapies, staffingResolver } from "./scheduling/rotaRepo";
 
 /**
  * Convert "HH:mm" to minutes from midnight.
@@ -66,9 +68,9 @@ export interface OverlapCheckResult {
 }
 
 /**
- * Validate a proposed booking against opening hours, block-outs, and other
- * appointments. Two appointments only conflict if they overlap in time AND
- * share at least one therapy (capacity-1-per-therapy model).
+ * Validate a proposed booking against opening hours, block-outs, resource
+ * limits (spaces and equipment), and then the staff rule when the business
+ * uses the rota.
  *
  * Times are inclusive-exclusive: [start, end).
  */
@@ -129,21 +131,44 @@ export function checkBookingSlot(
     .where(eq(appointments.date, dateIso))
     .all();
 
+  const kept = existing.filter(
+    (a) => a.status !== "cancelled" && (excludeAppointmentId == null || a.id !== excludeAppointmentId),
+  );
+
   const conflict = firstConflict({
     startMin,
     endMin,
     demand: demandForTherapies(therapyIds),
     bufferMinutes: buffer,
     limits: resourceLimits(),
-    booked: existing
-      .filter((a) => a.status !== "cancelled" && (excludeAppointmentId == null || a.id !== excludeAppointmentId))
-      .map((a) => ({
-        startMin: hmToMin(a.startTime),
-        endMin: hmToMin(a.endTime),
-        demand: demandOf(a.therapyIds),
-      })),
+    booked: kept.map((a) => ({
+      startMin: hmToMin(a.startTime),
+      endMin: hmToMin(a.endTime),
+      demand: demandOf(a.therapyIds),
+    })),
   });
   if (conflict) return { ok: false, reason: conflictReason(conflict) };
+
+  // 4. Staff on the rota. Only when the business uses the rota (setting
+  //    staff_rota_on); off, `staffCoverFor` says "off" and this is skipped,
+  //    so every other business books exactly as before. The arithmetic is
+  //    @/lib/scheduling/staffDemand, shared with the free-slot engine.
+  const cover = staffCoverFor(dateIso);
+  if (cover.mode !== "off") {
+    const staffingOfAppt = staffingResolver();
+    const short = firstStaffShortfall({
+      startMin,
+      endMin,
+      staffing: staffingForTherapies(therapyIds),
+      cover,
+      booked: kept.map((a) => ({
+        startMin: hmToMin(a.startTime),
+        endMin: hmToMin(a.endTime),
+        ...staffingOfAppt(a.therapyIds),
+      })),
+    });
+    if (short) return { ok: false, reason: staffShortfallReason(short) };
+  }
 
   return { ok: true };
 }

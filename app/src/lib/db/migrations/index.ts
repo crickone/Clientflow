@@ -179,6 +179,9 @@ export function runMigrations(sqlite: BetterSqlite3, migrations: Migration[]): v
   }
 }
 
+/** Resource names whose treatments a therapist sets up and leaves running (0012). */
+export const SETUP_RESOURCE_PATTERN = /hbot|infrared|hifem|red light|pemf|sauna/i;
+
 /**
  * Tenant-plane migrations, applied by openTenantDb() (../tenant.ts) right
  * after ensureTenantTables(). Effectively empty today — there is no pending
@@ -362,6 +365,26 @@ export const TENANT_MIGRATIONS: Migration[] = [
         const plan = planFollowUpColumns(slots);
         for (const m of plan.moves) move.run(m.position, m.id);
         for (const i of plan.inserts) insert.run(b.id, i.name, i.colour, i.position, i.key, now);
+      }
+    },
+  },
+  {
+    id: "0012-seed-therapy-staffing",
+    description:
+      "Staff rota: mark therapies mapped to a machine-like resource (HBOT, infrared, HIFEM, red light, PEMF, sauna, by resource name, case-insensitive) as 'setup', meaning one therapist can set several up and look after them together. Everything else keeps the column default 'whole'. Runs once. Nothing changes for a business until it uses the rota (setting staff_rota_on), because the staff rule is off by default.",
+    up: (sqlite) => {
+      const cols = sqlite.prepare("PRAGMA table_info(therapies)").all() as { name: string }[];
+      if (!cols.some((c) => c.name === "staffing")) {
+        sqlite.exec("ALTER TABLE therapies ADD COLUMN staffing TEXT NOT NULL DEFAULT 'whole'");
+      }
+      const rows = sqlite
+        .prepare(
+          "SELECT DISTINCT tr.therapy_id AS id, r.name AS name FROM therapy_resources tr JOIN resources r ON r.id = tr.resource_id",
+        )
+        .all() as { id: number; name: string }[];
+      const setSetup = sqlite.prepare("UPDATE therapies SET staffing = 'setup' WHERE id = ?");
+      for (const id of new Set(rows.filter((r) => SETUP_RESOURCE_PATTERN.test(r.name)).map((r) => r.id))) {
+        setSetup.run(id);
       }
     },
   },

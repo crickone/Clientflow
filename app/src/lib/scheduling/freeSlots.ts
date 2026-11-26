@@ -3,14 +3,16 @@
  * plain-tsx test runner (same convention as pipeline/roles.ts).
  *
  * This module answers "what times are free?" over a date range. It does NOT
- * own the rule for whether a time is free: that lives in ./resourceDemand and
- * is the same function `checkBookingSlot` (@/lib/schedule) uses to validate a
- * single proposed booking. An earlier version of this file reimplemented the
- * overlap test, which meant two copies of the rule and a standing risk that a
- * slot offered here would be refused at booking. One rule now, called twice.
+ * own the rules for whether a time is free: they live in ./resourceDemand and
+ * ./staffDemand, and each is the same function `checkBookingSlot`
+ * (@/lib/schedule) uses to validate a single proposed booking. An earlier
+ * version of this file reimplemented the overlap test, which meant two copies
+ * of the rule and a standing risk that a slot offered here would be refused at
+ * booking. One rule each, called twice.
  */
 
 import { firstConflict, type BookedSpan, type Demand, type ResourceLimit } from "./resourceDemand";
+import { firstStaffShortfall, type DayCover, type Staffing, type StaffedSpan } from "./staffDemand";
 
 export type { BookedSpan, Demand, ResourceLimit };
 
@@ -37,6 +39,11 @@ export interface DayAvailability {
   openMin: number;
   closeMin: number;
   busy: BusySpan[];
+  /**
+   * Who is on and what is booked, for the staff rule (./staffDemand). Absent
+   * or cover "off" means the rule does not apply: today's behaviour.
+   */
+  staff?: { cover: DayCover; booked: StaffedSpan[] };
 }
 
 export interface FreeSlotsInput {
@@ -57,6 +64,8 @@ export interface FreeSlotsInput {
   limit: number;
   /** At most this many per day, so three offers don't all land on Tuesday. */
   maxPerDay?: number;
+  /** Who this service needs for the staff rule. Defaults to "whole". */
+  staffing?: Staffing;
 }
 
 export interface FreeSlot {
@@ -74,7 +83,7 @@ export interface FreeSlot {
 export function computeFreeSlots(input: FreeSlotsInput): FreeSlot[] {
   const {
     days, durationMinutes, bufferMinutes, granularityMinutes,
-    demand, limits, earliest, limit, maxPerDay,
+    demand, limits, earliest, limit, maxPerDay, staffing,
   } = input;
 
   if (durationMinutes <= 0 || granularityMinutes <= 0 || limit <= 0) return [];
@@ -110,6 +119,14 @@ export function computeFreeSlots(input: FreeSlotsInput): FreeSlot[] {
         limits,
       });
       if (clash) continue;
+
+      // The SAME staff rule the booking path enforces — see ./staffDemand.
+      if (
+        day.staff &&
+        firstStaffShortfall({ startMin: start, endMin: end, staffing: staffing ?? "whole", booked: day.staff.booked, cover: day.staff.cover })
+      ) {
+        continue;
+      }
 
       out.push({ date: day.date, startTime: minToHm(start), endTime: minToHm(end) });
       onThisDay++;

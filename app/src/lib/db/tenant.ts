@@ -783,6 +783,17 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
+    CREATE TABLE IF NOT EXISTS staff_shifts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      staff_id INTEGER NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      start TEXT NOT NULL,
+      "end" TEXT NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_staff_shifts_date ON staff_shifts(date);
+
     CREATE TABLE IF NOT EXISTS nutrition_plans (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL DEFAULT 'New Nutrition Plan',
@@ -2166,6 +2177,19 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     }
   } catch (err) {
     console.error("[db] therapies capacity migration failed:", err);
+  }
+
+  // Staff rota: who a treatment needs ("whole" or "setup"). Seeded once by
+  // migration 0012-seed-therapy-staffing.
+  try {
+    const cols = sqlite
+      .prepare("PRAGMA table_info(therapies)")
+      .all() as Array<{ name: string }>;
+    if (!cols.find((c) => c.name === "staffing")) {
+      sqlite.exec("ALTER TABLE therapies ADD COLUMN staffing TEXT NOT NULL DEFAULT 'whole'");
+    }
+  } catch (err) {
+    console.error("[db] therapies staffing migration failed:", err);
   }
 
   // WhatsApp bridge: provider id + delivery status on lead_messages.
