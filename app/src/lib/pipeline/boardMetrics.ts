@@ -30,6 +30,8 @@ export interface LeadMetricInput {
   updatedAt: number; // epoch ms
   role: StageRole | null;
   firstOutboundAt: number | null; // epoch ms of first *sent* outbound, or null
+  /** Brought in from another system (GoHighLevel): contacted there, so never "uncontacted" and not a speed-to-lead sample. */
+  imported?: boolean;
 }
 
 export interface BoardMetrics {
@@ -53,7 +55,13 @@ export function startOfWeekMs(now: number): number {
   return d.getTime();
 }
 
-export function computeBoardMetrics(leads: LeadMetricInput[], now: number): BoardMetrics {
+/**
+ * `since` (epoch ms): the day the business started running its leads here.
+ * Leads that came in before it are left out of every figure: they were
+ * handled somewhere else, so they say nothing about this system.
+ */
+export function computeBoardMetrics(all: LeadMetricInput[], now: number, since: number | null = null): BoardMetrics {
+  const leads = since == null ? all : all.filter((l) => l.createdAt >= since);
   const weekStart = startOfWeekMs(now);
   const prevWeekStart = weekStart - 7 * DAY_MS;
   const cutoff30 = now - 30 * DAY_MS;
@@ -72,12 +80,14 @@ export function computeBoardMetrics(leads: LeadMetricInput[], now: number): Boar
     if (l.createdAt >= weekStart) newThisWeek++;
     else if (l.createdAt >= prevWeekStart) newPrevWeek++;
 
-    if (l.firstOutboundAt != null && l.createdAt >= cutoff30) {
+    // A first message from before the lead reached Adonis (an older WhatsApp chat
+    // filled in from the phone) says nothing about how fast Adonis answered.
+    if (!l.imported && l.firstOutboundAt != null && l.createdAt >= cutoff30 && l.firstOutboundAt >= l.createdAt) {
       speedSum += l.firstOutboundAt - l.createdAt;
       speedCount++;
     }
 
-    if (l.firstOutboundAt == null && (l.role == null || !INACTIVE_ROLES.has(l.role))) {
+    if (!l.imported && l.firstOutboundAt == null && (l.role == null || !INACTIVE_ROLES.has(l.role))) {
       uncontactedNow++;
       if (now - l.createdAt > SLA_RED_MS) uncontactedBreaching = true;
     }

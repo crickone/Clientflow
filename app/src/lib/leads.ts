@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, inArray, isNotNull, like, or, sql } from "drizzle-orm";
 import { db } from "./db";
-import { leadMessages, leads, pipelineStages, type Lead, type LeadMessage } from "./db/schema";
+import { automationQueue, leadMessages, leads, pipelineStages, type Lead, type LeadMessage } from "./db/schema";
 import { normalizePhone } from "./whatsapp/phone";
 import { splitFullName } from "./humanName";
 import { resolveEntryStageId } from "./pipeline/stageRepo";
@@ -387,6 +387,8 @@ export function countLeadsInEntryStage(): number {
 /** A board lead: the full row plus the epoch-ms of its first *sent* outbound message (or null). */
 export type LeadWithSla = Lead & {
   firstOutboundAt: number | null;
+  /** Came in before the business started running leads here (setting lead_figures_since): no "waiting", not in the figures. */
+  beforeFigures?: boolean;
   stage: { id: number; name: string; colour: string; position: number; role: StageRole | null } | null;
 };
 
@@ -408,6 +410,16 @@ export function listLeadsForBoard(pipelineId?: number): LeadWithSla[] {
     .where(and(eq(leadMessages.direction, "outbound"), isNotNull(leadMessages.sentAt)))
     .groupBy(leadMessages.leadId)
     .as("first_outbound");
+  // A follow-up flow's message is contact too (they are not lead messages).
+  const flowFirst = new Map(
+    db
+      .select({ leadId: automationQueue.leadId, at: sql<number>`min(${automationQueue.sentAt})` })
+      .from(automationQueue)
+      .where(and(eq(automationQueue.kind, "message"), eq(automationQueue.status, "sent"), isNotNull(automationQueue.sentAt), isNotNull(automationQueue.leadId)))
+      .groupBy(automationQueue.leadId)
+      .all()
+      .map((r) => [r.leadId!, Number(r.at)]),
+  );
 
   const rows = db
     .select({
@@ -422,9 +434,13 @@ export function listLeadsForBoard(pipelineId?: number): LeadWithSla[] {
     .orderBy(desc(leads.createdAt))
     .all();
 
-  return rows.map((r) => ({
+  return rows.map((r) => {
+    const mine = r.firstOutboundAt ?? null;
+    const flow = flowFirst.get(r.lead.id) ?? null;
+    return {
     ...r.lead,
-    firstOutboundAt: r.firstOutboundAt ?? null,
+    firstOutboundAt: mine == null ? flow : flow == null ? mine : Math.min(mine, flow),
     stage: r.sId != null ? { id: r.sId, name: r.sName!, colour: r.sColour!, position: r.sPos!, role: (r.sRole as StageRole | null) } : null,
-  }));
+    };
+  });
 }

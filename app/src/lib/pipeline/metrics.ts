@@ -7,12 +7,13 @@
 import type { LeadWithSla } from "@/lib/leads";
 import { computeBoardMetrics, type BoardMetrics, type LeadMetricInput } from "./boardMetrics";
 
-export function boardMetricsFromLeads(leads: LeadWithSla[]): BoardMetrics {
+export function boardMetricsFromLeads(leads: LeadWithSla[], since: number | null = null): BoardMetrics {
   const input: LeadMetricInput[] = leads.map((l) => ({
     createdAt: l.createdAt.getTime(),
     updatedAt: l.updatedAt.getTime(),
     role: l.stage?.role ?? null,
     firstOutboundAt: l.firstOutboundAt,
+    imported: l.source === "gohighlevel",
   }));
-  return computeBoardMetrics(input, Date.now());
+  return computeBoardMetrics(input, Date.now(), since);
 }

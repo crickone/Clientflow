@@ -84,4 +84,23 @@ check("won lead at exactly 90d cutoff → counted (100%)", computeBoardMetrics([
 const beforeCutoff90Won: LeadMetricInput = { createdAt: NOW - 90 * DAY - 1, updatedAt: NOW - 90 * DAY - 1, role: "won", firstOutboundAt: null };
 check("won lead just before 90d cutoff → excluded (null)", computeBoardMetrics([beforeCutoff90Won], NOW).conversionPct, null);
 
+// Figures from the rollout day: older leads are left out of everything.
+const since = NOW - 2 * HOUR;
+const oldUnanswered: LeadMetricInput = { createdAt: NOW - 10 * DAY, updatedAt: NOW - 10 * DAY, role: "new", firstOutboundAt: null };
+const freshAnswered: LeadMetricInput = { createdAt: NOW - HOUR, updatedAt: NOW - HOUR, role: "new", firstOutboundAt: NOW - HOUR + 60_000 };
+const withSince = computeBoardMetrics([oldUnanswered, freshAnswered], NOW, since);
+check("since: a lead from before is not uncontacted", withSince.uncontactedNow, 0);
+check("since: speed from the new lead only", withSince.avgSpeedToLeadMs, 60_000);
+check("since: new this week counts only the new lead", withSince.newThisWeek, 1);
+check("no since: the old lead still counts", computeBoardMetrics([oldUnanswered, freshAnswered], NOW).uncontactedNow, 1);
+
+// A first message from before the lead reached here (old WhatsApp chat) is not a speed sample.
+const historyFirst: LeadMetricInput = { createdAt: NOW - DAY, updatedAt: NOW - DAY, role: "engaged", firstOutboundAt: NOW - 20 * DAY };
+check("first message before the lead existed → no speed sample", computeBoardMetrics([historyFirst], NOW).avgSpeedToLeadMs, null);
+check("...but it was contacted", computeBoardMetrics([historyFirst], NOW).uncontactedNow, 0);
+
+// Imported leads were contacted in the old system.
+const imported: LeadMetricInput = { createdAt: NOW - DAY, updatedAt: NOW - DAY, role: "nurture" as LeadMetricInput["role"], firstOutboundAt: null, imported: true };
+check("imported → not uncontacted", computeBoardMetrics([imported], NOW).uncontactedNow, 0);
+
 console.log(`\n${passed} passed`);

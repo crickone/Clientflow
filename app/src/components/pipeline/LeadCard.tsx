@@ -46,7 +46,8 @@ export function LeadCard({ lead, now, onDraft, onWhatsApp, onCall }: LeadCardPro
         ? "ready to book or pay"
         : lead.hotReason;
 
-  const waitingMs = lead.firstOutboundAt == null ? now - lead.createdAt.getTime() : null;
+  // Imported people were contacted in the system they came from: not "waiting".
+  const waitingMs = lead.firstOutboundAt == null && lead.source !== "gohighlevel" && !lead.beforeFigures ? now - lead.createdAt.getTime() : null;
   const tone = waitingMs != null ? slaTone(waitingMs) : null;
 
   const msInStage = now - lead.updatedAt.getTime();

@@ -7,6 +7,8 @@ import { listLeadsForBoard } from "@/lib/leads";
 import { listStages } from "@/lib/pipeline/stageRepo";
 import { defaultPipelineId, listPipelines } from "@/lib/pipeline/pipelineRepo";
 import { getCurrentMembership } from "@/lib/auth";
+import { readKey } from "@/lib/settings";
+import { zonedTimeToUtc } from "@/lib/leadFlows/sendingWindow";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,10 @@ export default async function LeadsPage(props: { searchParams?: Promise<{ pipeli
   const pipelines = listPipelines();
   const requested = Number(searchParams?.pipeline);
   const activePipelineId = pipelines.some((p) => p.id === requested) ? requested : defaultPipelineId();
-  const leads = listLeadsForBoard(activePipelineId);
+  // The day this business started running its leads here: figures and "waiting" count from it.
+  const sinceDay = readKey<string | null>("lead_figures_since", null);
+  const figuresSince = sinceDay && /^\d{4}-\d{2}-\d{2}$/.test(sinceDay) ? zonedTimeToUtc(sinceDay, "00:00") : null;
+  const leads = listLeadsForBoard(activePipelineId).map((l) => (figuresSince != null && l.createdAt.getTime() < figuresSince ? { ...l, beforeFigures: true } : l));
   const stages = listStages(activePipelineId);
   // Only admins get the "Manage stages" affordance on the board (the editor
   // actions are admin-guarded server-side too).
@@ -51,7 +56,7 @@ export default async function LeadsPage(props: { searchParams?: Promise<{ pipeli
           </span>
         </div>
       )}
-      <PipelineBoard leads={leads} stages={stages} canManageStages={canManageStages} pipelines={pipelines} activePipelineId={activePipelineId} />
+      <PipelineBoard leads={leads} stages={stages} canManageStages={canManageStages} pipelines={pipelines} activePipelineId={activePipelineId} figuresSince={figuresSince} />
     </div>
   );
 }

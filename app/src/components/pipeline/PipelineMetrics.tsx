@@ -2,22 +2,25 @@ import type { BoardMetrics } from "@/lib/pipeline/boardMetrics";
 import { Card } from "@/components/ui/Card";
 
 /** Four funnel stat tiles above the board. Server component — pure render of computed metrics. */
-export function PipelineMetrics({ metrics }: { metrics: BoardMetrics }) {
+export function PipelineMetrics({ metrics, since = null, now = Date.now() }: { metrics: BoardMetrics; since?: number | null; now?: number }) {
   const speed = fmtDuration(metrics.avgSpeedToLeadMs);
   const delta = metrics.newThisWeekDelta;
-  const deltaLabel = delta === 0 ? "same as last week" : `${delta > 0 ? "+" : ""}${delta} vs last week`;
+  // Figures start on the rollout day: inside a window, say so instead of the window.
+  const sinceLabel = since != null ? `since ${new Intl.DateTimeFormat("en-IE", { day: "numeric", month: "short", timeZone: "Europe/Dublin" }).format(new Date(since))}` : null;
+  const within = (days: number) => sinceLabel != null && since! > now - days * 86_400_000;
+  const deltaLabel = within(14) ? sinceLabel! : delta === 0 ? "same as last week" : `${delta > 0 ? "+" : ""}${delta} vs last week`;
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 24 }}>
       <Tile label="New this week" value={String(metrics.newThisWeek)} sub={deltaLabel} />
-      <Tile label="Avg speed to lead" value={speed} sub="last 30 days" />
+      <Tile label="Avg speed to lead" value={speed} sub={within(30) ? sinceLabel! : "last 30 days"} />
       <Tile
         label="Uncontacted now"
         value={String(metrics.uncontactedNow)}
         sub={metrics.uncontactedBreaching ? "some waiting >1h" : "within SLA"}
         danger={metrics.uncontactedBreaching}
       />
-      <Tile label="Lead → sale" value={metrics.conversionPct == null ? "—" : `${metrics.conversionPct}%`} sub="last 90 days" />
+      <Tile label="Lead → sale" value={metrics.conversionPct == null ? "—" : `${metrics.conversionPct}%`} sub={within(90) ? sinceLabel! : "last 90 days"} />
     </div>
   );
 }

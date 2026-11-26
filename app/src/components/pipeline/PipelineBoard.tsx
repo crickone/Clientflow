@@ -80,8 +80,11 @@ export function PipelineBoard({
   canManageStages,
   pipelines = [],
   activePipelineId,
+  figuresSince = null,
 }: {
   leads: LeadWithSla[];
+  /** Epoch ms the figures start from (the business's rollout day), or null for all time. */
+  figuresSince?: number | null;
   stages: StageRecord[];
   canManageStages: boolean;
   /** Every board the tenant has; tabs are shown when there is more than one. */
@@ -206,9 +209,10 @@ export function PipelineBoard({
       updatedAt: l.updatedAt.getTime(),
       role: l.stage?.role ?? null,
       firstOutboundAt: l.firstOutboundAt,
+      imported: l.source === "gohighlevel",
     }));
-    return computeBoardMetrics(input, now);
-  }, [filtered, now]);
+    return computeBoardMetrics(input, now, figuresSince);
+  }, [filtered, now, figuresSince]);
 
   // Funnel = ordinary stages (position order, as returned by listStages()); rails = lapsed/lost.
   const funnelStages = useMemo(
@@ -333,7 +337,7 @@ export function PipelineBoard({
         </nav>
       )}
 
-      <PipelineMetrics metrics={metrics} />
+      <PipelineMetrics metrics={metrics} since={figuresSince} now={now} />
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 360 }}>
