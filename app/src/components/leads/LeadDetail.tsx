@@ -11,6 +11,7 @@ import {
   CircleAlert,
   MousePointerClick,
   StickyNote,
+  UserPlus,
   UserRound,
   Check,
   ChevronDown,
@@ -30,6 +31,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { addConversationAsLeadAction } from "@/app/communication/actions";
 import type { Lead, LeadMessage } from "@/lib/db/schema";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -181,7 +183,20 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
     });
   }
 
-  const stage = stages.find((s) => s.id === lead.stageId) ?? null;
+  // A direct message from someone new: a conversation, not on the board until added.
+  const stage = lead.inboxOnly ? null : stages.find((s) => s.id === lead.stageId) ?? null;
+
+  function addAsLead() {
+    start(async () => {
+      const r = await addConversationAsLeadAction(lead.id);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success("Added to your pipeline as a lead.");
+      router.refresh();
+    });
+  }
 
   const fullName =
     [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "Anonymous";
@@ -545,7 +560,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
                     style={{ ["--stage" as string]: stage?.colour ?? "var(--text-tertiary)" }}
                   >
                     <span className="ld-stage-dot" />
-                    {stage?.name ?? "No stage"}
+                    {lead.inboxOnly ? "Not a lead" : stage?.name ?? "No stage"}
                     <ChevronDown size={13} />
                   </button>
                 </DropdownMenuTrigger>
@@ -643,6 +658,15 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
           </DropdownMenu>
         </div>
       </header>
+
+      {lead.inboxOnly && (
+        <div className="lv-inbox-only" role="status">
+          <p>A conversation only, from the Inbox. Not on your pipeline, so no follow-ups go out and it is not in your lead figures.</p>
+          <Button size="sm" onClick={addAsLead} loading={pending}>
+            <UserPlus size={14} /> Add as lead
+          </Button>
+        </div>
+      )}
 
       <div className="lv-grid">
         <section className="lv-feed" aria-label="Activity">

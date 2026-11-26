@@ -11,7 +11,7 @@ import { GRAPH_BASE, metaApiError } from "@/lib/facebook/graph";
 import { notePageRefusal } from "@/lib/facebook/health";
 import { getPageTokenForTenant } from "@/lib/facebook/pages";
 import type { MessagingEvent } from "@/lib/facebook/webhook";
-import { addMessage, fillLeadContact, findLeadMessageByProviderId, setLeadStatus, upsertLead } from "@/lib/leads";
+import { addMessage, addToPipeline, fillLeadContact, findLeadMessageByProviderId, setLeadStatus, upsertLead } from "@/lib/leads";
 import { hasFormDetails, parseFormDetails } from "./formDetails";
 import { participantName } from "./participant";
 import { addClientMessage, findClientMessageByProviderId } from "@/lib/clientMessages";
@@ -139,6 +139,8 @@ export async function recordDmEvent(ev: MessagingEvent, page: { pageId: string; 
       lastName: profile.lastName,
       fullName: profile.firstName ? undefined : profile.name,
       notes: `Started a conversation on ${CHANNEL_LABEL[ev.channel]}${profile.username ? ` (@${profile.username})` : ""}.`,
+      // A direct message is a conversation, not a lead: it stays in the Inbox until someone adds them.
+      inboxOnly: true,
     });
     created = isNew;
     db.insert(socialContacts)
@@ -181,7 +183,11 @@ export async function recordDmEvent(ev: MessagingEvent, page: { pageId: string; 
     setLeadStatus(owner.ownerId, "replied");
     // A click-to-Messenger ad form arrives as "Full name: ... / Email: ... / Phone number: ..." in the message itself.
     const form = parseFormDetails(ev.text);
-    if (hasFormDetails(form)) fillLeadContact(owner.ownerId, form);
+    if (hasFormDetails(form)) {
+      fillLeadContact(owner.ownerId, form);
+      // An ad's Messenger form is an enquiry: it goes on the board as a lead.
+      addToPipeline(owner.ownerId, "system");
+    }
     // The first profile lookup can fail (Meta's name access, a slow API): try again while we still have no name.
     if (!contact.name && !created) {
       const profile = await fetchProfile(ev.channel, ev.customerId, page);

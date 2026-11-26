@@ -312,9 +312,11 @@ async function dispatchBound(tenantId: number, now: number, baseUrl?: string): P
   // A lead that has been deleted, or has since said no, is not written to.
   const leadIds = [...new Set(due.map((d) => d.leadId).filter((id): id is number => id != null))];
   const leadRows = leadIds.length
-    ? tdb.select({ id: schema.leads.id, status: schema.leads.status }).from(schema.leads).where(inArray(schema.leads.id, leadIds)).all()
+    ? tdb.select({ id: schema.leads.id, status: schema.leads.status, inboxOnly: schema.leads.inboxOnly }).from(schema.leads).where(inArray(schema.leads.id, leadIds)).all()
     : [];
   const leadStatus = new Map(leadRows.map((l) => [l.id, l.status]));
+  // Taken off the board (a conversation only): nothing more goes out.
+  const inboxOnly = new Set(leadRows.filter((l) => l.inboxOnly).map((l) => l.id));
 
   // Imported runs (lib/ghlImport) only send while their flow is switched on.
   const runIds = [...new Set(due.map((d) => d.runId).filter((id): id is number => id != null))];
@@ -360,6 +362,11 @@ async function dispatchBound(tenantId: number, now: number, baseUrl?: string): P
       const status = leadStatus.get(item.leadId);
       if (status === undefined || status === "lost") {
         markRow(tdb, item.id, { status: "cancelled", error: status === undefined ? "Lead no longer exists." : "Lead marked lost." });
+        if (item.runId != null) closeRunIfDone(tdb, item.runId, now);
+        continue;
+      }
+      if (inboxOnly.has(item.leadId)) {
+        markRow(tdb, item.id, { status: "cancelled", error: "Not sent: a conversation only, not on the pipeline." });
         if (item.runId != null) closeRunIfDone(tdb, item.runId, now);
         continue;
       }

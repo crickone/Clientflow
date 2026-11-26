@@ -162,6 +162,8 @@ export function startFlow(leadId: number, triggerKey: string, opts: StartFlowOpt
   if (!lead) return skip("no such lead");
   // Do not contact (an import's DND or "not interested"): no flow until a person clears it.
   if (lead.doNotContact) return skip("do not contact");
+  // An Inbox-only conversation is not a lead yet: nothing is sent until someone adds them.
+  if (lead.inboxOnly) return skip("inbox only");
   const def = getFlowDefinition(triggerKey);
   if (!def.enabled) return skip("switched off");
   if (opts.ifNotActive && alreadyRunning(leadId, triggerKey)) return skip("already running");

@@ -783,7 +783,10 @@ export async function leadConversionByTherapy(
     })
     .from(leads)
     .where(
-      sql`date(${leads.createdAt} / 1000, 'unixepoch') BETWEEN ${startIso} AND ${endIso}`,
+      and(
+        sql`date(${leads.createdAt} / 1000, 'unixepoch') BETWEEN ${startIso} AND ${endIso}`,
+        eq(leads.inboxOnly, false),
+      ),
     )
     .groupBy(leads.therapyInterest)
     .all();

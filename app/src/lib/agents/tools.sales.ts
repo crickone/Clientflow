@@ -1,7 +1,7 @@
 import "server-only";
 
 import type Anthropic from "@anthropic-ai/sdk";
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { leadMessages, leads } from "@/lib/db/schema";
 import { addMessage, getLead } from "@/lib/leads";
@@ -213,7 +213,7 @@ export function listLeadsTool(ctx: ToolContext, input: Record<string, unknown>):
   const rows = db
     .select()
     .from(leads)
-    .where(stageMatch ? inArray(leads.stageId, stageMatch.ids) : undefined)
+    .where(stageMatch ? and(inArray(leads.stageId, stageMatch.ids), eq(leads.inboxOnly, false)) : eq(leads.inboxOnly, false))
     .orderBy(...(hottest ? [sql`${leads.leadScore} is null`, desc(leads.leadScore), desc(leads.updatedAt)] : [desc(leads.updatedAt)]))
     .limit(limit)
     .all();

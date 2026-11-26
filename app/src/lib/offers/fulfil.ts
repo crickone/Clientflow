@@ -9,7 +9,7 @@ import { clients, leads, offerOrders, packages, payments } from "@/lib/db/schema
 import { getCampaign, getCampaignLandingUrl } from "@/lib/campaigns/store";
 import { ACCESS_PARAM, getOfferAccessKey } from "./access";
 import { cancelSequences, enrolLeadInSequence } from "@/lib/automations/nurture";
-import { upsertLead } from "@/lib/leads";
+import { addToPipeline, upsertLead } from "@/lib/leads";
 import { defaultPipelineId, pipelineForCampaign } from "@/lib/pipeline/pipelineRepo";
 import { onPaymentRecorded } from "@/lib/pipeline/stage";
 import { splitFullName } from "@/lib/humanName";
@@ -132,7 +132,7 @@ export async function fulfilCheckout(
       // a second card that never moves (two orders made two cards before).
       const sameBoard = pipelineId ?? defaultPipelineId();
       const already = db
-        .select({ id: leads.id, notes: leads.notes })
+        .select({ id: leads.id, notes: leads.notes, inboxOnly: leads.inboxOnly })
         .from(leads)
         .where(
           and(
@@ -149,6 +149,8 @@ export async function fulfilCheckout(
           .set({ clientId: client.id, notes: already.notes ? `${already.notes}\n${boughtNote}` : boughtNote, updatedAt: new Date() })
           .where(eq(leads.id, leadId))
           .run();
+        // A buyer who had only written to the Inbox is a customer now: on the board.
+        if (already.inboxOnly) addToPipeline(leadId, "system");
       } else {
         const { lead } = upsertLead({
           source: "offer",

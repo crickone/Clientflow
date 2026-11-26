@@ -3504,6 +3504,8 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     // GoHighLevel import (lib/ghlImport): do not contact, who placed a run,
     // and the per-person import record.
     addColumn("leads", "do_not_contact", "do_not_contact INTEGER NOT NULL DEFAULT 0");
+    // Direct messages from someone new stay in the Inbox, off the board (lib/leads addToPipeline).
+    addColumn("leads", "inbox_only", "inbox_only INTEGER NOT NULL DEFAULT 0");
     addColumn("lead_flow_runs", "source", "source TEXT");
     sqlite.exec(`
       CREATE TABLE IF NOT EXISTS ghl_import_people (

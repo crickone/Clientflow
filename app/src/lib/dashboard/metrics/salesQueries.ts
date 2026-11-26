@@ -43,7 +43,7 @@ export function leadsCreatedIn(fromMs: number, toMs: number) {
     })
     .from(schema.leads)
     .leftJoin(schema.pipelineStages, eq(schema.pipelineStages.id, schema.leads.stageId))
-    .where(and(gte(schema.leads.createdAt, d(fromMs)), lt(schema.leads.createdAt, d(toMs))))
+    .where(and(gte(schema.leads.createdAt, d(fromMs)), lt(schema.leads.createdAt, d(toMs)), eq(schema.leads.inboxOnly, false)))
     .all();
 }
 
@@ -51,7 +51,7 @@ export function countLeadsIn(fromMs: number, toMs: number): number {
   const row = db
     .select({ n: sql<number>`count(*)` })
     .from(schema.leads)
-    .where(and(gte(schema.leads.createdAt, d(fromMs)), lt(schema.leads.createdAt, d(toMs))))
+    .where(and(gte(schema.leads.createdAt, d(fromMs)), lt(schema.leads.createdAt, d(toMs)), eq(schema.leads.inboxOnly, false)))
     .get();
   return Number(row?.n ?? 0);
 }
@@ -86,7 +86,10 @@ export function openPipelineCount(): { open: number; pipelines: number } {
     .from(schema.leads)
     .leftJoin(schema.pipelineStages, eq(schema.pipelineStages.id, schema.leads.stageId))
     .where(
-      sql`${schema.pipelineStages.role} IS NULL OR ${schema.pipelineStages.role} NOT IN ('won','repeat','lost','lapsed')`,
+      and(
+        sql`(${schema.pipelineStages.role} IS NULL OR ${schema.pipelineStages.role} NOT IN ('won','repeat','lost','lapsed'))`,
+        eq(schema.leads.inboxOnly, false),
+      ),
     )
     .get();
   return { open: Number(rows?.n ?? 0), pipelines: listPipelines().length };
@@ -120,7 +123,7 @@ export function stageDistribution(): { label: string; value: number }[] {
   const rows = db
     .select({ stageId: schema.leads.stageId, n: sql<number>`count(*)` })
     .from(schema.leads)
-    .where(eq(schema.leads.pipelineId, pid))
+    .where(and(eq(schema.leads.pipelineId, pid), eq(schema.leads.inboxOnly, false)))
     .groupBy(schema.leads.stageId)
     .all();
   const by = new Map(rows.map((r) => [r.stageId, Number(r.n)]));
@@ -248,6 +251,7 @@ export function staleLeads(nowMs: number, limit = 10) {
     .where(
       and(
         lt(schema.leads.updatedAt, d(nowMs - STALE_MS)),
+        eq(schema.leads.inboxOnly, false),
         sql`(${schema.pipelineStages.role} IS NULL OR ${schema.pipelineStages.role} NOT IN ('won','repeat','lost','lapsed'))`,
       ),
     )
@@ -268,6 +272,7 @@ export function slaBreachCount(nowMs: number): number {
         // five follow-up columns (system_key set) are worked leads, not uncontacted ones.
         sql`(${schema.pipelineStages.role} = 'new' OR (${schema.pipelineStages.role} IS NULL AND ${schema.pipelineStages.systemKey} IS NULL))`,
         lt(schema.leads.createdAt, d(nowMs - SLA_RED_MS)),
+        eq(schema.leads.inboxOnly, false),
         sql`NOT EXISTS (SELECT 1 FROM ${schema.leadMessages} WHERE ${schema.leadMessages.leadId} = ${schema.leads.id} AND ${schema.leadMessages.direction} = 'outbound' AND ${schema.leadMessages.sentAt} IS NOT NULL)`,
       ),
     )

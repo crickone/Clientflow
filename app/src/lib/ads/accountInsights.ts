@@ -268,7 +268,7 @@ export function ownResults(tenantId: number, bounds: { from: number; to: number 
     const newLeads = tdb
       .select({ arrival: leads.arrival })
       .from(leads)
-      .where(and(gte(leads.createdAt, new Date(bounds.from)), lt(leads.createdAt, new Date(bounds.to))))
+      .where(and(gte(leads.createdAt, new Date(bounds.from)), lt(leads.createdAt, new Date(bounds.to)), eq(leads.inboxOnly, false)))
       .all();
     for (const l of newLeads) {
       const id = metaCampaignOf(parseArrival(l.arrival));

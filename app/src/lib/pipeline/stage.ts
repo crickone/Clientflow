@@ -60,10 +60,12 @@ export interface StageWriteOptions {
  */
 export function writeStageId(leadId: number, stageId: number, note: string, actor: StageActor = "system", opts: StageWriteOptions = {}): void {
   const before = db
-    .select({ stageId: schema.leads.stageId, pipelineId: schema.leads.pipelineId })
+    .select({ stageId: schema.leads.stageId, pipelineId: schema.leads.pipelineId, inboxOnly: schema.leads.inboxOnly })
     .from(schema.leads)
     .where(eq(schema.leads.id, leadId))
     .get();
+  // An Inbox-only conversation is on no board: nothing moves it (lib/leads addToPipeline puts it on one).
+  if (before?.inboxOnly) return;
   const pipelineId = leadPipelineId(leadId);
   const stage = pipelineId == null ? undefined : listStages(pipelineId).find((s) => s.id === stageId);
   const legacy = stage?.role ? ROLE_TO_LEGACY_KEY[stage.role] : undefined;
@@ -106,6 +108,7 @@ export function writeStageId(leadId: number, stageId: number, note: string, acto
 export function advanceStage(leadId: number, role: StageRole, reason?: string): boolean {
   const cur = currentStageRecord(leadId);
   if (!cur) return false;
+  if (db.select({ v: schema.leads.inboxOnly }).from(schema.leads).where(eq(schema.leads.id, leadId)).get()?.v) return false;
   const pipelineId = leadPipelineId(leadId) ?? undefined;
   const targetId = resolveStageIdByRole(role, pipelineId);
   if (targetId == null) return false; // this board doesn't use that role → automation off

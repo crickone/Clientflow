@@ -117,8 +117,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, ignored: "non-json" });
     }
 
-    // Inbound message → thread it against a client (preferred), a lead, or park
-    // it as a new whatsapp lead so nothing is dropped.
+    // Inbound message → thread it against a client (preferred), a lead, or keep
+    // it as an Inbox-only conversation (not on the board) so nothing is dropped.
     const inbound = bridge.parseInboundWebhook(body);
     if (inbound) {
       const client = findClientByPhone(inbound.fromPhone);
@@ -185,6 +185,8 @@ export async function POST(req: NextRequest) {
             source: "whatsapp",
             phone: inbound.fromPhone,
             notes: "Inbound WhatsApp from an unknown number.",
+            // A direct message is a conversation, not a lead: it stays in the Inbox until someone adds them.
+            inboxOnly: true,
           }).lead;
         }
         const inboundMsg = addMessage({

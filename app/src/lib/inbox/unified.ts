@@ -1,6 +1,6 @@
 import "server-only";
 
-import { desc, isNotNull, sql } from "drizzle-orm";
+import { desc, eq, isNotNull, sql } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import { emailMessages } from "@/lib/db/schema";
@@ -35,8 +35,8 @@ export type InboxItem = {
   outbound: boolean;
   messageCount: number;
   threadId: string | null;
-  /** A member or lead this person matches, for the row chip and context card. */
-  contact: { type: "client" | "lead"; id: number } | null;
+  /** A member or lead this person matches, for the row chip and context card. inboxOnly: a conversation, not on the board. */
+  contact: InboxContact | null;
   conv: {
     kind: "lead" | "client";
     contactId: number;
@@ -54,11 +54,13 @@ export type InboxItem = {
 
 export type EmailMode = "two-way" | "sent-log";
 
+export type InboxContact = { type: "client" | "lead"; id: number; inboxOnly?: boolean };
+
 /** Lowercased email → member / lead, for matching senders. Members win. */
-function contactIndex(): Map<string, { type: "client" | "lead"; id: number }> {
-  const map = new Map<string, { type: "client" | "lead"; id: number }>();
-  for (const l of db.select({ id: schema.leads.id, email: schema.leads.email }).from(schema.leads).where(isNotNull(schema.leads.email)).all()) {
-    if (l.email) map.set(l.email.trim().toLowerCase(), { type: "lead", id: l.id });
+function contactIndex(): Map<string, InboxContact> {
+  const map = new Map<string, InboxContact>();
+  for (const l of db.select({ id: schema.leads.id, email: schema.leads.email, inboxOnly: schema.leads.inboxOnly }).from(schema.leads).where(isNotNull(schema.leads.email)).all()) {
+    if (l.email) map.set(l.email.trim().toLowerCase(), l.inboxOnly ? { type: "lead", id: l.id, inboxOnly: true } : { type: "lead", id: l.id });
   }
   for (const c of db.select({ id: schema.clients.id, email: schema.clients.email }).from(schema.clients).where(isNotNull(schema.clients.email)).all()) {
     if (c.email) map.set(c.email.trim().toLowerCase(), { type: "client", id: c.id });
@@ -165,6 +167,9 @@ function sentLogItems(): InboxItem[] {
 }
 
 function conversationItems(): InboxItem[] {
+  const inboxOnly = new Set(
+    db.select({ id: schema.leads.id }).from(schema.leads).where(eq(schema.leads.inboxOnly, true)).all().map((r) => r.id),
+  );
   return listConversations().map((c) => {
     const channel: InboxChannel = c.channel === "messenger" || c.channel === "instagram" ? c.channel : "whatsapp";
     const text = c.lastDirection === "outbound" ? `You: ${c.lastMessage}` : c.lastMessage;
@@ -183,7 +188,7 @@ function conversationItems(): InboxItem[] {
       outbound: c.lastDirection === "outbound",
       messageCount: 0,
       threadId: null,
-      contact: { type: c.kind, id: c.contactId },
+      contact: c.kind === "lead" && inboxOnly.has(c.contactId) ? { type: c.kind, id: c.contactId, inboxOnly: true } : { type: c.kind, id: c.contactId },
       conv: {
         kind: c.kind,
         contactId: c.contactId,

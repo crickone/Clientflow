@@ -6,7 +6,7 @@ import { ArrowUpRight, Mail, Phone, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
-import { addSenderAsLeadAction, type ContactContext } from "@/app/communication/actions";
+import { addConversationAsLeadAction, addSenderAsLeadAction, type ContactContext } from "@/app/communication/actions";
 import { hueOf, initials } from "./format";
 
 /**
@@ -29,9 +29,18 @@ export function InboxAvatar({ name, size = 36 }: { name: string; size?: number }
   );
 }
 
+/** A direct message from someone new: kept in the Inbox, not on the board. */
+const isConversationOnly = (ctx: ContactContext) => ctx.type === "lead" && ctx.inboxOnly;
+
 function typeLabel(ctx: ContactContext, memberLabel: string) {
+  if (isConversationOnly(ctx)) return "Not a lead";
   return ctx.type === "client" ? memberLabel : ctx.type === "lead" ? "Lead" : "Not on file";
 }
+
+const pillType = (ctx: ContactContext) => (isConversationOnly(ctx) ? "unknown" : ctx.type);
+
+/** Someone the card can add as a lead: an email sender not on file, or a conversation not on the board. */
+const canBeAdded = (ctx: ContactContext) => (ctx.type === "unknown" && !!ctx.email) || isConversationOnly(ctx);
 
 const SOURCE_NAME: Record<string, string> = {
   whatsapp: "WhatsApp",
@@ -48,10 +57,12 @@ const since = (ms: number) => new Date(ms).toLocaleDateString("en-IE", { day: "n
 function useAddLead(ctx: ContactContext | null, onAdded: (leadId: number) => void) {
   const [pending, start] = useTransition();
   const add = () => {
-    if (!ctx || ctx.type !== "unknown" || !ctx.email) return;
-    const { name, email } = ctx;
+    if (!ctx || !canBeAdded(ctx)) return;
     start(async () => {
-      const res = await addSenderAsLeadAction({ name, email });
+      const res =
+        ctx.type === "lead"
+          ? await addConversationAsLeadAction(ctx.id)
+          : await addSenderAsLeadAction({ name: ctx.name, email: ctx.email ?? "" });
       if (!res.ok) {
         toast.error(res.error);
         return;
@@ -90,7 +101,7 @@ export function ContactPanel({
     <aside className="inbox-context">
       <InboxAvatar name={ctx.name} size={52} />
       <div className="inbox-context-name">{ctx.name}</div>
-      <span className={`inbox-pill inbox-pill--${ctx.type}`}>{typeLabel(ctx, memberLabel)}</span>
+      <span className={`inbox-pill inbox-pill--${pillType(ctx)}`}>{typeLabel(ctx, memberLabel)}</span>
 
       <dl className="inbox-context-facts">
         {email && (
@@ -113,7 +124,16 @@ export function ContactPanel({
           <div><dt>{memberLabel} since</dt><dd>{since(ctx.since)}</dd></div>
         </dl>
       )}
-      {ctx.type === "lead" && (
+      {ctx.type === "lead" && ctx.inboxOnly && (
+        <>
+          <dl className="inbox-context-rows">
+            <div><dt>Wrote on</dt><dd>{SOURCE_NAME[ctx.source.toLowerCase()] ?? ctx.source}</dd></div>
+            <div><dt>First message</dt><dd>{since(ctx.since)}</dd></div>
+          </dl>
+          <p className="inbox-context-note">A conversation only. Not on your pipeline.</p>
+        </>
+      )}
+      {ctx.type === "lead" && !ctx.inboxOnly && (
         <dl className="inbox-context-rows">
           <div><dt>Stage</dt><dd>{ctx.stage ?? "Not set"}</dd></div>
           <div><dt>Source</dt><dd>{SOURCE_NAME[ctx.source.toLowerCase()] ?? ctx.source.charAt(0).toUpperCase() + ctx.source.slice(1)}</dd></div>
@@ -125,13 +145,13 @@ export function ContactPanel({
       )}
 
       <div style={{ marginTop: 16, display: "grid", gap: 8 }}>
-        {ctx.type !== "unknown" ? (
+        {ctx.type !== "unknown" && !isConversationOnly(ctx) ? (
           <Link href={ctx.href}>
             <Button variant="outline" size="sm" style={{ width: "100%" }}>
               Open profile <ArrowUpRight size={14} />
             </Button>
           </Link>
-        ) : canAddLead && email ? (
+        ) : canAddLead && canBeAdded(ctx) ? (
           <Button size="sm" onClick={add} loading={pending} style={{ width: "100%" }}>
             <UserPlus size={14} /> Add as lead
           </Button>
@@ -160,17 +180,19 @@ export function ContactStrip({
         ? ctx.membership.name
         : `${memberLabel} since ${since(ctx.since)}`
       : ctx.type === "lead"
-        ? ctx.stage ?? "Lead"
+        ? ctx.inboxOnly
+          ? "Inbox only"
+          : ctx.stage ?? "Lead"
         : `Not a ${memberLabel.toLowerCase()} or lead yet`;
   return (
     <div className="inbox-context-strip">
-      <span className={`inbox-pill inbox-pill--${ctx.type}`}>{typeLabel(ctx, memberLabel)}</span>
+      <span className={`inbox-pill inbox-pill--${pillType(ctx)}`}>{typeLabel(ctx, memberLabel)}</span>
       <span className="inbox-context-strip-fact">{fact}</span>
-      {ctx.type !== "unknown" ? (
+      {ctx.type !== "unknown" && !isConversationOnly(ctx) ? (
         <Link href={ctx.href} className="inbox-link">
           Open profile <ArrowUpRight size={13} />
         </Link>
-      ) : canAddLead && ctx.email ? (
+      ) : canAddLead && canBeAdded(ctx) ? (
         <Button size="sm" variant="outline" onClick={add} loading={pending}>
           <UserPlus size={13} /> Add as lead
         </Button>

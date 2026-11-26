@@ -674,9 +674,9 @@ function Row({
         </span>
         {i.subject && <span className="inbox-row-subject">{i.subject}</span>}
         <span className="inbox-row-snippet">{i.snippet || " "}</span>
-        {(i.contact || i.failed || i.conv?.aiPriority === "high" || i.review) && (
+        {((i.contact && !i.contact.inboxOnly) || i.failed || i.conv?.aiPriority === "high" || i.review) && (
           <span className="inbox-row-chips">
-            {i.contact && <span className={`inbox-pill inbox-pill--${i.contact.type}`}>{i.contact.type === "client" ? memberLabel : "Lead"}</span>}
+            {i.contact && !i.contact.inboxOnly && <span className={`inbox-pill inbox-pill--${i.contact.type}`}>{i.contact.type === "client" ? memberLabel : "Lead"}</span>}
             {i.conv?.aiPriority === "high" && <span className="inbox-pill inbox-pill--urgent">Urgent</span>}
             {i.review && <Stars rating={i.review.rating} size={11} />}
             {i.failed && <span className="inbox-pill inbox-pill--urgent">Not sent</span>}

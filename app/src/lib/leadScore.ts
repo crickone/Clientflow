@@ -27,7 +27,7 @@ function factsFor(tenantId: number, leadId: number): LeadFacts | null {
     .leftJoin(pipelineStages, eq(pipelineStages.id, leads.stageId))
     .where(eq(leads.id, leadId))
     .get();
-  if (!row) return null;
+  if (!row || row.lead.inboxOnly) return null;
   const l = row.lead;
   const msgs = tdb
     .select()
@@ -100,6 +100,8 @@ export async function scoreLeadsIfDue(tenantId: number): Promise<number> {
     .leftJoin(pipelineStages, eq(pipelineStages.id, leads.stageId))
     .leftJoin(lastMsg, eq(lastMsg.leadId, leads.id))
     .leftJoin(lastInbound, eq(lastInbound.leadId, leads.id))
+    // An Inbox-only conversation is not a lead: not scored until someone adds them.
+    .where(eq(leads.inboxOnly, false))
     .all();
   const now = Date.now();
   const due = rows

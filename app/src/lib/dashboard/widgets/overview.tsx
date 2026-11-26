@@ -40,7 +40,7 @@ function countLeads(fromMs: number, toMs: number): number {
   const row = db
     .select({ n: sql<number>`count(*)` })
     .from(schema.leads)
-    .where(and(gte(schema.leads.createdAt, new Date(fromMs)), lt(schema.leads.createdAt, new Date(toMs))))
+    .where(and(gte(schema.leads.createdAt, new Date(fromMs)), lt(schema.leads.createdAt, new Date(toMs)), eq(schema.leads.inboxOnly, false)))
     .get();
   return Number(row?.n ?? 0);
 }
@@ -52,7 +52,7 @@ function leadSpark(fromMs: number, toMs: number): number[] {
   const rows = db
     .select({ at: schema.leads.createdAt })
     .from(schema.leads)
-    .where(and(gte(schema.leads.createdAt, new Date(fromMs)), lt(schema.leads.createdAt, new Date(toMs))))
+    .where(and(gte(schema.leads.createdAt, new Date(fromMs)), lt(schema.leads.createdAt, new Date(toMs)), eq(schema.leads.inboxOnly, false)))
     .all();
   for (const r of rows) {
     const i = r.at ? bucketIndex(buckets, r.at.getTime()) : -1;
@@ -294,7 +294,7 @@ export const OVERVIEW_WIDGETS = {
       const counts = db
         .select({ stageId: schema.leads.stageId, n: sql<number>`count(*)` })
         .from(schema.leads)
-        .where(eq(schema.leads.pipelineId, pid))
+        .where(and(eq(schema.leads.pipelineId, pid), eq(schema.leads.inboxOnly, false)))
         .groupBy(schema.leads.stageId)
         .all();
       const byStage = new Map(counts.map((c) => [c.stageId, Number(c.n)]));

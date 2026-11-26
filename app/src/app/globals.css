@@ -4895,6 +4895,8 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
    sidebar is open or collapsed: two columns, then tablet, then phone. */
 .lv { max-width: 1280px; container-type: inline-size; container-name: lv; }
 .lv-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px 24px; padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--hairline); }
+.lv-inbox-only { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; padding: 12px 14px 12px 16px; margin: -4px 0 20px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--hairline); }
+.lv-inbox-only p { margin: 0; font-size: 13.5px; color: var(--text-secondary); max-width: 62ch; }
 .lv-title { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; }
 .lv-stage { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px 0 11px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 500; color: var(--text-primary); cursor: pointer; background: color-mix(in srgb, var(--stage) 16%, transparent); border: 1px solid color-mix(in srgb, var(--stage) 40%, transparent); }
 .lv-stage .ld-stage-dot { background: var(--stage); width: 8px; height: 8px; }

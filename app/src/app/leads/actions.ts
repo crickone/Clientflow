@@ -12,6 +12,7 @@ import {
   addMessage,
   setLeadStatus,
   upsertLead,
+  addToPipeline,
   type LeadStatus,
 } from "@/lib/leads";
 import { logActivity } from "@/lib/queries";
@@ -43,6 +44,8 @@ async function rescore(leadId: number): Promise<LeadScore | null> {
 /** Operator override of a lead's pipeline stage (e.g. mark Lost, or correct). */
 export async function setLeadStageAction(leadId: number, stageId: number): Promise<{ score: LeadScore | null }> {
   await requireUser();
+  // Picking a stage for a conversation from the Inbox puts it on the board first.
+  addToPipeline(leadId, "user");
   setStageToId(leadId, stageId);
   const score = await rescore(leadId);
   revalidatePath(`/leads/${leadId}`);

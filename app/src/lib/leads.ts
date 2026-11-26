@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, inArray, isNotNull, like, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, like, or, sql, type SQL } from "drizzle-orm";
 import { db } from "./db";
 import { automationQueue, leadMessages, leads, pipelineStages, type Lead, type LeadMessage } from "./db/schema";
 import { normalizePhone } from "./whatsapp/phone";
@@ -42,6 +42,12 @@ export interface NormalizedLeadInput {
   pipelineId?: number | null;
   /** Who created the lead, for the stage history. Omitted = system. */
   actor?: StageActor;
+  /**
+   * Only in the Inbox: a direct message from someone new. Stored off the
+   * board, with no stage, no follow-ups, no call and no new-lead alert, until
+   * someone adds them as a lead (addToPipeline).
+   */
+  inboxOnly?: boolean;
 }
 
 /**
@@ -102,25 +108,64 @@ export function upsertLead(input: NormalizedLeadInput): {
       notes: nz(input.notes),
       rawPayload: input.rawPayload ? JSON.stringify(input.rawPayload) : null,
       arrival: input.arrival ? JSON.stringify(input.arrival) : null,
-      assignedUserId: defaultAssigneeForNewLead(),
+      assignedUserId: input.inboxOnly ? null : defaultAssigneeForNewLead(),
       pipelineId,
-      stageId: resolveEntryStageId(pipelineId) ?? undefined,
+      stageId: input.inboxOnly ? undefined : resolveEntryStageId(pipelineId) ?? undefined,
+      inboxOnly: input.inboxOnly === true,
     })
     .returning()
     .all();
   const lead = inserted[0];
   if (input.marketingConsent) recordIntakeConsent(lead.id, input.marketingConsent);
+  if (!lead.inboxOnly) welcomeLead(lead, input.actor);
+  return { lead, created: true };
+}
+
+/**
+ * What a lead gets the moment it is on the board: its first stage in the
+ * history, the call flow, its follow-up sequence, and the team told.
+ */
+function welcomeLead(lead: Lead, actor?: StageActor): void {
   if (lead.stageId != null) {
-    recordStageEvent(db, { leadId: lead.id, pipelineId: lead.pipelineId, fromStageId: null, toStageId: lead.stageId, actor: input.actor ?? "system" });
+    recordStageEvent(db, { leadId: lead.id, pipelineId: lead.pipelineId, fromStageId: null, toStageId: lead.stageId, actor: actor ?? "system" });
   }
   enrolInCallFlow(lead);
   enrolInNurture(lead);
   // Tell the team (not for a lead that came in on a message, which already
   // notified, or one a staff member typed in). Never throws.
-  notifyNewLead(lead, input.actor);
+  notifyNewLead(lead, actor);
   // The assignee's own alert and the WhatsApp alert (lib/leadFlows/alerts). Never throws.
-  alertNewLead(lead, input.actor);
-  return { lead, created: true };
+  alertNewLead(lead, actor);
+}
+
+/** True when the lead is only an Inbox conversation, not on the board. */
+export function isInboxOnly(leadId: number): boolean {
+  return db.select({ v: leads.inboxOnly }).from(leads).where(eq(leads.id, leadId)).get()?.v === true;
+}
+
+/** Leads on the board: everyone except Inbox-only conversations. For any query that counts or lists leads. */
+export const onBoard = eq(leads.inboxOnly, false);
+
+/**
+ * Put an Inbox-only conversation on the board as a lead: on its board's first
+ * column (or the column it was in before it was taken off), with a new
+ * lead's welcome. Safe to call twice: a lead already on the board is left as it is.
+ */
+export function addToPipeline(leadId: number, actor: StageActor = "user"): { lead: Lead; added: boolean } | null {
+  const cur = db.select().from(leads).where(eq(leads.id, leadId)).get();
+  if (!cur) return null;
+  if (!cur.inboxOnly) return { lead: cur, added: false };
+  const pipelineId = getPipeline(cur.pipelineId) ? cur.pipelineId : defaultPipelineId();
+  const stageId = cur.stageId ?? resolveEntryStageId(pipelineId) ?? null;
+  const [lead] = db
+    .update(leads)
+    .set({ inboxOnly: false, pipelineId, stageId, assignedUserId: cur.assignedUserId ?? defaultAssigneeForNewLead(), createdAt: cur.stageId == null ? new Date() : cur.createdAt, updatedAt: new Date() })
+    .where(eq(leads.id, leadId))
+    .returning()
+    .all();
+  // A card taken off the board and put back keeps its history; a new one is welcomed.
+  if (cur.stageId == null) welcomeLead(lead, actor);
+  return { lead, added: true };
 }
 
 /**
@@ -199,7 +244,7 @@ export function listLeads(opts: {
   status?: LeadStatus | "all";
 } = {}) {
   const { q, status = "all" } = opts;
-  const where = [];
+  const where: (SQL | undefined)[] = [onBoard];
   if (status !== "all") where.push(eq(leads.status, status));
   if (q) {
     const like_ = `%${q.toLowerCase()}%`;
@@ -430,7 +475,7 @@ export function listLeadsForBoard(pipelineId?: number): LeadWithSla[] {
     .from(leads)
     .leftJoin(firstOutbound, eq(firstOutbound.leadId, leads.id))
     .leftJoin(pipelineStages, eq(pipelineStages.id, leads.stageId))
-    .where(pipelineId == null ? undefined : eq(leads.pipelineId, pipelineId))
+    .where(pipelineId == null ? onBoard : and(onBoard, eq(leads.pipelineId, pipelineId)))
     .orderBy(desc(leads.createdAt))
     .all();
 

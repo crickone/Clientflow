@@ -89,6 +89,7 @@ const requireLocal = createRequire(import.meta.url);
     arrival: null,
     doNotCall: false,
     doNotContact: false,
+    inboxOnly: false,
     leadScore: null,
     leadNextStep: null,
     leadScoredAt: null,

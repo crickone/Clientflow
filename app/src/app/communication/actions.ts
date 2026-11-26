@@ -28,7 +28,7 @@ import { getTheme } from "@/lib/settings";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { emailMessages } from "@/lib/db/schema";
-import { upsertLead } from "@/lib/leads";
+import { addToPipeline, upsertLead } from "@/lib/leads";
 import { draftEmailReply } from "@/lib/ai/draftEmailReply";
 import { AiCapError } from "@/lib/ai/usage";
 import { draftReviewReply } from "@/lib/ai/draftReviewReply";
@@ -247,6 +247,8 @@ export type ContactContext =
       since: number;
       stage: string | null;
       source: string;
+      /** A conversation only (a direct message from someone new): not on the board until added. */
+      inboxOnly: boolean;
     }
   | { type: "unknown"; name: string; email: string | null };
 
@@ -305,8 +307,9 @@ export async function contactContextAction(input: {
         phone: l.phone,
         href: `/leads/${l.id}`,
         since: l.createdAt.getTime(),
-        stage: stage?.name ?? null,
+        stage: l.inboxOnly ? null : stage?.name ?? null,
         source: l.source,
+        inboxOnly: l.inboxOnly,
       };
     }
   }
@@ -334,6 +337,21 @@ export async function addSenderAsLeadAction(input: {
   }
   revalidatePath("/leads");
   return { ok: true, leadId: lead.id };
+}
+
+/** Put a conversation (a direct message from someone new) on the board as a lead. Safe to click twice. */
+export async function addConversationAsLeadAction(leadId: number): Promise<{ ok: true; leadId: number } | { ok: false; error: string }> {
+  await requireUser();
+  if (!Number.isInteger(leadId) || leadId <= 0) return { ok: false, error: "This conversation was not found." };
+  const res = addToPipeline(leadId, "user");
+  if (!res) return { ok: false, error: "This conversation was not found." };
+  if (res.added) {
+    const name = [res.lead.firstName, res.lead.lastName].filter(Boolean).join(" ").trim() || res.lead.phone || "a conversation";
+    await logActivity("lead.new", `Lead added from the inbox: ${name}`, { leadId });
+  }
+  revalidatePath("/leads");
+  revalidatePath(`/leads/${leadId}`);
+  return { ok: true, leadId };
 }
 
 /** Adonis drafts a reply to an email thread; it lands in the reply box, never sent from here. */

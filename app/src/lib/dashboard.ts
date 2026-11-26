@@ -96,7 +96,7 @@ export function getGymDashboard(): GymDashboard {
   const newLeadsThisMonth = db
     .select({ id: leads.id })
     .from(leads)
-    .where(gte(leads.createdAt, monthStart))
+    .where(and(gte(leads.createdAt, monthStart), eq(leads.inboxOnly, false)))
     .all().length;
 
   const monthPays = db.select({ amount: payments.amountEur }).from(payments).where(gte(payments.createdAt, monthStart)).all();
@@ -154,7 +154,7 @@ export function getNeedsAttention(): AttentionItem[] {
     items.push({ key: "email", label: unreadEmails === 1 ? "unread email" : "unread emails", count: unreadEmails, href: "/communication", tone: "alert" });
   }
 
-  const newLeads = db.select({ id: leads.id }).from(leads).where(eq(leads.status, "new")).all().length;
+  const newLeads = db.select({ id: leads.id }).from(leads).where(and(eq(leads.status, "new"), eq(leads.inboxOnly, false))).all().length;
   if (newLeads > 0) {
     items.push({ key: "leads", label: newLeads === 1 ? "new lead to follow up" : "new leads to follow up", count: newLeads, href: "/leads", tone: "alert" });
   }

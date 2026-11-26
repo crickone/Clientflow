@@ -378,6 +378,13 @@ export const leads = sqliteTable("leads", {
    * startFlow, importedRuns.ts) until a person clears it on the lead page.
    */
   doNotContact: integer("do_not_contact", { mode: "boolean" }).notNull().default(false),
+  /**
+   * Only in the Inbox: someone who wrote on WhatsApp, Messenger or Instagram
+   * and is not a lead (yet). Their messages live on this row, but it is not on
+   * any board, counted in lead figures, moved between columns, followed up or
+   * announced as a new lead. "Add as lead" (lib/leads addToPipeline) clears it.
+   */
+  inboxOnly: integer("inbox_only", { mode: "boolean" }).notNull().default(false),
   // Lead score (lib/leadScore.ts): readiness to buy out of 100 and the next
   // step, from Jev. Null until first scored. Writing them never touches updatedAt.
   leadScore: integer("lead_score"),
