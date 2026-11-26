@@ -3196,6 +3196,16 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     }
   }
 
+  // Where an outbound WhatsApp came from ("phone" = the business's own WhatsApp, not Adonis). Additive.
+  for (const table of ["lead_messages", "client_messages"]) {
+    try {
+      const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+      if (cols.length && !cols.some((c) => c.name === "origin")) sqlite.exec(`ALTER TABLE ${table} ADD COLUMN origin TEXT`);
+    } catch (err) {
+      console.error(`[db] ${table}.origin migration failed:`, err);
+    }
+  }
+
   // Lead score from Jev (lib/leadScore.ts). Additive.
   try {
     const cols = sqlite.prepare("PRAGMA table_info(leads)").all() as Array<{ name: string }>;

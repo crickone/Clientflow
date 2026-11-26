@@ -3,6 +3,7 @@ import "server-only";
 import { timingSafeEqual } from "node:crypto";
 
 import { normalizePhone } from "./phone";
+import { parseChatHistory, type ChatMessage } from "./historyModel";
 import type {
   ConnectionStatus,
   InboundMedia,
@@ -127,6 +128,17 @@ export class WhapiBridge implements WhatsAppBridge {
     };
     const qr = data.base64 ?? data.qr ?? null;
     return { qr: qr ? ensureDataUrl(qr) : null, connected: false };
+  }
+
+  async listChat(phone: string, count: number): Promise<ChatMessage[]> {
+    const digits = normalizePhone(phone);
+    if (!digits) return [];
+    const chat = `${digits}@s.whatsapp.net`;
+    const res = await fetch(`${this.base}/messages/list/${encodeURIComponent(chat)}?count=${Math.max(1, Math.min(500, Math.round(count)))}`, {
+      headers: this.headers(),
+    });
+    if (!res.ok) throw new Error(`WhatsApp history failed (${res.status}).`);
+    return parseChatHistory(await res.json().catch(() => ({})));
   }
 
   parseInboundWebhook(payload: unknown): InboundMessage | null {

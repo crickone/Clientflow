@@ -30,6 +30,8 @@ import { notifyInboundMessage } from "@/lib/notifications/notify";
 import { ingestWhatsAppMediaLater } from "@/lib/whatsapp/inboundMedia";
 import { onWhatsAppDeliveryFailed } from "@/lib/leadFlows/undelivered";
 import { withdrawConsentOnStopReply } from "@/lib/leadFlows/consent";
+import { phoneSentFromWebhook } from "@/lib/whatsapp/historyModel";
+import { recordPhoneSent } from "@/lib/whatsapp/history";
 
 /**
  * Distinguishes an expected "tenant is over its monthly AI cap" skip from a
@@ -224,6 +226,16 @@ export async function POST(req: NextRequest) {
           channel: "whatsapp",
         }).catch((err) => logTriageOutcome("lead inbound", err));
       }
+    }
+
+    // Sent from the business's own WhatsApp (the phone, WhatsApp Web, another
+    // tool): onto the person's record, so their conversation is whole. Never
+    // what Adonis sent itself (those carry source "api").
+    try {
+      const fromPhone = phoneSentFromWebhook(body);
+      if (fromPhone.length > 0) recordPhoneSent(fromPhone);
+    } catch (err) {
+      console.error("[whatsapp] recording a phone-sent message failed:", err);
     }
 
     // Delivery/read status → update the matching outbound row.

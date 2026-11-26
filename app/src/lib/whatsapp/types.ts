@@ -75,6 +75,13 @@ export interface WhatsAppBridge {
    */
   mediaSources?(media: InboundMedia): Array<{ url: string; headers?: Record<string, string> }>;
 
+  /**
+   * The chat with a number, as the provider holds it: everything sent and
+   * received on the business's WhatsApp, including from its phone. Newest
+   * `count` messages. Optional: a provider without history leaves it out.
+   */
+  listChat?(phone: string, count: number): Promise<import("./historyModel").ChatMessage[]>;
+
   /** Map a provider status-webhook payload to a normalized status, or null. */
   parseStatusWebhook(payload: unknown): StatusUpdate | null;
 

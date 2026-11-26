@@ -546,6 +546,9 @@ export const leadMessages = sqliteTable(
     // Photos, videos, voice notes and files that came with the message: a JSON
     // array of lib/inbox/mediaModel MessageMedia, null when there are none.
     media: text("media"),
+    // "phone": sent from the business's own WhatsApp (the phone, or an earlier
+    // tool such as GoHighLevel), not through Adonis. Null otherwise.
+    origin: text("origin"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -656,6 +659,8 @@ export const clientMessages = sqliteTable(
     sentAt: integer("sent_at", { mode: "timestamp_ms" }),
     // Same as lead_messages.media.
     media: text("media"),
+    // Same as lead_messages.origin.
+    origin: text("origin"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

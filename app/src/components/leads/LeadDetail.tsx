@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import {
   ArrowLeft,
@@ -89,6 +90,26 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
     setLead(initialLead);
   }, [initialLead]);
   const [messages, setMessages] = useState(initialMessages);
+  // A refresh (after the WhatsApp history loads) hands in new messages: adopt them.
+  useEffect(() => {
+    setMessages(initialMessages);
+  }, [initialMessages]);
+  const router = useRouter();
+  // The whole WhatsApp chat, including what was sent from the phone or GoHighLevel:
+  // fill it in from the business's WhatsApp, then show it.
+  useEffect(() => {
+    if (!initialLead.phone) return;
+    let gone = false;
+    fetch(`/api/leads/${initialLead.id}/whatsapp-history`, { method: "POST" })
+      .then((r) => r.json())
+      .then((d: { added?: number }) => {
+        if (!gone && (d.added ?? 0) > 0) router.refresh();
+      })
+      .catch(() => {});
+    return () => {
+      gone = true;
+    };
+  }, [initialLead.id, initialLead.phone, router]);
   const [drafting, setDrafting] = useState(false);
   const [pending, start] = useTransition();
   const confirm = useConfirm();
@@ -457,7 +478,15 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
     return (
       <div key={`m-${m.id}`} className="ld-msg" data-side={side} data-draft={isDraft}>
         <div className="ld-msg-meta">
-          {isInbound ? `${lead.firstName || "They"} replied` : isOutbound ? (isDraft ? "Draft, not sent" : "You") : "Note for the team"}
+          {isInbound
+            ? `${lead.firstName || "They"} replied`
+            : isOutbound
+              ? isDraft
+                ? "Draft, not sent"
+                : m.origin === "phone"
+                  ? "Sent from your WhatsApp"
+                  : "You"
+              : "Note for the team"}
           {m.channel && m.channel !== "manual" && m.channel !== "system" && ` · ${CHANNEL_NAME[m.channel] ?? m.channel}`}
           {m.aiGenerated && " · written by Adonis"}
           {" · "}
