@@ -1,249 +1,213 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { Search, Ticket } from "lucide-react";
-import type { Therapy } from "@/lib/db/schema";
-import type { VoucherRow } from "@/lib/vouchers/store";
-import { deliveryStatus } from "@/lib/vouchers/model";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { useVocab } from "@/components/providers/VocabProvider";
-import { formatDate, formatEur } from "@/lib/utils";
+import { useMemo, useState, type ReactNode } from "react";
+import { ArrowUpRight, Check, Copy, Search, Ticket } from "lucide-react";
 
-interface Props {
-  vouchers: VoucherRow[];
-  therapyMap: Map<number, Therapy>;
+import { Badge } from "@/components/ui/Badge";
+import { formatEur } from "@/lib/utils";
+import {
+  STATE_FILTERS,
+  balanceOf,
+  daysLeft,
+  filterVouchers,
+  stateCounts,
+  voucherState,
+  type SourceFilter,
+  type StateFilter,
+  type VoucherFigures,
+  type VoucherLike,
+  type VoucherState,
+} from "@/lib/vouchers/listModel";
+
+export interface VoucherListRow extends VoucherLike {
+  id: number;
+  treatment: { name: string; colour: string } | null;
+  delivery: { label: string; tone: "green" | "amber" | "red" } | null;
 }
 
-export function VoucherList({ vouchers, therapyMap }: Props) {
-  const vocab = useVocab();
-  const [q, setQ] = useState("");
-  const today = new Date().toISOString().slice(0, 10);
+const STATE_LABEL: Record<VoucherState, string> = { unused: "Unused", part: "Part used", used: "Used", expired: "Expired", cancelled: "Cancelled" };
+const STATE_TONE: Record<VoucherState, "success" | "info" | "neutral" | "danger" | "warning"> = {
+  unused: "success",
+  part: "info",
+  used: "neutral",
+  expired: "warning",
+  cancelled: "danger",
+};
 
-  const filtered = useMemo(() => {
-    if (!q.trim()) return vouchers;
-    const needle = q.trim().toLowerCase();
-    return vouchers.filter((v) =>
-      [
-        v.code,
-        v.purchaserName,
-        v.purchaserEmail ?? "",
-        v.recipientName ?? "",
-        v.order?.buyerName ?? "",
-        v.order?.recipientEmail ?? "",
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle),
-    );
-  }, [vouchers, q]);
+const DATE = new Intl.DateTimeFormat("en-IE", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const fmtDay = (iso: string) => DATE.format(new Date(`${iso}T00:00:00Z`));
 
+function expiryNote(v: VoucherLike, today: string): { text: string; warn: boolean } | null {
+  const d = daysLeft(v, today);
+  if (d == null) return voucherState(v, today) === "expired" ? { text: "Past its date", warn: true } : null;
+  if (d === 0) return { text: "Expires today", warn: true };
+  if (d <= 30) return { text: `${d} day${d === 1 ? "" : "s"} left`, warn: true };
+  return null;
+}
+
+function CodeCopy({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Clipboard blocked: the code is still on screen.
+    }
+  };
   return (
-    <>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          marginBottom: 20,
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ position: "relative", flex: 1, maxWidth: 480 }}>
-          <Search
-            size={15}
-            style={{
-              position: "absolute",
-              left: 14,
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "var(--text-tertiary)",
-              pointerEvents: "none",
-            }}
-          />
-          <Input
-            placeholder="Search by code, name, or email…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            style={{ paddingLeft: 38, borderRadius: "var(--radius)" }}
-          />
-        </div>
-        <div
-          style={{
-            marginLeft: "auto",
-            color: "var(--text-tertiary)",
-            fontSize: 13,
-          }}
-        >
-          {filtered.length} of {vouchers.length}
-        </div>
-      </div>
-
-      {filtered.length === 0 ? (
-        <div
-          style={{
-            padding: "48px 24px",
-            background: "var(--surface-1)",
-            border: "1px dashed var(--hairline)",
-            borderRadius: "var(--radius)",
-            color: "var(--text-tertiary)",
-            fontSize: 14,
-            textAlign: "center",
-          }}
-        >
-          No vouchers match &ldquo;{q}&rdquo;.
-        </div>
-      ) : (
-        <Card style={{ padding: 0, overflow: "hidden" }}>
-          <table>
-            <thead>
-              <tr>
-                <th style={th}>Code</th>
-                <th style={th}>Purchaser</th>
-                <th style={th}>Recipient</th>
-                <th style={th}>{vocab.service}</th>
-                <th style={th}>Original</th>
-                <th style={th}>Balance</th>
-                <th style={th}>Expiry</th>
-                <th style={th}>Status</th>
-                <th style={{ ...th, textAlign: "right" }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((v) => {
-                const t = v.therapyId ? therapyMap.get(v.therapyId) : null;
-                const expired = v.expiryDate < today;
-                const balance = v.balanceEur ?? v.valueEur;
-                const empty = balance <= 0.01;
-                const partiallyUsed =
-                  balance > 0.01 && balance < v.valueEur - 0.01;
-                const cancelled = v.cancelledAt != null;
-                // Past its date is a warning, not a refusal: staff may still take it.
-                const redeemable = !empty && !cancelled;
-                const delivery = v.order ? deliveryStatus(v.order) : null;
-                return (
-                  <tr key={v.id}>
-                    <td
-                      style={{
-                        ...td,
-                        fontFamily: "var(--font-heading)",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      <Link href={`/vouchers/${encodeURIComponent(v.code)}`} style={{ color: "var(--text-primary)" }}>
-                        {v.code}
-                      </Link>
-                    </td>
-                    <td style={td}>
-                      <div>{v.order?.buyerName ?? v.purchaserName}</div>
-                      {v.source === "online" && (
-                        <div style={{ marginTop: 4 }}>
-                          <Badge tone="info">Bought online</Badge>
-                        </div>
-                      )}
-                      {v.purchaserEmail && (
-                        <div
-                          style={{
-                            color: "var(--text-tertiary)",
-                            fontSize: 11,
-                            marginTop: 2,
-                          }}
-                        >
-                          {v.purchaserEmail}
-                        </div>
-                      )}
-                    </td>
-                    <td style={td}>
-                      <div>{v.recipientName ?? "—"}</div>
-                      {delivery && (
-                        <div style={{ marginTop: 4 }}>
-                          <Badge tone={delivery.tone}>{delivery.label}</Badge>
-                        </div>
-                      )}
-                    </td>
-                    <td style={td}>
-                      {t ? (
-                        <Badge colour={t.colourHex}>{t.name}</Badge>
-                      ) : (
-                        <Badge>Any</Badge>
-                      )}
-                    </td>
-                    <td style={td}>{formatEur(v.valueEur)}</td>
-                    <td
-                      style={{
-                        ...td,
-                        color: empty
-                          ? "var(--text-tertiary)"
-                          : partiallyUsed
-                            ? "#b45309"
-                            : "var(--text-primary)",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {formatEur(balance)}
-                    </td>
-                    <td style={td}>{formatDate(v.expiryDate)}</td>
-                    <td style={td}>
-                      {cancelled ? (
-                        <Badge tone="red">Cancelled</Badge>
-                      ) : empty ? (
-                        <Badge tone="green">Redeemed</Badge>
-                      ) : expired ? (
-                        <Badge tone="red">Expired</Badge>
-                      ) : partiallyUsed ? (
-                        <Badge tone="amber">Partial</Badge>
-                      ) : (
-                        <Badge tone="amber">Active</Badge>
-                      )}
-                    </td>
-                    <td style={{ ...td, textAlign: "right" }}>
-                      {redeemable ? (
-                        <Link
-                          href={`/appointments/new?voucher=${encodeURIComponent(v.code)}`}
-                        >
-                          <Button size="sm" variant="outline">
-                            <Ticket size={13} />
-                            Redeem
-                          </Button>
-                        </Link>
-                      ) : (
-                        <span
-                          style={{
-                            color: "var(--text-tertiary)",
-                            fontSize: 12,
-                          }}
-                        >
-                          —
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
-      )}
-    </>
+    <span className="vh-code">
+      <Link href={`/vouchers/${encodeURIComponent(code)}`}>{code}</Link>
+      <button type="button" onClick={copy} aria-label={copied ? "Copied" : `Copy ${code}`} title={copied ? "Copied" : "Copy code"}>
+        {copied ? <Check size={13} /> : <Copy size={13} />}
+      </button>
+    </span>
   );
 }
 
-const th: React.CSSProperties = {
-  textAlign: "left",
-  padding: "14px 16px",
-  fontSize: 11,
-  fontWeight: 500,
-  color: "var(--text-tertiary)",
-  textTransform: "uppercase",
-  letterSpacing: "0.1em",
-  borderBottom: "1px solid var(--hairline)",
-};
-const td: React.CSSProperties = {
-  padding: "14px 16px",
-  borderBottom: "1px solid var(--hairline)",
-  fontSize: 14,
-  color: "var(--text-secondary)",
-};
+export function VoucherList({ vouchers, figures, today, help }: { vouchers: VoucherListRow[]; figures: VoucherFigures; today: string; help: ReactNode }) {
+  const [q, setQ] = useState("");
+  const [state, setState] = useState<StateFilter>("all");
+  const [source, setSource] = useState<SourceFilter>("all");
+  const [expiring, setExpiring] = useState(false);
+
+  const counts = useMemo(() => stateCounts(vouchers, today), [vouchers, today]);
+  const shown = useMemo(() => filterVouchers(vouchers, { today, state, source, expiring, q }), [vouchers, today, state, source, expiring, q]);
+  const hasOnline = vouchers.some((v) => v.source === "online");
+
+  return (
+    <div className="vh">
+      <div className="vh-figures">
+        <div className="vh-fig">
+          <span className="vh-fig-label">Still to be used</span>
+          <span className="vh-fig-value">{formatEur(figures.owedEur)}</span>
+          <span className="vh-fig-note">on {figures.owedCount} voucher{figures.owedCount === 1 ? "" : "s"}</span>
+        </div>
+        <div className="vh-fig">
+          <span className="vh-fig-label">Sold this month</span>
+          <span className="vh-fig-value">{formatEur(figures.soldEur)}</span>
+          <span className="vh-fig-note">{figures.soldCount} voucher{figures.soldCount === 1 ? "" : "s"}</span>
+        </div>
+        <div className="vh-fig">
+          <span className="vh-fig-label">Used this month</span>
+          <span className="vh-fig-value">{formatEur(figures.usedEur)}</span>
+          <span className="vh-fig-note">taken off bookings and sales</span>
+        </div>
+        <button
+          type="button"
+          className="vh-fig vh-fig--button"
+          aria-pressed={expiring}
+          data-warn={figures.expiringCount > 0 || undefined}
+          onClick={() => setExpiring((e) => !e)}
+          disabled={figures.expiringCount === 0 && !expiring}
+        >
+          <span className="vh-fig-label">Expiring in 30 days</span>
+          <span className="vh-fig-value">{figures.expiringCount}</span>
+          <span className="vh-fig-note">{expiring ? "Showing these. Show all" : figures.expiringCount > 0 ? "Show these" : "None due"}</span>
+        </button>
+      </div>
+
+      {help}
+
+      <div className="vh-tools">
+        <label className="vh-search">
+          <Search size={15} aria-hidden />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by code, name or email" aria-label="Search vouchers" />
+        </label>
+        <div className="vh-pills" role="group" aria-label="Status">
+          {STATE_FILTERS.filter((f) => f.key === "all" || counts[f.key] > 0 || state === f.key).map((f) => (
+            <button key={f.key} type="button" className="vh-pill" aria-pressed={state === f.key} onClick={() => setState(f.key)}>
+              {f.label} <span>{counts[f.key]}</span>
+            </button>
+          ))}
+        </div>
+        {hasOnline && (
+          <div className="vh-pills" role="group" aria-label="Where it was sold">
+            {(["all", "online", "staff"] as const).map((s) => (
+              <button key={s} type="button" className="vh-pill" aria-pressed={source === s} onClick={() => setSource(s)}>
+                {s === "all" ? "Anywhere" : s === "online" ? "Online" : "In clinic"}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {shown.length === 0 ? (
+        <div className="vh-none">No vouchers match. Clear the search or pick another filter.</div>
+      ) : (
+        <div className="vh-wrap">
+          <div className="vh-list" role="table" aria-label="Gift vouchers">
+            <div className="vh-row vh-head" role="row">
+              <span role="columnheader">For</span>
+              <span role="columnheader">Code</span>
+              <span role="columnheader">Treatment</span>
+              <span role="columnheader">Balance</span>
+              <span role="columnheader">Expires</span>
+              <span role="columnheader">Status</span>
+              <span role="columnheader" className="vh-sr">Actions</span>
+            </div>
+            {shown.map((v) => {
+              const s = voucherState(v, today);
+              const balance = Math.max(0, balanceOf(v));
+              const pct = v.valueEur > 0 ? Math.min(100, Math.round((balance / v.valueEur) * 100)) : 0;
+              const note = expiryNote(v, today);
+              const from = v.buyerName ?? v.purchaserName;
+              const redeemable = s !== "used" && s !== "cancelled";
+              return (
+                <div key={v.id} className="vh-row" role="row" data-state={s}>
+                  <div className="vh-who" role="cell">
+                    <Link href={`/vouchers/${encodeURIComponent(v.code)}`} className="vh-name">
+                      {v.recipientName || from}
+                    </Link>
+                    <span className="vh-from">
+                      {v.recipientName ? `from ${from}` : "Bought for themselves"}
+                      {v.source === "online" ? " · online" : ""}
+                    </span>
+                    {v.delivery && (
+                      <span className="vh-delivery" data-tone={v.delivery.tone}>
+                        {v.delivery.label}
+                      </span>
+                    )}
+                  </div>
+                  <div className="vh-cell" role="cell" data-label="Code">
+                    <CodeCopy code={v.code} />
+                  </div>
+                  <div className="vh-cell" role="cell" data-label="Treatment">
+                    {v.treatment ? <Badge colour={v.treatment.colour}>{v.treatment.name}</Badge> : <span className="vh-muted">Any treatment</span>}
+                  </div>
+                  <div className="vh-cell vh-balance" role="cell" data-label="Balance">
+                    <span>
+                      <strong>{formatEur(balance)}</strong> of {formatEur(v.valueEur)}
+                    </span>
+                    <span className="vh-bar" aria-hidden>
+                      <span style={{ width: `${pct}%` }} />
+                    </span>
+                  </div>
+                  <div className="vh-cell vh-expiry" role="cell" data-label="Expires">
+                    <span>{fmtDay(v.expiryDate)}</span>
+                    {note && <span className="vh-expiry-note" data-warn={note.warn || undefined}>{note.text}</span>}
+                  </div>
+                  <div className="vh-cell" role="cell" data-label="Status">
+                    <Badge tone={STATE_TONE[s]}>{STATE_LABEL[s]}</Badge>
+                  </div>
+                  <div className="vh-acts" role="cell">
+                    {redeemable && (
+                      <Link href={`/appointments/new?voucher=${encodeURIComponent(v.code)}`} className="btn btn--outline btn--sm">
+                        <Ticket size={13} /> Redeem
+                      </Link>
+                    )}
+                    <Link href={`/vouchers/${encodeURIComponent(v.code)}`} className="vh-open" aria-label={`Open ${v.code}`}>
+                      Open <ArrowUpRight size={13} />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

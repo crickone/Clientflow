@@ -1,15 +1,21 @@
 import Link from "next/link";
 import { Gift, Plus, Store } from "lucide-react";
+import { gte, sql } from "drizzle-orm";
+
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { VoucherList } from "@/components/vouchers/VoucherList";
+import { VoucherList, type VoucherListRow } from "@/components/vouchers/VoucherList";
+import { db, schema } from "@/lib/db";
 import { getTherapyMap } from "@/lib/queries";
 import { getFeatureFlags, getVenueType } from "@/lib/settings";
 import { getCurrentMembership } from "@/lib/auth";
 import { isModuleOn } from "@/lib/features";
+import { dublinToday } from "@/lib/billing/dates";
+import { zonedTimeToUtc } from "@/lib/leadFlows/sendingWindow";
 import { listVoucherRows } from "@/lib/vouchers/store";
+import { deliveryStatus } from "@/lib/vouchers/model";
+import { voucherFigures } from "@/lib/vouchers/listModel";
 import { getVocab } from "@/lib/vocabulary";
 
 export const dynamic = "force-dynamic";
@@ -21,11 +27,49 @@ export default async function VouchersPage() {
   // Products > Vouchers > Online store: admins, with the voucher_store module on.
   const showStore = getCurrentMembership()?.role === "admin" && isModuleOn(getFeatureFlags(), "voucher_store");
 
+  const today = dublinToday();
+  const month = today.slice(0, 7);
+  const monthStart = zonedTimeToUtc(`${month}-01`, "00:00");
+  const usedThisMonthEur = Number(
+    db
+      .select({ n: sql<number>`coalesce(sum(${schema.voucherRedemptions.amountEur}), 0)` })
+      .from(schema.voucherRedemptions)
+      .where(gte(schema.voucherRedemptions.createdAt, monthStart))
+      .get()?.n ?? 0,
+  );
+
+  const rows: VoucherListRow[] = vouchers.map((v) => {
+    const t = v.therapyId ? therapyMap.get(v.therapyId) : null;
+    return {
+      id: v.id,
+      code: v.code,
+      valueEur: v.valueEur,
+      balanceEur: v.balanceEur,
+      expiryDate: v.expiryDate,
+      cancelledAt: v.cancelledAt,
+      createdAt: v.createdAt.getTime(),
+      source: v.source,
+      purchaserName: v.purchaserName,
+      purchaserEmail: v.purchaserEmail,
+      recipientName: v.recipientName,
+      buyerName: v.order?.buyerName ?? null,
+      recipientEmail: v.order?.recipientEmail ?? null,
+      treatment: t ? { name: t.name, colour: t.colourHex } : null,
+      delivery: v.order ? deliveryStatus(v.order) : null,
+    };
+  });
+  const figures = voucherFigures(rows, {
+    today,
+    month,
+    monthOf: (ms) => dublinToday(new Date(ms)).slice(0, 7),
+    usedThisMonthEur,
+  });
+
   return (
     <div className="app-page">
       <PageHeader
-        eyebrow="Vouchers"
-        title="Gift Vouchers"
+        eyebrow="Sales"
+        title="Gift vouchers"
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {showStore && (
@@ -46,197 +90,54 @@ export default async function VouchersPage() {
         }
       />
 
-      <Card
-        style={{
-          marginBottom: 24,
-          background: "var(--surface-1)",
-          borderColor: "var(--hairline)",
-        }}
-      >
-        <div
-          style={{
-            fontSize: 11,
-            color: "var(--text-tertiary)",
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-            fontWeight: 500,
-            marginBottom: 12,
-          }}
-        >
-          How to handle gift vouchers
-        </div>
-
-        <ol
-          style={{
-            margin: 0,
-            paddingLeft: 0,
-            listStyle: "none",
-            display: "flex",
-            flexDirection: "column",
-            gap: 14,
-            counterReset: "vstep",
-          }}
-        >
-          <Step
-            n={1}
-            title="Selling a voucher"
-            body={
-              <>
-                Click <strong>Create voucher</strong>. Pick the{" "}
-                <strong>purchaser</strong> (the person paying — link them as a client or
-                enter a guest name + email) and the <strong>recipient</strong> (who the
-                voucher is for). Choose a value, optional therapy, and expiry. Hit{" "}
-                <strong>Create voucher</strong> — the system generates a unique code.
-              </>
-            }
-          />
-          <Step
-            n={2}
-            title="Writing the physical voucher"
-            body={
-              <>
-                Open the new voucher and write the <strong>code</strong> (it looks like{" "}
-                <code style={codeStyle}>AB-2026-K7QX</code>), the{" "}
-                <strong>recipient name</strong>, the <strong>value</strong>, and the{" "}
-                <strong>expiry date</strong> on the physical card. Hand it to the
-                purchaser.
-              </>
-            }
-          />
-          <Step
-            n={3}
-            title="Recipient vs guest"
-            body={
-              <>
-                If the recipient is linked to a {vocab.member.toLowerCase()} record,{" "}
-                <strong>only that {vocab.member.toLowerCase()}</strong>{" "}
-                can redeem the voucher. If you used <em>Just a name</em>, anyone with the
-                code can redeem it — the first {vocab.member.toLowerCase()} who uses it gets locked in.
-              </>
-            }
-          />
-          <Step
-            n={4}
-            title={`Redeeming on a ${vocab.plan.toLowerCase()}`}
-            body={
-              <>
-                When the customer comes in to buy a {vocab.plan.toLowerCase()}, go to{" "}
-                <Link href="/packages/new" style={linkStyle}>
-                  {vocab.plans} → Sell {vocab.plan.toLowerCase()}
-                </Link>
-                . Pick the template and {vocab.member.toLowerCase()}, then enter the voucher code in the
-                <strong> Gift voucher</strong> field and hit <strong>Apply</strong>. The
-                voucher amount comes off the price; the customer pays the remainder.
-              </>
-            }
-          />
-          <Step
-            n={5}
-            title="Partial use & balance"
-            body={
-              <>
-                If the {vocab.plan.toLowerCase()} costs less than the voucher value, the leftover stays on
-                the voucher for next time. Check any voucher&apos;s remaining balance
-                from the list below — fully-used vouchers are marked redeemed.
-              </>
-            }
-          />
-        </ol>
-      </Card>
-
       {vouchers.length === 0 ? (
-        <EmptyState
-          icon={<Gift size={32} strokeWidth={1.4} />}
-          title="No vouchers yet"
-          message={`Create a voucher to gift ${vocab.service.toLowerCase()} sessions or a euro value.`}
-          action={
-            <Link href="/vouchers/new">
-              <Button>
-                <Plus size={15} />
-                Create voucher
-              </Button>
-            </Link>
-          }
-        />
+        <>
+          <EmptyState
+            icon={<Gift size={32} strokeWidth={1.4} />}
+            title="No vouchers yet"
+            message={`Create a voucher to gift ${vocab.service.toLowerCase()} sessions or a euro value.`}
+            action={
+              <Link href="/vouchers/new">
+                <Button>
+                  <Plus size={15} />
+                  Create voucher
+                </Button>
+              </Link>
+            }
+          />
+          <HowVouchersWork member={vocab.member.toLowerCase()} plan={vocab.plan.toLowerCase()} />
+        </>
       ) : (
-        <VoucherList vouchers={vouchers} therapyMap={therapyMap} />
+        <VoucherList
+          vouchers={rows}
+          figures={figures}
+          today={today}
+          help={<HowVouchersWork member={vocab.member.toLowerCase()} plan={vocab.plan.toLowerCase()} />}
+        />
       )}
     </div>
   );
 }
 
-function Step({
-  n,
-  title,
-  body,
-}: {
-  n: number;
-  title: string;
-  body: React.ReactNode;
-}) {
+/** The short how-to, closed until asked for. */
+function HowVouchersWork({ member, plan }: { member: string; plan: string }) {
   return (
-    <li
-      style={{
-        display: "flex",
-        gap: 14,
-        alignItems: "flex-start",
-      }}
-    >
-      <span
-        style={{
-          flexShrink: 0,
-          width: 28,
-          height: 28,
-          borderRadius: "var(--radius)",
-          background: "var(--surface-2)",
-          border: "1px solid var(--hairline)",
-          color: "var(--text-primary)",
-          fontSize: 13,
-          fontWeight: 500,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {n}
-      </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            color: "var(--text-primary)",
-            fontSize: 14,
-            fontWeight: 500,
-            marginBottom: 2,
-          }}
-        >
-          {title}
-        </div>
-        <div
-          style={{
-            color: "var(--text-secondary)",
-            fontSize: 13,
-            lineHeight: 1.55,
-          }}
-        >
-          {body}
-        </div>
-      </div>
-    </li>
+    <details className="vh-help">
+      <summary>How vouchers work</summary>
+      <ol>
+        <li>
+          <strong>Sell one.</strong> Create voucher: who is paying, who it is for, a euro value or one treatment, and an expiry. The code is made for you. Vouchers bought in the online store appear here by themselves.
+        </li>
+        <li>
+          <strong>Give it.</strong> Open the voucher to print it or email it, or write the code, the name, the value and the expiry on a card.
+        </li>
+        <li>
+          <strong>Use it.</strong> Press Redeem to book with it, or enter the code in the Gift voucher field when selling a {plan}. The value comes off the price.
+        </li>
+        <li>
+          <strong>What is left stays on it.</strong> A part-used voucher keeps its balance for next time. A voucher for a named {member} can only be used by that {member}.
+        </li>
+      </ol>
+    </details>
   );
 }
-
-const codeStyle: React.CSSProperties = {
-  background: "var(--surface-2)",
-  border: "1px solid var(--hairline)",
-  borderRadius: "var(--radius)",
-  padding: "1px 6px",
-  fontFamily:
-    "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-  fontSize: 12,
-  color: "var(--text-primary)",
-};
-
-const linkStyle: React.CSSProperties = {
-  color: "var(--text-primary)",
-  textDecoration: "underline",
-};
