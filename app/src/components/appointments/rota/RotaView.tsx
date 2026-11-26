@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, AlertTriangle, ChevronLeft, ChevronRight, Copy, Info, Plus, UserPlus } from "lucide-react";
@@ -268,14 +268,14 @@ function TreatmentsCard({
       toast.error(res.error);
       return;
     }
-    // Saved: drop the local pick so the server's value shows after the refresh.
-    setPicked((p) => {
-      const rest = { ...p };
-      delete rest[t.id];
-      return rest;
-    });
+    // Saved: the pick stays until the refreshed list arrives (the effect below drops it then).
     router.refresh();
   };
+
+  // Fresh server data replaces every local pick, so a change made elsewhere shows.
+  useEffect(() => {
+    setPicked({});
+  }, [treatments]);
 
   return (
     <Card className="rv-card">
