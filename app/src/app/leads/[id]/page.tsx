@@ -10,6 +10,7 @@ import { listAssignableStaff } from "@/lib/leadFlows/assignment";
 import { listLeadCalls } from "@/lib/leadFlows/calls";
 import { leadFlowStatus } from "@/lib/leadFlows/runs";
 import { getLead, getLeadMessages } from "@/lib/leads";
+import { leadActivity } from "@/lib/leadActivity";
 import { listStages } from "@/lib/pipeline/stageRepo";
 import { voiceAvailability } from "@/lib/voice/dial";
 
@@ -41,20 +42,26 @@ export default async function LeadDetailPage(
   const personLinks = membership && mapEnabled(membership.tenant.id) ? personLinksForLead(membership.tenant.id, id) : null;
   const imported = getImportedPerson({ leadId: id });
   const showLinks = !!personLinks && (personLinks.linked.length > 0 || personLinks.reviews.length > 0);
+  const activity = leadActivity(lead);
 
   return (
     <div className="app-page">
-      {showLinks && personLinks && (
-        <div style={{ maxWidth: 560, marginBottom: 16 }}>
-          <PersonLinksCard linked={personLinks.linked} reviews={personLinks.reviews} />
-        </div>
-      )}
-      <LeadDetail lead={lead} messages={messages} stages={stages} voice={voice} staff={staff} flow={flow} calls={calls} />
-      {imported && (
-        <div style={{ maxWidth: 560, marginTop: 16 }}>
-          <GhlImportCard person={imported} leadId={id} isAdmin={membership?.role === "admin"} />
-        </div>
-      )}
+      <LeadDetail
+        lead={lead}
+        messages={messages}
+        stages={stages}
+        voice={voice}
+        staff={staff}
+        flow={flow}
+        calls={calls}
+        activity={activity}
+        extras={
+          <>
+            {showLinks && personLinks && <PersonLinksCard linked={personLinks.linked} reviews={personLinks.reviews} />}
+            {imported && <GhlImportCard person={imported} leadId={id} isAdmin={membership?.role === "admin"} />}
+          </>
+        }
+      />
     </div>
   );
 }

@@ -257,6 +257,20 @@ export async function logInboundReplyAction(
   revalidatePath("/leads");
 }
 
+/** A note for the team on the lead's activity. Not sent to the lead, and not read as a reply. */
+export async function addLeadNoteAction(leadId: number, content: string): Promise<{ ok: true; messageId: number } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const text = content.trim();
+  if (!text) return { ok: false, error: "Write the note first." };
+  if (text.length > 4000) return { ok: false, error: "Keep the note under 4,000 characters." };
+  const lead = db.select({ id: leads.id }).from(leads).where(eq(leads.id, leadId)).get();
+  if (!lead) return { ok: false, error: "That lead no longer exists." };
+  const name = user.name?.trim().split(/\s+/)[0];
+  const row = addMessage({ leadId, direction: "note", channel: "manual", content: name ? `${name}: ${text}` : text, sentAt: new Date() });
+  revalidatePath(`/leads/${leadId}`);
+  return { ok: true, messageId: row.id };
+}
+
 export async function deleteLeadAction(id: number) {
   await requireAdmin();
   const leadId = z.number().int().positive().parse(id);

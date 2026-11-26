@@ -111,7 +111,7 @@ export function LeadFollowUpsCard({
   const next = flow.next[0];
   return (
     <Card className="ld-card">
-      <CardLabel>Follow-ups</CardLabel>
+      <CardLabel>Follow-up</CardLabel>
       <dl className="ld-facts">
         <div>
           <dt>
@@ -138,18 +138,10 @@ export function LeadFollowUpsCard({
               aria-label="Agreed to marketing"
               onClick={() => void toggleConsent()}
               disabled={pending}
-              style={{
-                padding: "7px 12px",
-                borderRadius: "var(--radius)",
-                border: "1px solid var(--hairline)",
-                background: consent ? "var(--accent)" : "var(--surface-1)",
-                color: consent ? "var(--accent-contrast)" : "var(--text-secondary)",
-                fontSize: 12.5,
-                fontFamily: "inherit",
-                cursor: "pointer",
-              }}
+              className="lv-switch"
             >
-              {consent ? "Agreed to news and offers" : "Not agreed"}
+              <span>{consent ? "Agreed" : "Not agreed"}</span>
+              <span className="lv-switch-track" aria-hidden />
             </button>
           </dd>
         </div>
