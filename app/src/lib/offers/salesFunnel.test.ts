@@ -29,7 +29,7 @@ const requireLocal = createRequire(import.meta.url);
   const { controlSqlite } = requireLocal("../db/control") as typeof import("../db/control");
   const { runWithTenant, getTenantDbById } = requireLocal("../db/tenant") as typeof import("../db/tenant");
   const schema = requireLocal("../db/schema") as typeof import("../db/schema");
-  const { and, eq } = requireLocal("drizzle-orm") as typeof import("drizzle-orm");
+  const { and, eq, sql } = requireLocal("drizzle-orm") as typeof import("drizzle-orm");
   const { createCampaign } = requireLocal("../campaigns/store") as typeof import("../campaigns/store");
   const store = requireLocal("./store") as typeof import("./store");
   const fulfil = requireLocal("./fulfil") as typeof import("./fulfil");
@@ -110,6 +110,33 @@ const requireLocal = createRequire(import.meta.url);
       nurture.cancelSequences(lead!.id, ["checkout_abandoned"]);
       assert.equal(tdb.select().from(schema.automationQueue).where(and(eq(schema.automationQueue.leadId, lead!.id), eq(schema.automationQueue.status, "queued"))).all().length, 0);
 
+      // ── one card per buyer ──
+      // Two purchases a minute apart (deep tissue, then sports massage) leave one card, moved to Repeat customer.
+      const buy = async (sessionId: string, email: string) => {
+        const o = store.createPendingOrder(offer, "acct_1", null);
+        store.setOrderSession(o.id, sessionId);
+        const r = await fulfil.fulfilCheckout(tid, "acct_1", {
+          id: sessionId,
+          client_reference_id: String(o.id),
+          payment_status: "paid",
+          amount_total: 6400,
+          currency: "eur",
+          payment_intent: `pi_${sessionId}`,
+          customer_details: { email, name: "Twice Buyer", phone: "0870000001" },
+        } as never);
+        assert.equal(r.status, "fulfilled");
+      };
+      await buy("cs_twice_1", "twice@example.ie");
+      await buy("cs_twice_2", "Twice@Example.ie");
+      const cards = tdb.select().from(schema.leads).where(eq(schema.leads.email, "twice@example.ie")).all();
+      assert.equal(cards.length, 1, "two purchases, one card");
+      const stage = tdb.select().from(schema.pipelineStages).where(eq(schema.pipelineStages.id, cards[0].stageId!)).get();
+      assert.equal(stage?.role, "repeat", "and it moved to Repeat customer");
+      assert.equal((cards[0].notes ?? "").split("Bought").length - 1, 2, "both purchases on the card");
+      // The unfinished-checkout card for the same person becomes the sale, not a second card.
+      await buy("cs_maeve", "maeve@example.ie");
+      assert.equal(tdb.select().from(schema.leads).where(sql`lower(${schema.leads.email}) = 'maeve@example.ie'`).all().length, 1, "the checkout card is the buyer's card");
+
       // ── started-checkout events ──
       tdb.insert(schema.sites).values({ slug: "sales-funnel-site", name: "Site", status: "live", metaPixelId: "1234567890123456" } as typeof schema.sites.$inferInsert).run();
       const ctx = { consent: true, fbp: null, fbc: null, ip: "1.2.3.4", userAgent: "UA", url: "https://x.ie/c/black-friday" };
@@ -120,7 +147,7 @@ const requireLocal = createRequire(import.meta.url);
       assert.deepEqual(evs.map((e) => e.event_name), ["InitiateCheckout"], "once per id, and nothing without consent");
       assert.equal(JSON.parse(evs[0].payload).event_id, "ic-abc12345", "the browser's id, so Meta keeps one");
     });
-    console.log("salesFunnel: revenue matched to ads, unfinished checkout follow-up, funnel events; 13 checks passed.");
+    console.log("salesFunnel: revenue matched to ads, unfinished checkout follow-up, funnel events, one card per buyer; 18 checks passed.");
   } finally {
     cleanup();
   }

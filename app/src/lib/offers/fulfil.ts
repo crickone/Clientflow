@@ -1,7 +1,7 @@
 import "server-only";
 import { queuePurchase } from "@/lib/facebook/capi";
 import { parseArrival } from "@/lib/arrival";
-import { eq, sql } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { runWithTenant } from "@/lib/db/tenant";
@@ -10,7 +10,7 @@ import { getCampaign, getCampaignLandingUrl } from "@/lib/campaigns/store";
 import { ACCESS_PARAM, getOfferAccessKey } from "./access";
 import { cancelSequences, enrolLeadInSequence } from "@/lib/automations/nurture";
 import { upsertLead } from "@/lib/leads";
-import { pipelineForCampaign } from "@/lib/pipeline/pipelineRepo";
+import { defaultPipelineId, pipelineForCampaign } from "@/lib/pipeline/pipelineRepo";
 import { onPaymentRecorded } from "@/lib/pipeline/stage";
 import { splitFullName } from "@/lib/humanName";
 import { logActivity } from "@/lib/queries";
@@ -125,25 +125,52 @@ export async function fulfilCheckout(
     // the payment just recorded moves it to won.
     const campaign = offer?.campaignId ? getCampaign(offer.campaignId) : null;
     try {
-      const { lead } = upsertLead({
-        source: "offer",
-        sourceLeadId: `offer:${order.id}`,
-        campaign: campaign?.name ?? offer?.title ?? "Online offer",
-        pipelineId: campaign ? pipelineForCampaign(campaign.id)?.id ?? null : null,
-        fullName: fullName || null,
-        email,
-        phone: phone || null,
-        notes: `Bought ${offer?.title ?? "an offer"} online for ${formatEur(order.amountCents)}.`,
-        arrival: parseArrival(order.arrival),
-      });
-      db.update(leads).set({ clientId: client.id }).where(eq(leads.id, lead.id)).run();
+      const pipelineId = campaign ? pipelineForCampaign(campaign.id)?.id ?? null : null;
+      const boughtNote = `Bought ${offer?.title ?? "an offer"} online for ${formatEur(order.amountCents)}.`;
+      // One card per person: a buyer already on this board (an earlier
+      // purchase, or a lead with the same email) gets their card updated, not
+      // a second card that never moves (two orders made two cards before).
+      const sameBoard = pipelineId ?? defaultPipelineId();
+      const already = db
+        .select({ id: leads.id, notes: leads.notes })
+        .from(leads)
+        .where(
+          and(
+            eq(leads.pipelineId, sameBoard),
+            email ? or(eq(leads.clientId, client.id), sql`lower(${leads.email}) = ${email}`) : eq(leads.clientId, client.id),
+          ),
+        )
+        .orderBy(sql`${leads.clientId} = ${client.id} desc`, desc(leads.id))
+        .get();
+      let leadId: number;
+      if (already) {
+        leadId = already.id;
+        db.update(leads)
+          .set({ clientId: client.id, notes: already.notes ? `${already.notes}\n${boughtNote}` : boughtNote, updatedAt: new Date() })
+          .where(eq(leads.id, leadId))
+          .run();
+      } else {
+        const { lead } = upsertLead({
+          source: "offer",
+          sourceLeadId: `offer:${order.id}`,
+          campaign: campaign?.name ?? offer?.title ?? "Online offer",
+          pipelineId,
+          fullName: fullName || null,
+          email,
+          phone: phone || null,
+          notes: boughtNote,
+          arrival: parseArrival(order.arrival),
+        });
+        leadId = lead.id;
+        db.update(leads).set({ clientId: client.id }).where(eq(leads.id, leadId)).run();
+      }
       // They bought: an earlier unfinished checkout of theirs stops chasing them.
       if (email) {
         for (const a of db.select({ id: leads.id }).from(leads).where(sql`${leads.source} = 'checkout' and lower(${leads.email}) = ${email}`).all()) {
           cancelSequences(a.id, ["checkout_abandoned"]);
         }
       }
-      onPaymentRecorded(client.id);
+      onPaymentRecorded(client.id, leadId);
     } catch (err) {
       console.error("[offers] lead update failed", err);
     }

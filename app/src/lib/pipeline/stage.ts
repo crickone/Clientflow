@@ -317,8 +317,9 @@ export function onAppointmentStatus(appointmentId: number, status: string): void
   if (!leadId) return;
   advanceStage(leadId, status === "completed" ? "attended" : "no_show");
 }
-export function onPaymentRecorded(clientId: number): void {
-  const leadId = leadIdForClient(clientId);
+/** leadId: the card to move when the caller knows it (an online purchase); else the client's first lead. */
+export function onPaymentRecorded(clientId: number, forLeadId?: number): void {
+  const leadId = forLeadId ?? leadIdForClient(clientId);
   if (!leadId) return;
   const row = db.select({ n: sql<number>`count(*)` }).from(schema.payments).where(and(eq(schema.payments.clientId, clientId), gt(schema.payments.amountEur, 0))).get();
   const paid = Number(row?.n ?? 0);
