@@ -6348,7 +6348,7 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .rv-hd { padding: 12px; border-bottom: 1px solid var(--hairline); font-size: 12.5px; color: var(--text-tertiary); min-width: 0; }
 .rv-hd b { display: block; color: var(--text-primary); font-family: var(--font-helvetica-now); font-weight: 600; font-size: 14px; }
 .rv-hd.is-closed b { color: var(--text-tertiary); }
-.rv-who { padding: 14px 12px 14px 16px; border-bottom: 1px solid var(--hairline); display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--text-primary); }
+.rv-who { font-size: 14px; line-height: 1.35; padding: 14px 12px 14px 16px; border-bottom: 1px solid var(--hairline); display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--text-primary); }
 .rv-who-name { min-width: 0; overflow-wrap: anywhere; }
 .rv-who small { display: block; color: var(--text-tertiary); font-size: 12px; }
 .rv-av { width: 30px; height: 30px; flex: none; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--hairline-strong); display: grid; place-items: center; font-family: var(--font-helvetica-now); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
@@ -6360,7 +6360,7 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .rv-add { display: flex; align-items: center; justify-content: center; gap: 5px; height: 32px; border-radius: 9px; border: 1px dashed var(--hairline-strong); background: transparent; color: var(--text-tertiary); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .rv-add:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
 .rv-cell .rv-shift ~ .rv-add { height: 26px; }
-.rv-shift:focus-visible, .rv-add:focus-visible, .rv-ib:focus-visible, .rv-link:focus-visible, .rv-seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rv-shift:focus-visible, .rv-add:focus-visible, .rv-ib:focus-visible, .rv-link:focus-visible, .rv-pick button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .rv-foot { padding: 14px 12px 14px 16px; font-size: 12.5px; color: var(--text-secondary); }
 .rv-foot b { display: block; color: var(--text-primary); font-weight: 500; }
 .rv-cov { padding: 12px 8px 14px; border-left: 1px solid var(--hairline); display: grid; gap: 6px; align-content: start; min-width: 0; }
@@ -6393,10 +6393,10 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .rv-tr { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--hairline); font-size: 13.5px; color: var(--text-primary); }
 .rv-tr:first-of-type { border-top: 0; }
 .rv-tr > span:first-child { min-width: 0; overflow-wrap: anywhere; }
-.rv-seg { display: inline-flex; flex: none; border: 1px solid var(--hairline-strong); border-radius: 9px; overflow: hidden; }
-.rv-seg button { padding: 5px 10px; font: inherit; font-size: 12px; color: var(--text-tertiary); background: transparent; border: 0; white-space: nowrap; cursor: pointer; }
-.rv-seg button[aria-checked="true"] { background: var(--surface-3); color: var(--text-primary); }
-.rv-seg button:disabled { cursor: default; }
+.rv-pick { display: inline-flex; flex: none; border: 1px solid var(--hairline-strong); border-radius: 9px; overflow: hidden; }
+.rv-pick button { padding: 5px 10px; font: inherit; font-size: 12px; color: var(--text-tertiary); background: transparent; border: 0; white-space: nowrap; cursor: pointer; }
+.rv-pick button[aria-checked="true"] { background: var(--surface-3); color: var(--text-primary); }
+.rv-pick button:disabled { cursor: default; }
 .rv-muted { margin: 0; color: var(--text-tertiary); font-size: 13px; }
 .rv-note { margin-top: 12px; line-height: 1.5; }
 .rv-end { margin-top: 20px; display: flex; justify-content: flex-end; }

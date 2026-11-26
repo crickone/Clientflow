@@ -277,7 +277,7 @@ function TreatmentsCard({
               return (
                 <div key={t.id} className="rv-tr">
                   <span>{t.name}</span>
-                  <span className="rv-seg" role="radiogroup" aria-label={`Who ${t.name} needs`}>
+                  <span className="rv-pick" role="radiogroup" aria-label={`Who ${t.name} needs`}>
                     {(
                       [
                         ["whole", "Whole time"],
