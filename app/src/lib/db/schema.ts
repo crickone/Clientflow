@@ -3601,6 +3601,24 @@ export const whatsappBroadcasts = sqliteTable("whatsapp_broadcasts", {
   finishedAt: integer("finished_at"),
 });
 
+/**
+ * The people on the business's WhatsApp (its saved contacts and one-to-one
+ * chats), read from the provider by lib/whatsapp/contactsSync. For the
+ * Contacts page only: never leads, never marketed to. Hidden ones stay hidden.
+ */
+export const whatsappContacts = sqliteTable("whatsapp_contacts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  /** Digits only, with country code. */
+  phone: text("phone").notNull().unique(),
+  name: text("name"),
+  saved: integer("saved", { mode: "boolean" }).notNull().default(false),
+  lastChatAt: integer("last_chat_at"),
+  hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+});
+export type WhatsAppContact = typeof whatsappContacts.$inferSelect;
+
 /** Each member a broadcast goes to, fixed when it's sent; the ticker works through the queued ones. */
 export const whatsappBroadcastSends = sqliteTable("whatsapp_broadcast_sends", {
   id: integer("id").primaryKey({ autoIncrement: true }),

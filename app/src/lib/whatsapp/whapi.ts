@@ -141,6 +141,21 @@ export class WhapiBridge implements WhatsAppBridge {
     return parseChatHistory(await res.json().catch(() => ({})));
   }
 
+  async listContactsPage(offset: number, count: number): Promise<unknown> {
+    return this.getPage("contacts", offset, count);
+  }
+
+  async listChatsPage(offset: number, count: number): Promise<unknown> {
+    return this.getPage("chats", offset, count);
+  }
+
+  private async getPage(what: "contacts" | "chats", offset: number, count: number): Promise<unknown> {
+    const qs = new URLSearchParams({ count: String(Math.max(1, Math.min(500, Math.round(count)))), offset: String(Math.max(0, Math.round(offset))) });
+    const res = await fetch(`${this.base}/${what}?${qs}`, { headers: this.headers(), signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) throw new Error(`WhatsApp ${what} failed (${res.status}).`);
+    return res.json().catch(() => ({}));
+  }
+
   parseInboundWebhook(payload: unknown): InboundMessage | null {
     const messages = asArray(getProp(payload, "messages"));
     for (const m of messages) {

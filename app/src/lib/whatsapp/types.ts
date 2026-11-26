@@ -81,6 +81,9 @@ export interface WhatsAppBridge {
    * `count` messages. Optional: a provider without history leaves it out.
    */
   listChat?(phone: string, count: number): Promise<import("./historyModel").ChatMessage[]>;
+  /** One page of the number's contacts and of its chats, as the provider returns them (lib/whatsapp/contactsModel reads them). */
+  listContactsPage?(offset: number, count: number): Promise<unknown>;
+  listChatsPage?(offset: number, count: number): Promise<unknown>;
 
   /** Map a provider status-webhook payload to a normalized status, or null. */
   parseStatusWebhook(payload: unknown): StatusUpdate | null;

@@ -3506,6 +3506,19 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     addColumn("leads", "do_not_contact", "do_not_contact INTEGER NOT NULL DEFAULT 0");
     // Direct messages from someone new stay in the Inbox, off the board (lib/leads addToPipeline).
     addColumn("leads", "inbox_only", "inbox_only INTEGER NOT NULL DEFAULT 0");
+    // The business's WhatsApp contacts, for the Contacts page (lib/whatsapp/contactsSync).
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS whatsapp_contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phone TEXT NOT NULL UNIQUE,
+        name TEXT,
+        saved INTEGER NOT NULL DEFAULT 0,
+        last_chat_at INTEGER,
+        hidden INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+    `);
     addColumn("lead_flow_runs", "source", "source TEXT");
     sqlite.exec(`
       CREATE TABLE IF NOT EXISTS ghl_import_people (

@@ -5,6 +5,8 @@ import { and, asc, eq, gte } from "drizzle-orm";
 import { claimDailyRun, controlDb, getCronState, isWeeklyDue, resetDailyClaim, setCronState } from "@/lib/db/control";
 import { purgeOldVisitorHashes } from "@/lib/analytics/pageViews";
 import { checkpointAllOpenConnections, getTenantDbById, runWithTenant } from "@/lib/db/tenant";
+import { isWhatsAppConfiguredForTenant } from "@/lib/whatsapp/config";
+import { syncWhatsAppContacts } from "@/lib/whatsapp/contactsSync";
 import { hasSocialConnection, recordFollowerSnapshot } from "@/lib/social/metrics";
 import { automationLog, automationMessages, automationTriggers, clients, tenants } from "@/lib/db/schema";
 import { applyShortcodes, DEFAULT_MESSAGES, isMessageLive, type Channel } from "@/lib/automationModel";
@@ -263,6 +265,16 @@ export async function runDailyAutomations(): Promise<{ tenants: number; birthday
       if (hasSocialConnection(t.id)) await runWithTenant(t.id, () => recordFollowerSnapshot(t.id));
     } catch (err) {
       console.error(`[recorder:social_followers] snapshot failed for tenant ${t.id}:`, err);
+    }
+  }
+
+  // The business's WhatsApp contacts for the Contacts page (lib/whatsapp/contactsSync).
+  // Only tenants with WhatsApp set up; fail-soft per tenant.
+  for (const t of list) {
+    try {
+      if (isWhatsAppConfiguredForTenant(t.id)) await runWithTenant(t.id, () => syncWhatsAppContacts());
+    } catch (err) {
+      console.error(`[whatsapp contacts] daily import failed for tenant ${t.id}:`, err);
     }
   }
 

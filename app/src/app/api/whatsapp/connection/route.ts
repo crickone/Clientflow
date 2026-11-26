@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth";
 import { getWhatsAppBridge, isWhatsAppConfigured } from "@/lib/whatsapp";
+import { syncWhatsAppContactsIfNever } from "@/lib/whatsapp/contactsSync";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ export async function GET() {
     const status = await bridge.connectionStatus();
     // Only fetch a QR when not yet linked.
     const qr = status.connected ? null : (await bridge.getQrCode()).qr;
+    // Just connected: bring the number's contacts in for the Contacts page (in the background, once).
+    if (status.connected) syncWhatsAppContactsIfNever();
     return NextResponse.json({
       ok: true,
       configured: true,
