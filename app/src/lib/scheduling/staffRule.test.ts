@@ -27,6 +27,7 @@ import * as schema from "@/lib/db/schema";
 import { makeScratchTenant } from "@/lib/leadFlows/testing/harness";
 import { setKey } from "@/lib/settings";
 import { checkBookingSlot } from "@/lib/schedule";
+import { eq } from "drizzle-orm";
 
 import { findFreeSlots } from "./availability";
 import * as repo from "./rotaRepo";
@@ -119,6 +120,18 @@ const scratch = makeScratchTenant("staff-rule-test");
       assert.equal(checkBookingSlot("2030-01-14", "10:00", 60, [hbot.id]).ok, false, "one assumed person is busy with the massage");
       assert.equal(checkBookingSlot("2030-01-14", "11:00", 60, [hbot.id]).ok, true);
       assert.deepEqual(freeTimes(unfilled), search("2030-01-14"));
+
+      // ── Adonis's booking tools go through the same check.
+      const { executeTool } = await import("@/lib/assistant/tools");
+      const ctx = { tenantId: scratch.tid };
+      const refused = JSON.parse((await executeTool("create_appointment", { clientName: "Test Client", date: "2030-01-08", startTime: "10:00" }, ctx)).text);
+      assert.match(refused.error ?? "", /Nobody is on the rota then/, "Adonis cannot book a day nobody is on");
+      const booked = JSON.parse((await executeTool("create_appointment", { clientName: "Test Client", date: "2030-01-07", startTime: "12:00" }, ctx)).text);
+      assert.ok(booked.result, "Adonis books a time the rota covers");
+      const made = db.select().from(schema.appointments).where(eq(schema.appointments.startTime, "12:00")).get();
+      assert.equal(made?.endTime, "13:00", "an hour when no end is given");
+      const moved = JSON.parse((await executeTool("reschedule_appointment", { clientName: "Test Client", date: "2030-01-07", startTime: "12:00", newDate: "2030-01-08", newStartTime: "12:00" }, ctx)).text);
+      assert.match(moved.error ?? "", /Nobody is on the rota then/, "Adonis cannot move a booking to a day nobody is on");
 
       // ── Switched off: exactly the baseline again, rota data and all.
       repo.setRotaOn(false);

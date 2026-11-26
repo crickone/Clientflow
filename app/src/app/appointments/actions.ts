@@ -17,6 +17,7 @@ import {
 } from "@/lib/db/schema";
 import { logActivity } from "@/lib/queries";
 import { appointmentStatusDates } from "@/lib/statusDates";
+import { checkBookingSlot } from "@/lib/schedule";
 import { redeemAtBooking } from "@/lib/vouchers/redeem";
 import {
   onAppointmentBooked,
@@ -141,7 +142,23 @@ export async function updateStatusAction(
   status: "scheduled" | "confirmed" | "completed" | "cancelled" | "no_show",
 ) {
   await requireUser();
-  const prev = db.select({ status: appointments.status }).from(appointments).where(eq(appointments.id, id)).get();
+  const prev = db.select().from(appointments).where(eq(appointments.id, id)).get();
+  // Bringing a cancelled or no-show booking back puts it in the diary again: it must still fit.
+  const reopening = (status === "scheduled" || status === "confirmed") && (prev?.status === "cancelled" || prev?.status === "no_show");
+  if (prev && reopening) {
+    const [sh, sm] = prev.startTime.split(":").map(Number);
+    const [eh, em] = prev.endTime.split(":").map(Number);
+    const dur = Math.max(5, eh * 60 + em - (sh * 60 + sm) || 60);
+    let therapyIds: number[] = [];
+    try {
+      const parsed = JSON.parse(prev.therapyIds ?? "[]");
+      if (Array.isArray(parsed)) therapyIds = parsed.map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    } catch {
+      // An unreadable list checks as no treatments.
+    }
+    const slot = checkBookingSlot(prev.date, prev.startTime, dur, therapyIds, id);
+    if (!slot.ok) return { ok: false as const, error: `It no longer fits: ${slot.reason}` };
+  }
   db.update(appointments)
     .set({ status, updatedAt: new Date(), ...appointmentStatusDates(prev?.status ?? null, status, new Date()) })
     .where(eq(appointments.id, id))
@@ -162,6 +179,7 @@ export async function updateStatusAction(
   revalidatePath(`/appointments/${id}`);
   revalidatePath("/appointments");
   revalidatePath("/dashboard");
+  return { ok: true as const };
 }
 
 const completeSchema = z.object({

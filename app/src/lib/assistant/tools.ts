@@ -1,5 +1,6 @@
 import "server-only";
 import { voidBookingPayments } from "@/lib/bookingPayments";
+import { checkBookingSlot } from "@/lib/schedule";
 
 import type Anthropic from "@anthropic-ai/sdk";
 import JSZip from "jszip";
@@ -1493,7 +1494,11 @@ function createAppointment(ctx: ToolContext, input: Record<string, unknown>): st
   const start = String(input.startTime || "");
   if (!/^\d{2}:\d{2}$/.test(start)) return JSON.stringify({ error: "startTime must be HH:mm." });
   const endRaw = String(input.endTime || "");
-  const end = /^\d{2}:\d{2}$/.test(endRaw) ? endRaw : start;
+  // No end given: an hour, not a zero-length booking the diary cannot check.
+  const end = /^\d{2}:\d{2}$/.test(endRaw) && minutesBetween(start, endRaw) > 0 ? endRaw : addMinutes(start, 60);
+  // The same check as the booking screen: opening hours, block-outs, rooms and machines, and who is on the rota.
+  const slot = runWithTenant(ctx.tenantId, () => checkBookingSlot(date, start, minutesBetween(start, end), []));
+  if (!slot.ok) return JSON.stringify({ error: `Cannot book ${date} at ${start}: ${slot.reason}` });
   db.insert(appointments)
     .values({ clientId: c.id, date, startTime: start, endTime: end, notes: input.notes ? String(input.notes) : null, ...appointmentStatusDates(null, "scheduled", new Date()) })
     .run();
@@ -1996,6 +2001,15 @@ function rescheduleAppointment(ctx: ToolContext, input: Record<string, unknown>)
   const newStart = /^\d{2}:\d{2}$/.test(String(input.newStartTime || "")) ? String(input.newStartTime) : appt.startTime;
   if (newDate === appt.date && newStart === appt.startTime) return JSON.stringify({ error: "Give a new date or time to move it to." });
   const dur = Math.max(5, minutesBetween(appt.startTime, appt.endTime) || 60);
+  let therapyIds: number[] = [];
+  try {
+    const parsed = JSON.parse(appt.therapyIds ?? "[]");
+    if (Array.isArray(parsed)) therapyIds = parsed.map(Number).filter((n) => Number.isInteger(n) && n > 0);
+  } catch {
+    // An unreadable list checks as no treatments.
+  }
+  const slot = runWithTenant(ctx.tenantId, () => checkBookingSlot(newDate, newStart, dur, therapyIds, appt.id));
+  if (!slot.ok) return JSON.stringify({ error: `Cannot move it to ${newDate} at ${newStart}: ${slot.reason}` });
   db.update(appointments).set({ date: newDate, startTime: newStart, endTime: addMinutes(newStart, dur) }).where(eq(appointments.id, appt.id)).run();
   return JSON.stringify({ result: `Moved ${c.name}'s appointment to ${newDate} at ${newStart}.` });
 }

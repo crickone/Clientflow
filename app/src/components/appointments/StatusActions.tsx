@@ -41,7 +41,11 @@ export function StatusActions({
 
   function update(next: "scheduled" | "confirmed" | "cancelled" | "no_show") {
     start(async () => {
-      await updateStatusAction(appointmentId, next);
+      const res = await updateStatusAction(appointmentId, next);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
       toast.success(`Marked ${next.replace("_", " ")}.`);
     });
   }
