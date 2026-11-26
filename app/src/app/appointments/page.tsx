@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarClock, CalendarPlus, CalendarRange } from "lucide-react";
+import { CalendarClock, CalendarPlus, CalendarRange, UsersRound } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -58,6 +58,11 @@ export default async function AppointmentsPage(props: Props) {
         title={vocab.bookings}
         actions={
           <>
+            <Link href={`/appointments/rota?week=${isoStart}`}>
+              <Button variant="ghost">
+                <UsersRound size={15} /> Rota
+              </Button>
+            </Link>
             <Link href="/calendar">
               <Button variant="ghost">
                 <CalendarClock size={15} /> Diary
