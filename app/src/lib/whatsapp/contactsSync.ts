@@ -9,6 +9,7 @@ import { fillLeadContact } from "@/lib/leads";
 import { splitFullName } from "@/lib/humanName";
 import { getWhatsAppBridge, isWhatsAppConfigured } from "@/lib/whatsapp";
 import { mergeWaContacts, parseChatsPage, parseContactsPage, type WaContactRow } from "./contactsModel";
+import { backfillWhatsAppHistory } from "./history";
 
 /**
  * Bring the business's WhatsApp contacts (its saved contacts and one-to-one
@@ -98,6 +99,9 @@ export async function syncWhatsAppContacts(): Promise<{ ok: true; count: number 
       console.error("[whatsapp contacts] naming leads failed:", err);
     }
     setKey(SYNC_KEY, { at: Date.now(), okAt: Date.now(), count, error: null } satisfies ContactsSyncState);
+    // Then bring in the chats the records are behind on (lib/whatsapp/history), in the background.
+    const tid = tenantId;
+    if (tid) void runWithTenant(tid, () => backfillWhatsAppHistory()).catch((err) => console.error("[whatsapp history] backfill failed:", err));
     return { ok: true, count };
   } catch (err) {
     return fail(err instanceof Error ? err.message : "The WhatsApp import failed.");

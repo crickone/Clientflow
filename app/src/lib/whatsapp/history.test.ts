@@ -33,7 +33,8 @@ fs.rmSync(path.join(process.cwd(), "data", "tenants", "wa-history-test"), { recu
 const scratch = makeScratchTenant("wa-history-test");
 
 (async () => {
-  const { syncLeadWhatsApp, recordPhoneSent } = await import("./history");
+  const { syncLeadWhatsApp, syncClientWhatsApp, recordPhoneSent, backfillWhatsAppHistory } = await import("./history");
+  const { findLeadByPhone } = await import("@/lib/leads");
   let n = 0;
   const ok = (c: boolean, m: string) => {
     assert.ok(c, m);
@@ -78,6 +79,32 @@ const scratch = makeScratchTenant("wa-history-test");
       const leadsBefore = db.select().from(schema.leads).all().length;
       ok(recordPhoneSent([{ id: "ph-3", fromMe: true, at: 7000, text: "Hello", source: "mobile", toPhoneDigits: "353870009999" }]) === 0, "an unknown number is left alone");
       ok(db.select().from(schema.leads).all().length === leadsBefore, "an outbound message never makes a lead");
+
+      // A client's chat fills in on the client's record.
+      history = [
+        { id: "c-in-1", fromMe: false, at: 8000, text: "Can I move Friday?", source: "mobile" },
+        { id: "c-out-1", fromMe: true, at: 9000, text: "Yes, Saturday at 10", source: "mobile" },
+      ];
+      assert.deepEqual(await syncClientWhatsApp(client.id, { force: true }), { added: 2 });
+      n++;
+      const cmsg = db.select().from(schema.clientMessages).where(eq(schema.clientMessages.clientId, client.id)).orderBy(asc(schema.clientMessages.createdAt)).all();
+      ok(cmsg.map((m) => m.providerMessageId).join() === "ph-2,c-in-1,c-out-1" && cmsg[2].origin === "phone", "the client's chat, in order, the business's side marked as from its WhatsApp");
+
+      // One person, two cards: the one on the board gets their messages, not the Inbox-only one.
+      const [inboxCard] = db.insert(schema.leads).values({ source: "instagram", phone: "+353870000007", inboxOnly: true }).returning().all();
+      const [boardCard] = db.insert(schema.leads).values({ source: "facebook", phone: "087 000 0007" }).returning().all();
+      ok(findLeadByPhone("353870000007")?.id === boardCard.id && inboxCard.id < boardCard.id, "the card on the board wins over the Inbox-only one");
+
+      // The background fill: only chats that moved since the record's newest WhatsApp message are read.
+      db.insert(schema.whatsappContacts).values([
+        { phone: "353870000007", lastChatAt: 5_000_000 },
+        { phone: "353870000002", lastChatAt: 1000 },
+      ]).run();
+      history = [{ id: "bf-1", fromMe: false, at: 5_000_000, text: "Still on for tomorrow?", source: "mobile" }];
+      const filled = await backfillWhatsAppHistory({ gapMs: 0 });
+      ok(filled.checked === 1 && filled.added === 1 && filled.records === 1, "one chat behind, read in; the client already up to date is skipped");
+      ok(db.select().from(schema.leadMessages).where(eq(schema.leadMessages.leadId, boardCard.id)).all().length === 1, "on the card on the board");
+      ok((await backfillWhatsAppHistory({ gapMs: 0 })).checked === 0, "a second pass has nothing to do");
     });
     console.log(`whatsapp history: ${n} checks passed.`);
   } finally {

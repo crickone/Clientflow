@@ -322,9 +322,14 @@ export function setLeadMessageStatus(
 }
 
 /** Find a lead by normalized phone match (for inbound routing). */
+/**
+ * The lead a phone number belongs to. When one person has several cards, the
+ * one on the board wins over an Inbox-only conversation, then the newest, so
+ * their messages land where staff are working with them.
+ */
 export function findLeadByPhone(normalized: string): Lead | undefined {
   if (!normalized) return undefined;
-  const rows = db.select().from(leads).where(sql`${leads.phone} IS NOT NULL`).all();
+  const rows = db.select().from(leads).where(sql`${leads.phone} IS NOT NULL`).orderBy(leads.inboxOnly, desc(leads.id)).all();
   return rows.find((l) => normalizePhone(l.phone) === normalized);
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { sendClientWhatsAppAction } from "@/app/clients/actions";
@@ -17,6 +18,25 @@ export function ClientConversation({
 }) {
   const [messages, setMessages] = useState<ThreadMessage[]>(initialMessages);
   const [pending, start] = useTransition();
+  const router = useRouter();
+
+  // Fresh messages from the server (after the history below fills in) replace what is shown.
+  useEffect(() => setMessages(initialMessages), [initialMessages]);
+
+  // The whole WhatsApp chat, including what was sent from the phone or another tool (lib/whatsapp/history).
+  useEffect(() => {
+    if (!hasPhone) return;
+    let gone = false;
+    fetch(`/api/clients/${clientId}/whatsapp-history`, { method: "POST" })
+      .then((r) => r.json())
+      .then((d: { added?: number }) => {
+        if (!gone && (d.added ?? 0) > 0) router.refresh();
+      })
+      .catch(() => {});
+    return () => {
+      gone = true;
+    };
+  }, [clientId, hasPhone, router]);
 
   function handleSend(text: string) {
     start(async () => {
