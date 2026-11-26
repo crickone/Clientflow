@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { guard } from "@/lib/api/guard";
 import { BOOKING_STEP_MINUTES, blocksCoverDay, slotCandidates } from "@/lib/booking/slotModel";
 import { blockOutsForDate, checkBookingSlot, dayWindow } from "@/lib/schedule";
+import { mondayOf } from "@/lib/scheduling/rotaModel";
+import { weekUnfilled } from "@/lib/scheduling/rotaRepo";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +16,9 @@ const MAX_DURATION = 24 * 60;
  *
  * The start times the booking screen offers for one day, each marked free or
  * taken. Free means `checkBookingSlot` accepts it: the SAME check POST
- * /api/appointments runs (opening hours, block-outs, resource limits,
- * buffer), so a time shown as free is a time the booking goes through at.
+ * /api/appointments runs (opening hours, block-outs, resource limits, buffer,
+ * and the staff rule when the rota is on), so a time shown as free is a time
+ * the booking goes through at.
  * Staff only.
  */
 export async function GET(req: NextRequest) {
@@ -54,5 +57,7 @@ export async function GET(req: NextRequest) {
     close: win.close,
     stepMinutes: BOOKING_STEP_MINUTES,
     slots,
+    // The booking screen shows a reminder when this week's rota is empty.
+    rota: { unfilled: weekUnfilled(date), week: mondayOf(date) },
   });
 }

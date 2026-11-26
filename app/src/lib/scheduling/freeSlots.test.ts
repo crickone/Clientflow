@@ -195,4 +195,23 @@ check(
 check("spread of an empty list is empty", spreadSlots([], 2), []);
 check("spread never invents slots", spreadSlots(manySameDay.slice(0, 1), 3).length, 1);
 
+// ── Staff rule through the same seam ──────────────────────────────────────
+{
+  const sday = (staff?: { cover: import("./staffDemand").DayCover; booked: import("./staffDemand").StaffedSpan[] }) => ({
+    date: "2030-01-07", closed: false, openMin: 9 * 60, closeMin: 12 * 60, busy: [], staff,
+  });
+  const sbase = {
+    durationMinutes: 60, bufferMinutes: 0, granularityMinutes: 60, demand: new Map([[1, 1]]),
+    limits: new Map(), earliest: { date: "2030-01-01", min: 0 }, limit: 10,
+  };
+  const massageAt10 = { startMin: 600, endMin: 660, staffing: "whole" as const, label: "Massage" };
+  const ONE = { mode: "shifts" as const, shifts: [{ startMin: 540, endMin: 720 }] };
+  const times = (s: { startTime: string }[]) => s.map((x) => x.startTime);
+
+  check("no staff info = today", times(computeFreeSlots({ ...sbase, days: [sday()] })), ["09:00", "10:00", "11:00"]);
+  check("rota off = today", times(computeFreeSlots({ ...sbase, days: [sday({ cover: { mode: "off" }, booked: [massageAt10] })] })), ["09:00", "10:00", "11:00"]);
+  check("one on: the massage hour is not offered", times(computeFreeSlots({ ...sbase, staffing: "setup", days: [sday({ cover: ONE, booked: [massageAt10] })] })), ["09:00", "11:00"]);
+  check("nobody on: nothing offered", times(computeFreeSlots({ ...sbase, staffing: "setup", days: [sday({ cover: { mode: "shifts", shifts: [] }, booked: [] })] })), []);
+}
+
 console.log(`freeSlots: ${passed} checks passed.`);

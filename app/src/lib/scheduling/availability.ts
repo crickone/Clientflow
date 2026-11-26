@@ -7,6 +7,7 @@ import { getSettings, readKey } from "@/lib/settings";
 import { daysForBlock, dayOfWeek, checkBookingSlot } from "@/lib/schedule";
 import { computeFreeSlots, spreadSlots, hmToMin, type DayAvailability, type FreeSlot } from "./freeSlots";
 import { allResourceIds, demandForTherapies, demandResolver, resourceLimits } from "./resourceRepo";
+import { staffCoverResolver, staffingForTherapies, staffingResolver } from "./rotaRepo";
 
 /**
  * "What times can I offer this lead?" — the diary side of the lead engine.
@@ -14,8 +15,9 @@ import { allResourceIds, demandForTherapies, demandResolver, resourceLimits } fr
  * The arithmetic lives in ./freeSlots (pure, tested). This module is only the
  * data-loading shell: it reads opening hours, block-outs and the appointments
  * in range ONCE for the whole window and hands them over. Both it and
- * `checkBookingSlot` apply the SAME conflict rule (./resourceDemand), so a
- * slot offered here is a slot the booking path accepts. The final re-check
+ * `checkBookingSlot` apply the SAME two rules (./resourceDemand for spaces and
+ * equipment, ./staffDemand for who is on), so a slot offered here is a slot
+ * the booking path accepts. The final re-check
  * through `checkBookingSlot` is kept anyway: it is cheap over a handful of
  * slots, it catches a diary that moved between loading and offering, and it
  * fails closed.
@@ -91,7 +93,18 @@ export interface AvailabilityWindow {
  * `now` is injectable so a caller (and a test) can pin the clock; it defaults
  * to the real one.
  */
-export function findFreeSlots(opts: { limit?: number; maxPerDay?: number; now?: Date } = {}): AvailabilityWindow {
+export function findFreeSlots(
+  opts: {
+    limit?: number;
+    maxPerDay?: number;
+    now?: Date;
+    /**
+     * Defaults to true. False skips the final checkBookingSlot filter; tests
+     * use it to see what the search alone offers.
+     */
+    recheck?: boolean;
+  } = {},
+): AvailabilityWindow {
   const config = consultationConfig();
   const now = opts.now ?? new Date();
   const limit = opts.limit ?? 24;
@@ -140,6 +153,9 @@ export function findFreeSlots(opts: { limit?: number; maxPerDay?: number; now?: 
     else byDate.set(a.date, [a]);
   }
 
+  const coverOf = staffCoverResolver();
+  const staffingOfAppt = staffingResolver();
+
   const days: DayAvailability[] = [];
   for (let i = 0; ; i++) {
     const date = addDays(earliestDate, i);
@@ -150,7 +166,20 @@ export function findFreeSlots(opts: { limit?: number; maxPerDay?: number; now?: 
       continue;
     }
 
-    const busy = (byDate.get(date) ?? []).map((a) => ({
+    const dayAppts = byDate.get(date) ?? [];
+    const cover = coverOf(date);
+    const staff = cover.mode === "off"
+      ? undefined
+      : {
+          cover,
+          booked: dayAppts.map((a) => ({
+            startMin: hmToMin(a.startTime),
+            endMin: hmToMin(a.endTime),
+            ...staffingOfAppt(a.therapyIds),
+          })),
+        };
+
+    const busy = dayAppts.map((a) => ({
       startMin: hmToMin(a.startTime),
       endMin: hmToMin(a.endTime),
       demand: demandOf(a.therapyIds),
@@ -170,6 +199,7 @@ export function findFreeSlots(opts: { limit?: number; maxPerDay?: number; now?: 
       openMin: hmToMin(oh.open ?? "00:00"),
       closeMin: hmToMin(oh.close ?? "23:59"),
       busy,
+      staff,
     });
   }
 
@@ -183,12 +213,15 @@ export function findFreeSlots(opts: { limit?: number; maxPerDay?: number; now?: 
     earliest: { date: earliestDate, min: earliestMinOnDay },
     limit: limit * 3, // over-fetch so `spreadSlots` has room to pick across days
     maxPerDay: opts.maxPerDay,
+    staffing: staffingForTherapies(config.therapyIds),
   });
 
   // Fail closed against the booking API's own validator.
-  const slots = candidates
-    .filter((s) => checkBookingSlot(s.date, s.startTime, config.durationMinutes, config.therapyIds).ok)
-    .slice(0, limit);
+  const slots = (
+    opts.recheck === false
+      ? candidates
+      : candidates.filter((s) => checkBookingSlot(s.date, s.startTime, config.durationMinutes, config.therapyIds).ok)
+  ).slice(0, limit);
 
   return { slots, config };
 }

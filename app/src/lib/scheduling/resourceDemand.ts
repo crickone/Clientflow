@@ -16,10 +16,10 @@
  *   small gym  every class -> "The floor"   (concurrency 1)   one class at a time
  *   big gym    Spin -> "Studio A", Yoga -> "Studio B"         both at once
  *
- * Staff are deliberately NOT modelled. A person is a resource too, but a
- * useful staffing model needs "one person can supervise three machines while a
- * massage takes a whole person", and that needs a roster this platform does
- * not have. Spaces and equipment first.
+ * Staff are modelled separately, in ./staffDemand: a person is not a
+ * resource with a fixed concurrency, because one therapist can watch three
+ * machines while a massage takes a whole person. That rule reads the staff
+ * rota and applies only when a business uses it.
  */
 
 /** resourceId -> units consumed. */
