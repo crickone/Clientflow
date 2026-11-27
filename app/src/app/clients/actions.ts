@@ -13,21 +13,26 @@ import { clients } from "@/lib/db/schema";
 import { logActivity } from "@/lib/queries";
 import { fireTrigger } from "@/lib/automations";
 import { sendWhatsApp } from "@/lib/whatsapp/send";
+import { loadAttachments } from "@/lib/attachments/load";
 import { forgetImportedPerson } from "@/lib/ghlImport/store";
 
 export async function sendClientWhatsAppAction(
   clientId: number,
   text: string,
-): Promise<{ ok: true; messageId: number } | { ok: false; error: string }> {
+  /** Attachment tickets from the upload route; optional. */
+  attachmentTokens?: string[],
+): Promise<{ ok: true; messageId: number; failed: string[] } | { ok: false; error: string }> {
   await requireUser();
   try {
-    const { messageId } = await sendWhatsApp({
+    const attachments = loadAttachments(attachmentTokens);
+    const { messageId, failed } = await sendWhatsApp({
       subjectType: "client",
       subjectId: clientId,
       text,
+      ...(attachments.length ? { attachments } : {}),
     });
     revalidatePath(`/clients/${clientId}`);
-    return { ok: true, messageId };
+    return { ok: true, messageId, failed };
   } catch (err) {
     return {
       ok: false,

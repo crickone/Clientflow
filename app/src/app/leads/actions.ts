@@ -238,13 +238,17 @@ export async function sendLeadWhatsAppAction(
   text: string,
   /** When sending an existing draft, the draft row to remove once sent. */
   replaceMessageId?: number,
-): Promise<{ ok: true; messageId: number } | { ok: false; error: string }> {
+  /** Attachment tickets from the upload route; optional. */
+  attachmentTokens?: string[],
+): Promise<{ ok: true; messageId: number; failed: string[] } | { ok: false; error: string }> {
   await requireUser();
   try {
-    const { messageId } = await sendWhatsApp({
+    const attachments = loadAttachments(attachmentTokens);
+    const { messageId, failed } = await sendWhatsApp({
       subjectType: "lead",
       subjectId: leadId,
       text,
+      ...(attachments.length ? { attachments } : {}),
     });
     if (replaceMessageId) {
       db.delete(leadMessages)
@@ -255,7 +259,7 @@ export async function sendLeadWhatsAppAction(
     await rescore(leadId);
     revalidatePath(`/leads/${leadId}`);
     revalidatePath("/leads");
-    return { ok: true, messageId };
+    return { ok: true, messageId, failed };
   } catch (err) {
     return {
       ok: false,
@@ -284,15 +288,35 @@ export async function logInboundReplyAction(
 }
 
 /** A note for the team on the lead's activity. Not sent to the lead, and not read as a reply. */
-export async function addLeadNoteAction(leadId: number, content: string): Promise<{ ok: true; messageId: number } | { ok: false; error: string }> {
+export async function addLeadNoteAction(
+  leadId: number,
+  content: string,
+  /** Files kept on the note for the team; nothing is sent to the lead. */
+  attachmentTokens?: string[],
+): Promise<{ ok: true; messageId: number } | { ok: false; error: string }> {
   const user = await requireUser();
   const text = content.trim();
-  if (!text) return { ok: false, error: "Write the note first." };
+  let files;
+  try {
+    files = loadAttachments(attachmentTokens);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "That attachment has expired. Attach it again." };
+  }
+  if (!text && files.length === 0) return { ok: false, error: "Write the note first." };
   if (text.length > 4000) return { ok: false, error: "Keep the note under 4,000 characters." };
   const lead = db.select({ id: leads.id }).from(leads).where(eq(leads.id, leadId)).get();
   if (!lead) return { ok: false, error: "That lead no longer exists." };
   const name = user.name?.trim().split(/\s+/)[0];
-  const row = addMessage({ leadId, direction: "note", channel: "manual", content: name ? `${name}: ${text}` : text, sentAt: new Date() });
+  const media = files.map((f) => f.media);
+  const body = text || (media[0] ? mediaPlaceholder(media[0].kind) : text);
+  const row = addMessage({
+    leadId,
+    direction: "note",
+    channel: "manual",
+    content: name ? `${name}: ${body}` : body,
+    media: media.length ? media : null,
+    sentAt: new Date(),
+  });
   revalidatePath(`/leads/${leadId}`);
   return { ok: true, messageId: row.id };
 }

@@ -40,6 +40,9 @@ import { Badge } from "@/components/ui/Badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/DropdownMenu";
 import { Input, Textarea } from "@/components/ui/Input";
 import { MessageBody } from "@/components/messaging/MessageBody";
+import { AttachButton, AttachmentTray, DropHint } from "@/components/messaging/AttachmentTray";
+import { useAttachments } from "@/components/messaging/useAttachments";
+import { failedFilesNote } from "@/components/messaging/attachmentsModel";
 import type { StageRecord } from "@/lib/pipeline/roles";
 import {
   callLeadAction,
@@ -334,6 +337,8 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
   const [filter, setFilter] = useState<ActivityFilter>("all");
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // Files in the message box (WhatsApp, email and team notes all take them).
+  const att = useAttachments();
 
   async function draftIntoBox() {
     setDrafting(true);
@@ -357,30 +362,42 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
 
   function sendFromBox() {
     const t = text.trim();
-    if (!t) return;
+    if (!att.readyWith(t)) return;
+    const tokens = att.tokens;
+    const files = tokens.length ? tokens : undefined;
+    // The uploaded files' records, so the new row shows them straight away.
+    const sentMedia = att.items.flatMap((i) => (i.status === "ready" && i.media ? [i.media] : []));
+    const mediaJson = sentMedia.length ? JSON.stringify(sentMedia) : null;
     start(async () => {
       const now = new Date();
       if (channel === "note") {
-        const res = await addLeadNoteAction(lead.id, t);
+        const res = await addLeadNoteAction(lead.id, t, files);
         if (!res.ok) return void toast.error(res.error);
-        setMessages((prev) => [...prev, { id: res.messageId, leadId: lead.id, direction: "note", channel: "manual", content: t, aiGenerated: false, sentAt: now, createdAt: now } as LeadMessage]);
+        setMessages((prev) => [...prev, { id: res.messageId, leadId: lead.id, direction: "note", channel: "manual", content: t, media: mediaJson, aiGenerated: false, sentAt: now, createdAt: now } as LeadMessage]);
         setText("");
+        att.clear();
+        if (files) router.refresh();
         toast.success("Note saved.");
         return;
       }
       const res =
         channel === "email"
-          ? await sendLeadEmailAction(lead.id, { subject: emailSubject, text: t, draftMessageId: draftId ?? undefined })
-          : await sendLeadWhatsAppAction(lead.id, t, draftId ?? undefined);
+          ? await sendLeadEmailAction(lead.id, { subject: emailSubject, text: t, draftMessageId: draftId ?? undefined, ...(files ? { attachments: files } : {}) })
+          : await sendLeadWhatsAppAction(lead.id, t, draftId ?? undefined, files);
       if (!res.ok) return void toast.error(res.error);
       setMessages((prev) => [
         ...prev.filter((m) => m.id !== draftId),
-        { id: res.messageId, leadId: lead.id, direction: "outbound", channel, content: t, aiGenerated: draftId != null, status: "sent", sentAt: now, createdAt: now } as LeadMessage,
+        { id: res.messageId, leadId: lead.id, direction: "outbound", channel, content: t, media: mediaJson, aiGenerated: draftId != null, status: "sent", sentAt: now, createdAt: now } as LeadMessage,
       ]);
       if (lead.status === "new") setLead({ ...lead, status: "contacted" });
       setText("");
       setDraftId(null);
-      toast.success(channel === "email" ? `Email sent to ${lead.email}.` : "Sent on WhatsApp.");
+      att.clear();
+      // On WhatsApp each file is its own message; reload to show them as stored.
+      if (files) router.refresh();
+      const note = failedFilesNote((res as { failed?: string[] }).failed);
+      if (note) toast.error(note);
+      else toast.success(channel === "email" ? `Email sent to ${lead.email}.` : "Sent on WhatsApp.");
     });
   }
 
@@ -529,6 +546,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
             <div className="ld-bubble">
               <MessageBody content={m.content} media={m.media} />
             </div>
+            {m.status === "failed" && m.error && <div className="at-failed">Not sent: {m.error}</div>}
             {isDraft && draftActions(m, m.content)}
           </>
         )}
@@ -765,7 +783,8 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
                 <Input id={`lv-subject-${lead.id}`} value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} />
               </div>
             )}
-            <div className="lv-box">
+            <div className="lv-box at-dropzone" {...att.dropProps}>
+              <DropHint att={att} />
               <label htmlFor={`lv-text-${lead.id}`} className="sr-only">
                 {channel === "note" ? "Note for the team" : `Message to ${lead.firstName || fullName}`}
               </label>
@@ -783,15 +802,17 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
                 }}
                 placeholder={channel === "note" ? "Only the team sees this" : `Write a message to ${lead.firstName || fullName}`}
               />
+              <AttachmentTray att={att} />
               <div className="lv-box-foot">
-                {channel !== "note" ? (
-                  <Button variant="ghost" size="sm" onClick={() => void draftIntoBox()} disabled={drafting || pending}>
-                    <Sparkles size={13} /> {drafting ? "Drafting…" : text.trim() ? "Redraft with Adonis" : "Draft with Adonis"}
-                  </Button>
-                ) : (
-                  <span />
-                )}
-                <Button size="sm" onClick={sendFromBox} loading={pending} disabled={!text.trim()}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                  <AttachButton att={att} disabled={pending} />
+                  {channel !== "note" && (
+                    <Button variant="ghost" size="sm" onClick={() => void draftIntoBox()} disabled={drafting || pending}>
+                      <Sparkles size={13} /> {drafting ? "Drafting…" : text.trim() ? "Redraft with Adonis" : "Draft with Adonis"}
+                    </Button>
+                  )}
+                </span>
+                <Button size="sm" onClick={sendFromBox} loading={pending} disabled={!att.readyWith(text)}>
                   {channel === "note" ? "Save note" : "Send"} <Send size={13} />
                 </Button>
               </div>

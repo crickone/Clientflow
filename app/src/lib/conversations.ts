@@ -294,6 +294,7 @@ function toThread(rows: Array<{
   sentAt: Date | null;
   createdAt: Date;
   media: string | null;
+  error?: string | null;
 }>): ThreadMessage[] {
   return rows.map((m) => ({
     id: m.id,
@@ -305,6 +306,7 @@ function toThread(rows: Array<{
     sentAt: m.sentAt,
     createdAt: m.createdAt,
     ...(m.media ? { media: parseMedia(m.media) } : {}),
+    ...(m.error ? { error: m.error } : {}),
   }));
 }
 

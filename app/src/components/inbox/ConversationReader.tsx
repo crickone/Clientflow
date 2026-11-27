@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { ConversationThread, type ThreadMessage } from "@/components/messaging/ConversationThread";
 import { loadThreadAction, retriageAction, sendInboxMessageAction } from "@/app/communication/actions";
 import type { ConversationDetail } from "@/lib/conversations";
+import { failedFilesNote } from "@/components/messaging/attachmentsModel";
 
 const CHANNEL_LABELS = { whatsapp: "WhatsApp", messenger: "Messenger", instagram: "Instagram" } as const;
 
@@ -53,19 +54,31 @@ export function ConversationReader({
     if (focusReplyToken) composer.current?.focus();
   }, [focusReplyToken]);
 
-  function handleSend(text: string, fromDraft = false) {
-    startSend(async () => {
-      const res = await sendInboxMessageAction(kind, contactId, text);
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      const now = new Date();
-      const sent: ThreadMessage = { id: res.messageId, direction: "outbound", channel: res.channel, content: text, status: "sent", sentAt: now, createdAt: now };
-      setDetail((prev) => (prev ? { ...prev, messages: [...prev.messages, sent], draft: null } : prev));
-      setDraftDismissed(true);
-      onSent(text, res.channel);
-      toast.success(fromDraft ? "AI reply approved and sent." : `Sent on ${CHANNEL_LABELS[res.channel]}.`);
+  function handleSend(text: string, attachments: string[] = [], fromDraft = false): Promise<boolean> {
+    return new Promise((resolve) => {
+      startSend(async () => {
+        const res = await sendInboxMessageAction(kind, contactId, text, attachments.length ? attachments : undefined);
+        if (!res.ok) {
+          toast.error(res.error);
+          resolve(false);
+          return;
+        }
+        if (attachments.length) {
+          // Each file is its own message (some may have been refused); show them as stored.
+          const t = await loadThreadAction(kind, contactId);
+          if (t.ok) setDetail({ ...t.detail, draft: null });
+        } else {
+          const now = new Date();
+          const sent: ThreadMessage = { id: res.messageId, direction: "outbound", channel: res.channel, content: text, status: "sent", sentAt: now, createdAt: now };
+          setDetail((prev) => (prev ? { ...prev, messages: [...prev.messages, sent], draft: null } : prev));
+        }
+        setDraftDismissed(true);
+        onSent(text || "Sent a file", res.channel);
+        const note = failedFilesNote(res.failed);
+        if (note) toast.error(note);
+        else toast.success(fromDraft ? "AI reply approved and sent." : `Sent on ${CHANNEL_LABELS[res.channel]}.`);
+        resolve(true);
+      });
     });
   }
 
@@ -127,7 +140,7 @@ export function ConversationReader({
               </div>
               <div className="inbox-draft-text">{detail.draft.text}</div>
               <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-                <Button size="sm" disabled={!detail.canReply || sending} onClick={() => handleSend(detail.draft!.text, true)}>
+                <Button size="sm" disabled={!detail.canReply || sending} onClick={() => void handleSend(detail.draft!.text, [], true)}>
                   <Check size={14} /> Approve and send
                 </Button>
                 <Button

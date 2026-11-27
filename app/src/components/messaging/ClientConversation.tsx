@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { sendClientWhatsAppAction } from "@/app/clients/actions";
 import { ConversationThread, type ThreadMessage } from "./ConversationThread";
+import { failedFilesNote } from "./attachmentsModel";
 
 export function ClientConversation({
   clientId,
@@ -38,26 +39,37 @@ export function ClientConversation({
     };
   }, [clientId, hasPhone, router]);
 
-  function handleSend(text: string) {
-    start(async () => {
-      const res = await sendClientWhatsAppAction(clientId, text);
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: res.messageId,
-          direction: "outbound",
-          channel: "whatsapp",
-          content: text,
-          status: "sent",
-          sentAt: new Date(),
-          createdAt: new Date(),
-        },
-      ]);
-      toast.success("Sent via WhatsApp.");
+  function handleSend(text: string, attachments: string[]): Promise<boolean> {
+    return new Promise((resolve) => {
+      start(async () => {
+        const res = await sendClientWhatsAppAction(clientId, text, attachments.length ? attachments : undefined);
+        if (!res.ok) {
+          toast.error(res.error);
+          resolve(false);
+          return;
+        }
+        if (attachments.length) {
+          // Each file is its own message; reload the thread to show them as stored.
+          router.refresh();
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: res.messageId,
+              direction: "outbound",
+              channel: "whatsapp",
+              content: text,
+              status: "sent",
+              sentAt: new Date(),
+              createdAt: new Date(),
+            },
+          ]);
+        }
+        const note = failedFilesNote(res.failed);
+        if (note) toast.error(note);
+        else toast.success("Sent via WhatsApp.");
+        resolve(true);
+      });
     });
   }
 

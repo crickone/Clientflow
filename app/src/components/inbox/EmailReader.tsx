@@ -11,6 +11,9 @@ import type { EmailMessageRow } from "@/lib/gmail";
 import { cleanSnippet, decodeEntities, displaySender } from "@/lib/inbox/emailDisplay";
 import { InboxAvatar } from "./ContactCard";
 import { fullTime } from "./format";
+import { MessageBody as FilesBody } from "@/components/messaging/MessageBody";
+import { AttachButton, AttachmentTray, DropHint } from "@/components/messaging/AttachmentTray";
+import { useAttachments } from "@/components/messaging/useAttachments";
 
 /**
  * An email thread in the reading pane. Older messages fold to one line (the
@@ -39,6 +42,7 @@ export function EmailReader({
   const [drafting, startDraft] = useTransition();
   const replyRef = useRef<HTMLTextAreaElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const att = useAttachments({ disabled: !messages });
 
   async function load() {
     const res = await loadEmailThreadAction(threadId);
@@ -58,6 +62,7 @@ export function EmailReader({
   useEffect(() => {
     setMessages(null);
     setReply("");
+    att.clear();
     setComposing(expectReply);
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -79,16 +84,20 @@ export function EmailReader({
   const replyTo = last ? (last.direction === "in" ? displaySender(last.fromName, last.fromEmail).email : last.toEmail) : null;
   const subject = decodeEntities(last?.subject ?? "") || "(no subject)";
 
+  const canSend = !!messages && att.readyWith(reply);
+
   function send() {
-    if (!last || !reply.trim()) return;
+    if (!last || !att.readyWith(reply)) return;
+    const tokens = att.tokens;
     startSend(async () => {
-      const res = await replyEmailAction(last.id, reply);
+      const res = await replyEmailAction(last.id, reply, tokens.length ? tokens : undefined);
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
       toast.success("Reply sent");
       setReply("");
+      att.clear();
       await load();
     });
   }
@@ -136,9 +145,10 @@ export function EmailReader({
         )}
       </div>
 
-      <div className="inbox-composer">
+      <div className={composing ? "inbox-composer at-dropzone" : "inbox-composer"} {...(composing ? att.dropProps : {})}>
         {composing ? (
           <>
+            <DropHint att={att} />
             <div className="inbox-composer-to">
               To <strong>{replyTo ?? "..."}</strong>
             </div>
@@ -157,12 +167,14 @@ export function EmailReader({
               disabled={sending || !messages}
               style={{ resize: "vertical", minHeight: 96 }}
             />
+            <AttachmentTray att={att} />
             <div className="inbox-composer-actions">
+              <AttachButton att={att} disabled={sending || !messages} />
               <Button variant="outline" size="sm" onClick={draft} loading={drafting} disabled={!messages || sending}>
                 <Sparkles size={14} /> {reply.trim() ? "Redraft with Adonis" : "Draft with Adonis"}
               </Button>
               <span className="inbox-composer-hint">Cmd + Enter to send</span>
-              <Button size="sm" onClick={send} loading={sending} disabled={!reply.trim() || !messages}>
+              <Button size="sm" onClick={send} loading={sending} disabled={!canSend}>
                 <Send size={14} /> Send
               </Button>
             </div>
@@ -196,7 +208,14 @@ function EmailMessage({ m, expanded, onToggle }: { m: EmailMessageRow; expanded:
         <span className="inbox-msg-time">{fullTime(m.internalDate)}</span>
       </button>
       {expanded ? (
-        <MessageBody html={m.bodyHtml} text={m.bodyText} snippet={m.snippet} />
+        <>
+          <MessageBody html={m.bodyHtml} text={m.bodyText} snippet={m.snippet} />
+          {m.media && (
+            <div className="at-sent-files">
+              <FilesBody content="" media={m.media} />
+            </div>
+          )}
+        </>
       ) : (
         <div className="inbox-msg-snippet">{cleanSnippet(m.snippet ?? "")}</div>
       )}

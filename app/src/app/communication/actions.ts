@@ -186,13 +186,20 @@ export async function sendInboxMessageAction(
   kind: Kind,
   contactId: number,
   text: string,
-): Promise<{ ok: true; messageId: number; channel: ReplyChannel } | { ok: false; error: string }> {
+  /** Attachment tickets from the upload route; optional, text-only sends pass none. */
+  attachmentTokens?: string[],
+): Promise<
+  | { ok: true; messageId: number; channel: ReplyChannel; failed: string[] }
+  | { ok: false; error: string }
+> {
   try {
     await requireUser();
-    const { messageId, channel } = await sendReply({
+    const attachments = loadAttachments(attachmentTokens);
+    const { messageId, channel, failed } = await sendReply({
       subjectType: kind,
       subjectId: contactId,
       text,
+      ...(attachments.length ? { attachments } : {}),
     });
     // A human has now replied — resolve any staged AI draft so it doesn't
     // reappear when the thread reloads. A fresh draft is created on the next
@@ -207,7 +214,7 @@ export async function sendInboxMessageAction(
       revalidatePath(`/clients/${contactId}`);
     }
     revalidatePath("/communication");
-    return { ok: true, messageId, channel };
+    return { ok: true, messageId, channel, failed };
   } catch (err) {
     return {
       ok: false,

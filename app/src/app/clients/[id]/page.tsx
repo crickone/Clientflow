@@ -549,6 +549,7 @@ export default async function ClientProfile(
               sentAt: m.sentAt,
               createdAt: m.createdAt,
               ...(m.media ? { media: parseMedia(m.media) } : {}),
+              ...(m.error ? { error: m.error } : {}),
             }))}
           />
         </TabsContent>

@@ -11,6 +11,9 @@ import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
 import { sendClientEmailAction } from "@/app/clients/[id]/emailActions";
 import type { ClientEmailRow } from "@/lib/clientEmail";
+import { MessageBody } from "@/components/messaging/MessageBody";
+import { AttachButton, AttachmentTray, DropHint } from "@/components/messaging/AttachmentTray";
+import { useAttachments } from "@/components/messaging/useAttachments";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 // Deterministic UTC format — identical on server + client, avoids hydration drift.
@@ -35,22 +38,26 @@ export function ClientEmailPanel({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [pending, start] = useTransition();
+  const ready = Boolean(clientEmail) && emailReady;
+  const att = useAttachments({ disabled: !ready });
 
   function send() {
-    if (!subject.trim() || !body.trim()) {
-      toast.error("Add a subject and a message.");
+    if (!subject.trim() || !att.readyWith(body)) {
+      toast.error(att.busy ? "Wait for the files to finish uploading." : "Add a subject and a message.");
       return;
     }
+    const tokens = att.tokens;
     start(async () => {
-      const res = await sendClientEmailAction(clientId, { subject, body });
+      const res = await sendClientEmailAction(clientId, { subject, body, ...(tokens.length ? { attachments: tokens } : {}) });
       if (!res.ok) { toast.error(res.error); return; }
       toast.success(`Email sent to ${clientEmail}`);
       setSubject("");
       setBody("");
+      att.clear();
     });
   }
 
-  const canSend = Boolean(clientEmail) && emailReady && !pending;
+  const canSend = ready && !pending && !att.busy;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -73,7 +80,8 @@ export function ClientEmailPanel({
         </Notice>
       )}
 
-      <Card style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+      <Card className="at-dropzone" {...att.dropProps} style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+        <DropHint att={att} />
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Mail size={16} strokeWidth={1.75} />
           <strong style={{ fontSize: 14, color: "var(--text-primary)" }}>
@@ -114,7 +122,9 @@ export function ClientEmailPanel({
             }}
           />
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <AttachmentTray att={att} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <AttachButton att={att} disabled={!ready || pending} />
           <Button onClick={send} disabled={!canSend}>
             <Send size={14} strokeWidth={2} />
             {pending ? "Sending…" : "Send email"}
@@ -161,6 +171,11 @@ export function ClientEmailPanel({
               >
                 {m.body}
               </div>
+              {m.media && (
+                <div className="at-sent-files" style={{ color: "var(--text-secondary)" }}>
+                  <MessageBody content="" media={m.media} />
+                </div>
+              )}
               {m.status === "failed" && m.error && (
                 <div style={{ marginTop: 6, fontSize: 12, color: "#dc2626" }}>{m.error}</div>
               )}

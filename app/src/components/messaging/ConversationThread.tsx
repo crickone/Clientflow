@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Textarea } from "@/components/ui/Input";
 import { isMediaPlaceholder, type MessageMedia } from "@/lib/inbox/mediaModel";
 import { MessageBody } from "./MessageBody";
+import { AttachButton, AttachmentTray, DropHint } from "./AttachmentTray";
+import { useAttachments } from "./useAttachments";
 
 export interface ThreadMessage {
   id: number;
@@ -21,6 +23,8 @@ export interface ThreadMessage {
   createdAt: Date | string;
   /** Photos, video, voice notes and files that came with it. */
   media?: MessageMedia[];
+  /** Why a failed message did not go (a refused file), shown under it. */
+  error?: string | null;
 }
 
 /**
@@ -28,6 +32,9 @@ export interface ThreadMessage {
  * messages on the left, yours on the right, notes centred, a day divider when
  * the date changes, newest at the bottom with the composer under it.
  * Presentational -- the parent owns the send (`onSend`) and message state.
+ * The composer takes files too (paperclip, drop, paste): `onSend` gets the
+ * text and the attachment tickets, and returns false when the send failed so
+ * the text and files stay for another try.
  * Used by the inbox and the client profile.
  */
 const dayKey = (d: Date) => d.toLocaleDateString("en-IE", { timeZone: "Europe/Dublin" });
@@ -57,7 +64,7 @@ export function ConversationThread({
   messages: ThreadMessage[];
   canSend: boolean;
   sending: boolean;
-  onSend: (text: string) => void;
+  onSend: (text: string, attachments: string[]) => void | boolean | Promise<boolean | void>;
   emptyHint?: string;
   seedText?: string;
   /** The channel the reply goes out on, for the placeholder and button. */
@@ -72,6 +79,7 @@ export function ConversationThread({
   composerRef?: Ref<HTMLTextAreaElement>;
 }) {
   const [text, setText] = useState("");
+  const att = useAttachments({ disabled: !canSend });
   const scroller = useRef<HTMLDivElement>(null);
   // Lets the parent drop an AI draft into the composer ("Edit" on the draft banner).
   useEffect(() => {
@@ -83,11 +91,18 @@ export function ConversationThread({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
-  function send() {
+  async function send() {
     const t = text.trim();
-    if (!t) return;
-    onSend(t);
+    if (!att.readyWith(t)) return;
+    const tokens = att.tokens;
     setText("");
+    const result = await onSend(t, tokens);
+    if (result === false) {
+      // Keep what was written; the files are still in the tray.
+      setText((now) => (now.trim() ? now : t));
+      return;
+    }
+    att.clear();
   }
 
   let lastDay = "";
@@ -131,7 +146,7 @@ export function ConversationThread({
                 )}
                 {isNote ? (
                   <div style={{ alignSelf: "center", maxWidth: "80%", margin: "6px 0", fontSize: 12.5, color: "var(--text-tertiary)", textAlign: "center", whiteSpace: "pre-wrap" }}>
-                    {m.content}
+                    {m.media?.length ? <MessageBody content={m.content} media={m.media} /> : m.content}
                   </div>
                 ) : (
                   <div style={{ alignSelf: inbound ? "flex-start" : "flex-end", maxWidth: "78%", display: "flex", flexDirection: "column", alignItems: inbound ? "flex-start" : "flex-end", margin: "3px 0" }}>
@@ -166,6 +181,11 @@ export function ConversationThread({
                         <Badge tone={failed ? "red" : "neutral"}>{failed ? "Not delivered" : m.status}</Badge>
                       )}
                     </div>
+                    {failed && m.error && !inbound && (
+                      <div className="at-failed" style={{ marginTop: 2, maxWidth: 320, textAlign: "right" }}>
+                        Not sent: {m.error}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -174,8 +194,11 @@ export function ConversationThread({
         )}
       </div>
 
-      <div style={{ borderTop: "1px solid var(--hairline)", padding: 12, display: "grid", gap: 8 }}>
+      <div className="at-dropzone" {...att.dropProps} style={{ borderTop: "1px solid var(--hairline)", padding: 12, display: "grid", gap: 8 }}>
+        <DropHint att={att} />
+        <AttachmentTray att={att} />
         <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+          <AttachButton att={att} disabled={!canSend || sending} />
           <Textarea
             ref={composerRef}
             rows={2}
@@ -185,14 +208,14 @@ export function ConversationThread({
               // Enter sends, Shift+Enter is a new line -- as in the chat apps.
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
-                if (canSend && !sending) send();
+                if (canSend && !sending) void send();
               }
             }}
             placeholder={canSend ? `Message on ${channelLabel}` : note ?? "No phone number on file."}
             disabled={!canSend}
             style={{ flex: 1, resize: "none" }}
           />
-          <Button onClick={send} disabled={!canSend || sending || !text.trim()} aria-label={`Send on ${channelLabel}`}>
+          <Button onClick={() => void send()} disabled={!canSend || sending || !att.readyWith(text)} aria-label={`Send on ${channelLabel}`}>
             <Send size={14} />
             {sending ? "Sending" : "Send"}
           </Button>
