@@ -147,65 +147,43 @@ export default async function BillingSettingsPage() {
             </div>
           </Card>
 
-          <Card style={{ padding: 28 }}>
-            <CardLabel>Invoices</CardLabel>
-            {invoices.length === 0 ? (
+          {invoices.length === 0 ? (
+            <Card style={{ padding: 28 }}>
+              <CardLabel>Invoices</CardLabel>
               <p style={{ color: "var(--text-secondary)", fontSize: 14, marginTop: 6 }}>
                 No invoices yet.
               </p>
-            ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 10, fontSize: 13.5 }}>
-                <thead>
-                  <tr style={{ textAlign: "left", color: "var(--text-tertiary)" }}>
-                    <Th>Period</Th>
-                    <Th>Amount</Th>
-                    <Th>Status</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices
-                    .slice()
-                    .reverse()
-                    .map((inv: InvoiceRow) => (
-                      <tr key={inv.id} style={{ borderTop: "1px solid var(--hairline)" }}>
-                        <Td>{inv.periodStart} → {inv.periodEnd}</Td>
-                        <Td>{formatCents(inv.grossCents)}</Td>
-                        <Td style={{ textTransform: "capitalize", color: "var(--text-secondary)" }}>
-                          {inv.status}
-                        </Td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            )}
-          </Card>
+            </Card>
+          ) : (
+            <div>
+              <CardLabel>Invoices</CardLabel>
+              <div className="dt-wrap">
+                <table className="dt">
+                  <thead>
+                    <tr>
+                      <th>Period</th>
+                      <th className="dt-num">Amount</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoices
+                      .slice()
+                      .reverse()
+                      .map((inv: InvoiceRow) => (
+                        <tr key={inv.id}>
+                          <td>{inv.periodStart} → {inv.periodEnd}</td>
+                          <td className="dt-num">{formatCents(inv.grossCents)}</td>
+                          <td style={{ textTransform: "capitalize" }}>{inv.status}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
-  );
-}
-
-function Th({ children }: { children: React.ReactNode }) {
-  return (
-    <th
-      style={{
-        padding: "8px 10px 8px 0",
-        fontFamily: "var(--font-mono), ui-monospace, monospace",
-        fontSize: 10,
-        letterSpacing: "0.14em",
-        textTransform: "uppercase",
-        fontWeight: 400,
-      }}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return (
-    <td style={{ padding: "10px 10px 10px 0", color: "var(--text-primary)", ...style }}>
-      {children}
-    </td>
   );
 }

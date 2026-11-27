@@ -13,12 +13,22 @@ export function TableView({
     return <WidgetEmpty text={empty} />;
   }
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+    // Sits inside a widget card, so no panel of its own; tighter rows for a small card.
+    <div
+      style={
+        {
+          overflowX: "auto",
+          "--dt-pad-x": "10px",
+          "--dt-row-y": "9px",
+          "--dt-head-y": "8px",
+        } as React.CSSProperties
+      }
+    >
+      <table className="dt">
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key} style={{ textAlign: c.align ?? "left", padding: "6px 10px", color: "var(--text-tertiary)", fontWeight: 500, fontSize: 12, borderBottom: "1px solid var(--hairline)", whiteSpace: "nowrap" }}>
+              <th key={c.key} className={c.align === "right" ? "dt-num" : undefined}>
                 {c.label}
               </th>
             ))}
@@ -28,7 +38,7 @@ export function TableView({
           {rows.map((r, i) => (
             <tr key={i}>
               {columns.map((c) => (
-                <td key={c.key} style={{ textAlign: c.align ?? "left", padding: "7px 10px", color: "var(--text-primary)", borderBottom: "1px solid var(--hairline)", whiteSpace: "nowrap" }}>
+                <td key={c.key} className={c.align === "right" ? "dt-num dt-nowrap" : "dt-nowrap"}>
                   {r[c.key] ?? "-"}
                 </td>
               ))}

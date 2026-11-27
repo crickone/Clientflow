@@ -472,16 +472,16 @@ export function DesignDirectionView({
                     Pixels on a 1080-wide slide; other sizes scale with it. Line height is a multiple of the size,
                     letter spacing is in em.
                   </p>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "collapse", fontSize: 13 }}>
+                  <div className="dt-wrap">
+                    <table className="dt">
                       <thead>
-                        <tr style={{ textAlign: "left", color: "var(--text-tertiary)" }}>
-                          <th style={{ padding: "4px 8px 4px 0", fontWeight: 500 }}>Level</th>
-                          <th style={{ padding: "4px 8px", fontWeight: 500 }}>Size</th>
-                          <th style={{ padding: "4px 8px", fontWeight: 500 }}>Weight</th>
-                          <th style={{ padding: "4px 8px", fontWeight: 500 }}>Line height</th>
-                          <th style={{ padding: "4px 8px", fontWeight: 500 }}>Letter spacing</th>
-                          <th style={{ padding: "4px 8px", fontWeight: 500 }}>Caps</th>
+                        <tr>
+                          <th>Level</th>
+                          <th>Size</th>
+                          <th>Weight</th>
+                          <th>Line height</th>
+                          <th>Letter spacing</th>
+                          <th>Caps</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -489,20 +489,20 @@ export function DesignDirectionView({
                           const step = effectiveStep(selected, overrides, level);
                           return (
                             <tr key={level}>
-                              <td style={{ padding: "4px 8px 4px 0", textTransform: "capitalize" }}>{level}</td>
-                              <td style={{ padding: 4 }}>
+                              <td style={{ textTransform: "capitalize" }}>{level}</td>
+                              <td>
                                 {numberInput(`ts-${level}-size`, step.size, (v) => setStepField(level, "size", v), { min: 8, max: 400, step: 1 })}
                               </td>
-                              <td style={{ padding: 4 }}>
+                              <td>
                                 {numberInput(`ts-${level}-weight`, step.weight, (v) => setStepField(level, "weight", v), { min: 100, max: 900, step: 100 })}
                               </td>
-                              <td style={{ padding: 4 }}>
+                              <td>
                                 {numberInput(`ts-${level}-leading`, step.leading, (v) => setStepField(level, "leading", v), { min: 0.5, max: 4, step: 0.02 })}
                               </td>
-                              <td style={{ padding: 4 }}>
+                              <td>
                                 {numberInput(`ts-${level}-tracking`, step.tracking, (v) => setStepField(level, "tracking", v), { min: -0.5, max: 1, step: 0.005 })}
                               </td>
-                              <td style={{ padding: 4, textAlign: "center" }}>
+                              <td style={{ textAlign: "center" }}>
                                 <input
                                   type="checkbox"
                                   aria-label={`${level} in capitals`}

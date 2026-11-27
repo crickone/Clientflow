@@ -197,26 +197,28 @@ export function CallFlowView({
             Nothing queued. {flow.enabled ? "New leads will appear here once they arrive." : "Automatic calling is off."}
           </p>
         ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 10, fontSize: 13.5 }}>
+          <div className="dt-wrap dt-wrap--flush" style={{ marginTop: 10 }}>
+          <table className="dt">
             <thead>
-              <tr style={{ textAlign: "left", color: "var(--text-tertiary)" }}>
-                <th style={{ padding: "6px 8px", fontWeight: 500 }}>Lead</th>
-                <th style={{ padding: "6px 8px", fontWeight: 500 }}>Due</th>
-                <th style={{ padding: "6px 8px", fontWeight: 500 }}>Attempt</th>
+              <tr>
+                <th>Lead</th>
+                <th>Due</th>
+                <th>Attempt</th>
               </tr>
             </thead>
             <tbody>
               {pending.map((p, i) => (
-                <tr key={i} style={{ borderTop: "1px solid var(--hairline)" }}>
-                  <td style={{ padding: 8 }}>{p.leadName}</td>
-                  <td style={{ padding: 8 }}>{new Date(p.dueAt).toLocaleString("en-IE")}</td>
-                  <td style={{ padding: 8 }}>
+                <tr key={i}>
+                  <td>{p.leadName}</td>
+                  <td>{new Date(p.dueAt).toLocaleString("en-IE")}</td>
+                  <td>
                     {p.attempt + 1} of {flow.maxAttempts}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </Card>
 

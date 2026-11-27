@@ -1014,7 +1014,7 @@ a {
     grid-template-columns: 1fr !important;
   }
 
-  .app-page table {
+  .app-page table:not(.dt):not(.ib-table):not(.cy-phase-table) {
     display: block;
     max-width: 100%;
     overflow-x: auto;
@@ -6545,4 +6545,106 @@ a.ct-sync-note { color: var(--text-secondary); }
   .vh-who, .vh-acts { grid-column: auto; }
   .vh-cell::before { content: none; }
   .vh-acts { justify-content: flex-end; flex-wrap: nowrap; }
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Tables: ONE look for every table in the staff app (2026-11-27).          */
+/*  A rounded, hairline-bordered panel; a plain header row (small, muted,    */
+/*  sentence case, no band); roomy rows split by hairlines that light up on  */
+/*  hover; a title + meta pair for two-line cells; mono for codes; muted for */
+/*  empty values. New tables: <div className="dt-wrap"><table className="dt">.*/
+/*  Inside a card that already has a border use .dt-wrap--flush. The div    */
+/*  "tables" (contacts, vouchers, programs, imports) follow the same values  */
+/*  through the overrides at the end of this block.                         */
+/* ------------------------------------------------------------------------ */
+:root {
+  --dt-radius: 16px;
+  --dt-pad-x: 20px;
+  --dt-row-y: 16px;
+  --dt-head-y: 12px;
+  --dt-head-size: 13px;
+  --dt-cell-size: 14.5px;
+  --dt-row-hover: color-mix(in srgb, var(--text-primary) 3.5%, transparent);
+}
+.dt-wrap {
+  border: 1px solid var(--hairline);
+  border-radius: var(--dt-radius);
+  background: var(--surface-1);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.dt-wrap--flush { border: 0; border-radius: 0; background: transparent; margin: 0 -20px -20px; }
+.dt-wrap + .dt-wrap { margin-top: 16px; }
+table.dt, .ib-table, .cy-phase-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--dt-cell-size);
+  color: var(--text-primary);
+}
+.dt th, .ib-table th, .cy-phase-table th {
+  text-align: left;
+  font-size: var(--dt-head-size);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-tertiary);
+  padding: var(--dt-head-y) var(--dt-pad-x);
+  border-top: 0;
+  border-bottom: 1px solid var(--hairline);
+  background: transparent;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.dt td, .ib-table td, .cy-phase-table td {
+  padding: var(--dt-row-y) var(--dt-pad-x);
+  border-bottom: 0;
+  border-top: 1px solid var(--hairline);
+  color: var(--text-primary);
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+.dt tbody tr:first-child td, .ib-table tbody tr:first-child td, .cy-phase-table tbody tr:first-child td { border-top: 0; }
+.dt tbody tr, .ib-table tbody tr { transition: background-color 0.12s ease; }
+.dt tbody tr:hover, .ib-table tbody tr:hover { background: var(--dt-row-hover); }
+.dt a { color: var(--text-primary); text-decoration: none; font-weight: 500; }
+.dt a:hover { text-decoration: underline; text-decoration-color: var(--hairline-strong); text-underline-offset: 3px; }
+.dt a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.dt .dt-num, .dt th.dt-num { text-align: right; }
+.dt .dt-nowrap { white-space: nowrap; }
+.dt-cell { display: grid; gap: 3px; min-width: 0; }
+.dt-title { font-size: var(--dt-cell-size); font-weight: 500; color: var(--text-primary); }
+.dt-meta { display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; font-size: 13px; color: var(--text-tertiary); }
+.dt-meta > span { display: inline-flex; align-items: center; gap: 5px; }
+.dt-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13.5px; letter-spacing: 0.01em; }
+.dt-muted { color: var(--text-tertiary); }
+.dt-mono { white-space: nowrap; }
+/* On a phone a table keeps each cell on one line and scrolls sideways inside its panel. */
+@media (max-width: 720px) {
+  .dt th, .dt td, .ib-table th, .ib-table td { white-space: nowrap; }
+  .dt-meta { flex-wrap: nowrap; }
+}
+.dt-empty { padding: 36px var(--dt-pad-x); text-align: center; color: var(--text-tertiary); font-size: 14px; }
+
+/* The div tables follow the same values. */
+.ct-wrap, .vh-wrap, .pl-table, .pv-table { border-radius: var(--dt-radius); }
+.ct-head, .vh-head, .pl-row--head, .pv-row--head {
+  background: transparent !important;
+  font-size: var(--dt-head-size) !important;
+  font-weight: 500;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  color: var(--text-tertiary);
+  padding-top: var(--dt-head-y) !important;
+  padding-bottom: var(--dt-head-y) !important;
+}
+.ct-row:not(.ct-head), .vh-row:not(.vh-head), .pl-row:not(.pl-row--head), .pv-row:not(.pv-row--head) {
+  padding-top: var(--dt-row-y);
+  padding-bottom: var(--dt-row-y);
+  transition: background-color 0.12s ease;
+}
+.ct-row:not(.ct-head):hover, .vh-row:not(.vh-head):hover, .pl-row:not(.pl-row--head):hover { background: var(--dt-row-hover); }
+@container (min-width: 900px) {
+  .ct-row, .vh-row { padding-left: var(--dt-pad-x); padding-right: var(--dt-pad-x); }
 }

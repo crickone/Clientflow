@@ -324,15 +324,15 @@ export default async function ClientProfile(
           {appointments.length === 0 ? (
             <Empty message={`No ${vocab.bookings.toLowerCase()} yet.`} />
           ) : (
-            <Card style={{ padding: 0, overflow: "hidden" }}>
-              <table>
+            <div className="dt-wrap">
+              <table className="dt">
                 <thead>
                   <tr>
-                    <th style={th}>Date</th>
-                    <th style={th}>Time</th>
-                    <th style={th}>{vocab.services}</th>
-                    <th style={th}>Price</th>
-                    <th style={th}>Status</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>{vocab.services}</th>
+                    <th className="dt-num">Price</th>
+                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -340,13 +340,13 @@ export default async function ClientProfile(
                     const tids: number[] = JSON.parse(a.therapyIds || "[]");
                     return (
                       <tr key={a.id}>
-                        <td style={td}>
-                          <Link href={`/appointments/${a.id}`} style={linkStyle}>
+                        <td>
+                          <Link href={`/appointments/${a.id}`}>
                             {formatDate(a.date)}
                           </Link>
                         </td>
-                        <td style={td}>{formatTime(a.startTime)}</td>
-                        <td style={td}>
+                        <td>{formatTime(a.startTime)}</td>
+                        <td>
                           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                             {tids.map((tid) => {
                               const t = therapyMap.get(tid);
@@ -359,8 +359,8 @@ export default async function ClientProfile(
                             })}
                           </div>
                         </td>
-                        <td style={td}>{formatEur(a.totalPriceEur)}</td>
-                        <td style={td}>
+                        <td className="dt-num">{formatEur(a.totalPriceEur)}</td>
+                        <td>
                           <StatusBadge status={a.status} />
                         </td>
                       </tr>
@@ -368,7 +368,7 @@ export default async function ClientProfile(
                   })}
                 </tbody>
               </table>
-            </Card>
+            </div>
           )}
         </TabsContent>
 
@@ -506,32 +506,32 @@ export default async function ClientProfile(
           {payments.length === 0 ? (
             <Empty message="No payments recorded." />
           ) : (
-            <Card style={{ padding: 0, overflow: "hidden" }}>
-              <table>
+            <div className="dt-wrap">
+              <table className="dt">
                 <thead>
                   <tr>
-                    <th style={th}>Date</th>
-                    <th style={th}>Method</th>
-                    <th style={th}>Amount</th>
-                    <th style={th}>Notes</th>
+                    <th>Date</th>
+                    <th>Method</th>
+                    <th className="dt-num">Amount</th>
+                    <th>Notes</th>
                   </tr>
                 </thead>
                 <tbody>
                   {payments.map((p) => (
                     <tr key={p.id}>
-                      <td style={td}>{formatDateTime(p.createdAt)}</td>
-                      <td style={td}>
+                      <td>{formatDateTime(p.createdAt)}</td>
+                      <td>
                         <Badge>{p.paymentMethod}</Badge>
                       </td>
-                      <td style={td}>{formatEur(p.amountEur)}</td>
-                      <td style={{ ...td, color: "var(--text-tertiary)" }}>
+                      <td className="dt-num">{formatEur(p.amountEur)}</td>
+                      <td className="dt-muted">
                         {p.notes ?? ""}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </Card>
+            </div>
           )}
         </TabsContent>
 
@@ -838,28 +838,6 @@ function relativeDay(ms: number): string {
   if (days < 30) return `${days} days ago`;
   return formatDate(new Date(ms).toISOString().slice(0, 10));
 }
-
-const th: React.CSSProperties = {
-  textAlign: "left",
-  padding: "14px 16px",
-  fontSize: 11,
-  fontWeight: 500,
-  color: "var(--text-tertiary)",
-  textTransform: "uppercase",
-  letterSpacing: "0.1em",
-  borderBottom: "1px solid var(--hairline)",
-  background: "transparent",
-};
-const td: React.CSSProperties = {
-  padding: "14px 16px",
-  borderBottom: "1px solid var(--hairline)",
-  fontSize: 14,
-  color: "var(--text-secondary)",
-};
-const linkStyle: React.CSSProperties = {
-  color: "var(--text-primary)",
-  fontWeight: 500,
-};
 
 function Empty({ message }: { message: string }) {
   return (

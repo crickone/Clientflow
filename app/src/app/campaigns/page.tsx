@@ -6,7 +6,6 @@ import { listCampaigns, resolveAudience } from "@/lib/marketing/campaigns";
 import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -68,54 +67,37 @@ export default async function CampaignsPage() {
           }
         />
       ) : (
-        <Card style={{ padding: 0, overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div className="dt-wrap">
+          <table className="dt">
             <thead>
               <tr>
-                <th style={th}>Name</th>
-                <th style={th}>Subject</th>
-                <th style={th}>Status</th>
-                <th style={th}>Recipients</th>
-                <th style={th}>Created</th>
+                <th>Name</th>
+                <th>Subject</th>
+                <th>Status</th>
+                <th className="dt-num">Recipients</th>
+                <th>Created</th>
               </tr>
             </thead>
             <tbody>
               {campaigns.map((c, i) => (
                 <tr key={c.id}>
-                  <td style={{ ...td, color: "var(--text-primary)" }}>
-                    <Link href={`/campaigns/${c.id}`} style={{ color: "inherit" }}>
+                  <td>
+                    <Link href={`/campaigns/${c.id}`}>
                       {c.name}
                     </Link>
                   </td>
-                  <td style={td}>{c.subject}</td>
-                  <td style={td}>
+                  <td>{c.subject}</td>
+                  <td>
                     <Badge tone={STATUS_TONE[c.status] ?? "neutral"}>{c.status}</Badge>
                   </td>
-                  <td style={td}>{counts[i].toLocaleString()}</td>
-                  <td style={td}>{formatDate(c.createdAt)}</td>
+                  <td className="dt-num">{counts[i].toLocaleString()}</td>
+                  <td>{formatDate(c.createdAt)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </Card>
+        </div>
       )}
     </div>
   );
 }
-
-const th: React.CSSProperties = {
-  textAlign: "left",
-  padding: "14px 16px",
-  fontSize: 11,
-  fontWeight: 500,
-  color: "var(--text-tertiary)",
-  textTransform: "uppercase",
-  letterSpacing: "0.1em",
-  borderBottom: "1px solid var(--hairline)",
-};
-const td: React.CSSProperties = {
-  padding: "14px 16px",
-  borderBottom: "1px solid var(--hairline)",
-  fontSize: 14,
-  color: "var(--text-secondary)",
-};

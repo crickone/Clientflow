@@ -42,13 +42,6 @@ function cfaBadge(m: Pick<CampaignMetrics, "roas" | "cfaCovered">): {
   return { tone: "red", label: "Short" };
 }
 
-const td: React.CSSProperties = {
-  padding: "14px 16px",
-  borderBottom: "1px solid var(--hairline)",
-  fontSize: 14,
-  color: "var(--text-secondary)",
-};
-
 // The expanded panel sits on the page's own dark background (NOT a grey
 // surface-2 block), and every individual figure gets its own card — the same
 // clean card style as the rest of the page (surface-1 + hairline border).
@@ -87,7 +80,7 @@ export function CampaignRows({ rows }: { rows: CampaignMetrics[] }) {
         return (
           <React.Fragment key={m.id}>
             <tr>
-              <td style={{ ...td, width: 36, padding: "14px 4px 14px 16px" }}>
+              <td style={{ width: 36, paddingRight: 4 }}>
                 {/* Chevron-only toggle (not the whole row) so the Name link below keeps working as a plain navigation link. */}
                 <button
                   type="button"
@@ -111,19 +104,19 @@ export function CampaignRows({ rows }: { rows: CampaignMetrics[] }) {
                   <ChevronRight size={15} strokeWidth={2} aria-hidden />
                 </button>
               </td>
-              <td style={{ ...td, color: "var(--text-primary)" }}>
-                <Link href={`/marketing/campaigns/${m.id}`} style={{ color: "inherit" }}>
+              <td>
+                <Link href={`/marketing/campaigns/${m.id}`}>
                   {m.name}
                 </Link>
               </td>
-              <td style={td}>{m.season || "—"}</td>
-              <td style={td}>
+              <td>{m.season || "—"}</td>
+              <td>
                 <Badge tone={STATUS_TONE[m.status] ?? "neutral"}>{m.status}</Badge>
               </td>
-              <td style={td}>
+              <td>
                 {m.assets.approved}/{m.assets.total} approved
               </td>
-              <td style={td}>
+              <td>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <Badge tone={badge.tone}>{badge.label}</Badge>
                   <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
@@ -133,11 +126,11 @@ export function CampaignRows({ rows }: { rows: CampaignMetrics[] }) {
                   </span>
                 </div>
               </td>
-              <td style={td}>{formatDate(m.createdAt)}</td>
+              <td>{formatDate(m.createdAt)}</td>
             </tr>
             {isOpen && (
               <tr>
-                <td colSpan={COLUMN_COUNT} style={{ padding: 0, borderBottom: "1px solid var(--hairline)" }}>
+                <td colSpan={COLUMN_COUNT} style={{ padding: 0 }}>
                   <CampaignPanel m={m} />
                 </td>
               </tr>

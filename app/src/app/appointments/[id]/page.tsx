@@ -182,35 +182,40 @@ export default async function AppointmentDetail(
         </Card>
       </div>
 
-      <Card>
-        <CardLabel>Payment</CardLabel>
-        {apptPayments.length === 0 ? (
+      {apptPayments.length === 0 ? (
+        <Card>
+          <CardLabel>Payment</CardLabel>
           <div style={{ color: "var(--text-tertiary)", fontSize: 14 }}>
             No payments recorded.
           </div>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th style={th}>Method</th>
-                <th style={th}>Amount</th>
-                <th style={th}>Recorded</th>
-              </tr>
-            </thead>
-            <tbody>
-              {apptPayments.map((p) => (
-                <tr key={p.id}>
-                  <td style={td}>
-                    <Badge>{p.paymentMethod}</Badge>
-                  </td>
-                  <td style={td}>{formatEur(p.amountEur)}</td>
-                  <td style={td}>{formatDate(p.createdAt)}</td>
+        </Card>
+      ) : (
+        <div>
+          <CardLabel>Payment</CardLabel>
+          <div className="dt-wrap">
+            <table className="dt">
+              <thead>
+                <tr>
+                  <th>Method</th>
+                  <th className="dt-num">Amount</th>
+                  <th>Recorded</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Card>
+              </thead>
+              <tbody>
+                {apptPayments.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <Badge>{p.paymentMethod}</Badge>
+                    </td>
+                    <td className="dt-num">{formatEur(p.amountEur)}</td>
+                    <td>{formatDate(p.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -253,21 +258,3 @@ function Row({
     </div>
   );
 }
-
-const th: React.CSSProperties = {
-  textAlign: "left",
-  padding: "10px 12px",
-  fontSize: 11,
-  fontWeight: 500,
-  color: "var(--text-tertiary)",
-  textTransform: "uppercase",
-  letterSpacing: "0.1em",
-  borderBottom: "1px solid var(--hairline)",
-  background: "transparent",
-};
-const td: React.CSSProperties = {
-  padding: "10px 12px",
-  borderBottom: "1px solid var(--hairline)",
-  fontSize: 14,
-  color: "var(--text-secondary)",
-};

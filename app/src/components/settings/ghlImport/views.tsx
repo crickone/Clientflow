@@ -232,8 +232,8 @@ export function DryRunView(props: {
             <Download size={15} aria-hidden /> Download the list
           </Button>
         </div>
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
+        <div className="dt-wrap">
+          <table className={`dt ${styles.table}`}>
             <thead>
               <tr>
                 <th>Name</th>
@@ -249,9 +249,11 @@ export function DryRunView(props: {
               {filtered.slice(0, shown).map((r) => (
                 <tr key={r.id}>
                   <td>
-                    <span className={styles.name}>{r.name}</span>
-                    {r.email && <span className={styles.sub}>{r.email}</span>}
-                    {r.doNotContact && <Badge tone="danger">Do not contact</Badge>}
+                    <div className="dt-cell">
+                      <span className="dt-title">{r.name}</span>
+                      {r.email && <span className="dt-meta">{r.email}</span>}
+                      {r.doNotContact && <Badge tone="danger">Do not contact</Badge>}
+                    </div>
                   </td>
                   <td data-label="From">{r.fromStage}</td>
                   <td data-label="Days">{r.days ?? ""}</td>

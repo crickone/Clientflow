@@ -2,7 +2,6 @@ import Link from "next/link";
 import { CalendarClock, CalendarPlus, CalendarRange, UsersRound } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -137,16 +136,16 @@ export default async function AppointmentsPage(props: Props) {
           }
         />
       ) : (
-        <Card style={{ padding: 0, overflow: "hidden" }}>
-          <table>
+        <div className="dt-wrap">
+          <table className="dt">
             <thead>
               <tr>
-                <th style={th}>Date</th>
-                <th style={th}>Time</th>
-                <th style={th}>{vocab.member}</th>
-                <th style={th}>{vocab.services}</th>
-                <th style={th}>Price</th>
-                <th style={th}>Status</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>{vocab.member}</th>
+                <th>{vocab.services}</th>
+                <th className="dt-num">Price</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -155,24 +154,24 @@ export default async function AppointmentsPage(props: Props) {
                 const client = clients.get(a.clientId);
                 return (
                   <tr key={a.id}>
-                    <td style={td}>
-                      <Link href={`/appointments/${a.id}`} style={linkS}>
+                    <td>
+                      <Link href={`/appointments/${a.id}`}>
                         {formatDate(a.date)}
                       </Link>
                     </td>
-                    <td style={td}>
+                    <td>
                       {formatTime(a.startTime)}–{formatTime(a.endTime)}
                     </td>
-                    <td style={td}>
+                    <td>
                       {client ? (
-                        <Link href={`/clients/${client.id}`} style={linkS}>
+                        <Link href={`/clients/${client.id}`}>
                           {client.firstName} {client.lastName}
                         </Link>
                       ) : (
                         "—"
                       )}
                     </td>
-                    <td style={td}>
+                    <td>
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                         {tids.map((tid) => {
                           const t = therapyMap.get(tid);
@@ -185,8 +184,8 @@ export default async function AppointmentsPage(props: Props) {
                         })}
                       </div>
                     </td>
-                    <td style={td}>€{a.totalPriceEur.toFixed(2)}</td>
-                    <td style={td}>
+                    <td className="dt-num">€{a.totalPriceEur.toFixed(2)}</td>
+                    <td>
                       <StatusBadge status={a.status} />
                     </td>
                   </tr>
@@ -194,7 +193,7 @@ export default async function AppointmentsPage(props: Props) {
               })}
             </tbody>
           </table>
-        </Card>
+        </div>
       )}
     </div>
   );
@@ -203,25 +202,3 @@ export default async function AppointmentsPage(props: Props) {
 function isoOf(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
-const th: React.CSSProperties = {
-  textAlign: "left",
-  padding: "14px 16px",
-  fontSize: 11,
-  fontWeight: 500,
-  color: "var(--text-tertiary)",
-  textTransform: "uppercase",
-  letterSpacing: "0.1em",
-  borderBottom: "1px solid var(--hairline)",
-  background: "transparent",
-};
-const td: React.CSSProperties = {
-  padding: "14px 16px",
-  borderBottom: "1px solid var(--hairline)",
-  fontSize: 14,
-  color: "var(--text-secondary)",
-};
-const linkS: React.CSSProperties = {
-  color: "var(--text-primary)",
-  fontWeight: 500,
-};

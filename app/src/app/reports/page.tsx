@@ -280,42 +280,33 @@ export default async function ReportsPage(props: Props) {
                 <div style={{ ...subhead, marginBottom: 8 }}>
                   Stalled {vocab.plans.toLowerCase()} — chase these
                 </div>
-                <table
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    fontSize: 13,
-                  }}
-                >
-                  <thead>
-                    <tr style={{ color: "var(--text-secondary)" }}>
-                      <th style={th}>{vocab.member}</th>
-                      <th style={th}>{vocab.service}</th>
-                      <th style={th}>{vocab.plan}</th>
-                      <th style={{ ...th, textAlign: "right" }}>Used</th>
-                      <th style={{ ...th, textAlign: "right" }}>Expires</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pkgUtil.stalled.map((p) => (
-                      <tr
-                        key={p.packageId}
-                        style={{ borderTop: "1px solid var(--hairline)" }}
-                      >
-                        <td style={td}>{p.clientName}</td>
-                        <td style={td}>{p.therapyName}</td>
-                        <td style={td}>{p.packageName}</td>
-                        <td style={{ ...td, textAlign: "right" }}>
-                          {p.sessionsUsed}/{p.totalSessions} ·{" "}
-                          {pct(p.utilizationPct)}
-                        </td>
-                        <td style={{ ...td, textAlign: "right" }}>
-                          {p.expiryDate}
-                        </td>
+                <div className="dt-wrap">
+                  <table className="dt">
+                    <thead>
+                      <tr>
+                        <th>{vocab.member}</th>
+                        <th>{vocab.service}</th>
+                        <th>{vocab.plan}</th>
+                        <th className="dt-num">Used</th>
+                        <th className="dt-num">Expires</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {pkgUtil.stalled.map((p) => (
+                        <tr key={p.packageId}>
+                          <td>{p.clientName}</td>
+                          <td>{p.therapyName}</td>
+                          <td>{p.packageName}</td>
+                          <td className="dt-num">
+                            {p.sessionsUsed}/{p.totalSessions} ·{" "}
+                            {pct(p.utilizationPct)}
+                          </td>
+                          <td className="dt-num">{p.expiryDate}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </>
             )}
           </>
@@ -335,16 +326,6 @@ const subhead = {
   letterSpacing: 1,
   color: "var(--text-secondary)",
 };
-const th = {
-  textAlign: "left" as const,
-  padding: "6px 4px",
-  fontWeight: 500,
-  fontSize: 11,
-  textTransform: "uppercase" as const,
-  letterSpacing: 0.6,
-};
-const td = { padding: "8px 4px" };
-
 function Empty({ children }: { children: React.ReactNode }) {
   return (
     <div

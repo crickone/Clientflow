@@ -174,26 +174,12 @@ function SectionBlock({ section }: { section: Section }) {
       )}
 
       {section.table && (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div className="dt-wrap">
+          <table className="dt">
             <thead>
               <tr>
                 {section.table.headers.map((h, i) => (
-                  <th
-                    key={i}
-                    style={{
-                      textAlign: "left",
-                      padding: "12px 14px",
-                      borderBottom: "1px solid var(--hairline)",
-                      fontSize: 11,
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      color: "var(--text-tertiary)",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {h}
-                  </th>
+                  <th key={i}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -201,18 +187,7 @@ function SectionBlock({ section }: { section: Section }) {
               {section.table.rows.map((row, i) => (
                 <tr key={i}>
                   {row.map((cell, j) => (
-                    <td
-                      key={j}
-                      style={{
-                        padding: "14px",
-                        borderBottom: i === section.table!.rows.length - 1 ? "none" : "1px solid var(--hairline)",
-                        fontSize: 13.5,
-                        color: j === 0 ? "var(--text-primary)" : "var(--text-secondary)",
-                        fontWeight: j === 0 ? 500 : 400,
-                        lineHeight: 1.55,
-                        verticalAlign: "top",
-                      }}
-                    >
+                    <td key={j} className={j === 0 ? "dt-title" : undefined}>
                       {cell}
                     </td>
                   ))}

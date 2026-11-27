@@ -109,22 +109,22 @@ export function LookupClient({ conditions, categories }: Props) {
             <div style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-tertiary)", fontWeight: 500, marginBottom: 12 }}>
               {category}
             </div>
-            <div style={{ border: "1px solid var(--hairline)", borderRadius: "var(--radius)", overflow: "hidden", boxShadow: "var(--shadow-1)" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <div className="dt-wrap">
+              <table className="dt">
                 <thead>
-                  <tr style={{ background: "var(--surface-1)" }}>
-                    <th style={th()}>Condition</th>
-                    <th style={th()}>Therapies</th>
-                    <th style={th()}>Lead with</th>
+                  <tr>
+                    <th>Condition</th>
+                    <th>Therapies</th>
+                    <th>Lead with</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row, i) => (
-                    <tr key={row.name} style={{ borderTop: i === 0 ? "none" : "1px solid var(--hairline)" }}>
-                      <td style={td({ fontWeight: 500, color: "var(--text-primary)", minWidth: 200 })}>
+                  {rows.map((row) => (
+                    <tr key={row.name}>
+                      <td className="dt-title" style={{ minWidth: 200 }}>
                         {row.name}
                       </td>
-                      <td style={td({ minWidth: 200 })}>
+                      <td style={{ minWidth: 200 }}>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                           {ALL_THERAPIES.map((t) => {
                             const active = row.therapies.includes(t);
@@ -151,7 +151,7 @@ export function LookupClient({ conditions, categories }: Props) {
                           })}
                         </div>
                       </td>
-                      <td style={td({ color: "var(--text-secondary)", lineHeight: 1.55 })}>
+                      <td>
                         {row.leadWith}
                       </td>
                     </tr>
@@ -215,26 +215,4 @@ function FilterChip({ label, value, options, onChange }: { label: string; value:
       </select>
     </label>
   );
-}
-
-function th(): React.CSSProperties {
-  return {
-    textAlign: "left",
-    padding: "12px 16px",
-    fontSize: 11,
-    letterSpacing: "0.1em",
-    textTransform: "uppercase",
-    color: "var(--text-tertiary)",
-    fontWeight: 500,
-    borderBottom: "1px solid var(--hairline)",
-  };
-}
-
-function td(extra: React.CSSProperties): React.CSSProperties {
-  return {
-    padding: "14px 16px",
-    fontSize: 14,
-    verticalAlign: "top",
-    ...extra,
-  };
 }

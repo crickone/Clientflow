@@ -98,23 +98,23 @@ function Account({ account: a, several }: { account: AccountPerformance; several
           No campaign spent anything in this period.{a.quiet ? ` ${a.quiet} paused or ended campaign${a.quiet === 1 ? " is" : "s are"} on the account.` : ""}
         </Card>
       ) : (
-        <div className="adp-table-wrap">
-          <table className="ib-table">
+        <div className="dt-wrap">
+          <table className="dt">
             <thead>
               <tr>
                 <th>Campaign</th>
                 <th>Status</th>
-                <th style={{ textAlign: "right" }}>Spent</th>
-                <th style={{ textAlign: "right" }}>Results</th>
-                <th style={{ textAlign: "right" }}>Per result</th>
-                <th style={{ textAlign: "right" }}>Reach</th>
-                <th style={{ textAlign: "right" }}>Link clicks</th>
-                <th style={{ textAlign: "right" }}>Click rate</th>
+                <th className="dt-num">Spent</th>
+                <th className="dt-num">Results</th>
+                <th className="dt-num">Per result</th>
+                <th className="dt-num">Reach</th>
+                <th className="dt-num">Link clicks</th>
+                <th className="dt-num">Click rate</th>
                 {selling && (
                   <>
-                    <th style={{ textAlign: "right" }}>Sales</th>
-                    <th style={{ textAlign: "right" }}>Revenue</th>
-                    <th style={{ textAlign: "right" }} title="Revenue from Stripe divided by what the campaign spent">Return</th>
+                    <th className="dt-num">Sales</th>
+                    <th className="dt-num">Revenue</th>
+                    <th className="dt-num" title="Revenue from Stripe divided by what the campaign spent">Return</th>
                   </>
                 )}
               </tr>
@@ -140,19 +140,19 @@ function Account({ account: a, several }: { account: AccountPerformance; several
                         {st.label}
                       </Badge>
                     </td>
-                    <td style={{ textAlign: "right" }}>{m(c.numbers.spend)}</td>
-                    <td style={{ textAlign: "right" }}>
+                    <td className="dt-num">{m(c.numbers.spend)}</td>
+                    <td className="dt-num">
                       {int(c.results)} <span className="adp-muted">{c.resultLabel.toLowerCase()}</span>
                     </td>
-                    <td style={{ textAlign: "right" }}>{m(c.costPerResult)}</td>
-                    <td style={{ textAlign: "right" }}>{int(c.numbers.reach)}</td>
-                    <td style={{ textAlign: "right" }}>{int(c.numbers.linkClicks)}</td>
-                    <td style={{ textAlign: "right" }}>{pct(c.numbers.ctr)}</td>
+                    <td className="dt-num">{m(c.costPerResult)}</td>
+                    <td className="dt-num">{int(c.numbers.reach)}</td>
+                    <td className="dt-num">{int(c.numbers.linkClicks)}</td>
+                    <td className="dt-num">{pct(c.numbers.ctr)}</td>
                     {selling && (
                       <>
-                        <td style={{ textAlign: "right" }}>{int(c.ours.sales)}</td>
-                        <td style={{ textAlign: "right" }}>{c.ours.revenue ? m(c.ours.revenue) : "-"}</td>
-                        <td style={{ textAlign: "right" }}>{c.ours.returnOnSpend == null || !c.ours.revenue ? "-" : `${c.ours.returnOnSpend.toFixed(1)}x`}</td>
+                        <td className="dt-num">{int(c.ours.sales)}</td>
+                        <td className="dt-num">{c.ours.revenue ? m(c.ours.revenue) : "-"}</td>
+                        <td className="dt-num">{c.ours.returnOnSpend == null || !c.ours.revenue ? "-" : `${c.ours.returnOnSpend.toFixed(1)}x`}</td>
                       </>
                     )}
                   </tr>

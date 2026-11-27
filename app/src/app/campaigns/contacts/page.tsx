@@ -8,7 +8,6 @@ import { contacts } from "@/lib/db/schema";
 import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -75,16 +74,16 @@ export default async function ContactsPage() {
             {total.toLocaleString()} contact{total === 1 ? "" : "s"}
             {total > rows.length ? ` · showing the most recent ${rows.length.toLocaleString()}` : ""}
           </div>
-          <Card style={{ padding: 0, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div className="dt-wrap">
+            <table className="dt">
               <thead>
                 <tr>
-                  <th style={th}>Email</th>
-                  <th style={th}>Name</th>
-                  <th style={th}>Phone</th>
-                  <th style={th}>Status</th>
-                  <th style={th}>Tags</th>
-                  <th style={th}>Added</th>
+                  <th>Email</th>
+                  <th>Name</th>
+                  <th>Phone</th>
+                  <th>Status</th>
+                  <th>Tags</th>
+                  <th>Added</th>
                 </tr>
               </thead>
               <tbody>
@@ -92,13 +91,13 @@ export default async function ContactsPage() {
                   const tags = safeParseTags(c.tags);
                   return (
                     <tr key={c.id}>
-                      <td style={{ ...td, color: "var(--text-primary)" }}>{c.email}</td>
-                      <td style={td}>{c.name || <Dim>—</Dim>}</td>
-                      <td style={td}>{c.phone || <Dim>—</Dim>}</td>
-                      <td style={td}>
+                      <td>{c.email}</td>
+                      <td>{c.name || <Dim>—</Dim>}</td>
+                      <td>{c.phone || <Dim>—</Dim>}</td>
+                      <td>
                         <Badge tone={STATUS_TONE[c.status] ?? "neutral"}>{c.status}</Badge>
                       </td>
-                      <td style={td}>
+                      <td>
                         {tags.length === 0 ? (
                           <Dim>—</Dim>
                         ) : (
@@ -109,13 +108,13 @@ export default async function ContactsPage() {
                           </div>
                         )}
                       </td>
-                      <td style={td}>{formatDate(c.createdAt)}</td>
+                      <td>{formatDate(c.createdAt)}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          </Card>
+          </div>
         </>
       )}
     </div>
@@ -123,7 +122,7 @@ export default async function ContactsPage() {
 }
 
 function Dim({ children }: { children: React.ReactNode }) {
-  return <span style={{ color: "var(--text-tertiary)" }}>{children}</span>;
+  return <span className="dt-muted">{children}</span>;
 }
 
 function safeParseTags(raw: string | null): string[] {
@@ -135,20 +134,3 @@ function safeParseTags(raw: string | null): string[] {
     return [];
   }
 }
-
-const th: React.CSSProperties = {
-  textAlign: "left",
-  padding: "14px 16px",
-  fontSize: 11,
-  fontWeight: 500,
-  color: "var(--text-tertiary)",
-  textTransform: "uppercase",
-  letterSpacing: "0.1em",
-  borderBottom: "1px solid var(--hairline)",
-};
-const td: React.CSSProperties = {
-  padding: "14px 16px",
-  borderBottom: "1px solid var(--hairline)",
-  fontSize: 14,
-  color: "var(--text-secondary)",
-};

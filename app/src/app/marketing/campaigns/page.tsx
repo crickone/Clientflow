@@ -224,35 +224,24 @@ export default async function MarketingCampaignsPage() {
           }
         />
       ) : (
-        <Card style={{ padding: 0, overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div className="dt-wrap">
+          <table className="dt">
             <thead>
               <tr>
                 {/* Empty header cell for CampaignRows' leading chevron-toggle column. */}
-                <th style={{ ...th, width: 36 }} />
-                <th style={th}>Name</th>
-                <th style={th}>Season</th>
-                <th style={th}>Status</th>
-                <th style={th}>Assets</th>
-                <th style={th}>Performance</th>
-                <th style={th}>Created</th>
+                <th style={{ width: 36 }} />
+                <th>Name</th>
+                <th>Season</th>
+                <th>Status</th>
+                <th>Assets</th>
+                <th>Performance</th>
+                <th>Created</th>
               </tr>
             </thead>
             <CampaignRows rows={rows} />
           </table>
-        </Card>
+        </div>
       )}
     </div>
   );
 }
-
-const th: React.CSSProperties = {
-  textAlign: "left",
-  padding: "14px 16px",
-  fontSize: 11,
-  fontWeight: 500,
-  color: "var(--text-tertiary)",
-  textTransform: "uppercase",
-  letterSpacing: "0.1em",
-  borderBottom: "1px solid var(--hairline)",
-};

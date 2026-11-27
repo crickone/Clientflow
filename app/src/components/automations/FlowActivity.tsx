@@ -68,63 +68,61 @@ export function FlowActivity({ triggerKey, status }: { triggerKey: string; statu
           {counts.entered === 0 ? "Nobody has entered this follow-up yet. People appear here as soon as they do." : "Nobody matches this filter."}
         </Card>
       ) : (
-        <Card style={{ padding: 0, overflow: "hidden" }}>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5, minWidth: 720 }}>
-              <thead>
-                <tr style={{ textAlign: "left", color: "var(--text-tertiary)", fontSize: 12 }}>
-                  {["Person", "Entered", "Status", "Messages", "Last sent", "Next", ""].map((h) => (
-                    <th key={h} style={{ padding: "12px 16px", fontWeight: 500, borderBottom: "1px solid var(--hairline)" }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => {
-                  const href = `/automations/${triggerKey}/runs/${r.runId}`;
-                  return (
-                    <tr key={r.runId} style={{ borderBottom: "1px solid var(--hairline)" }}>
-                      <td style={{ padding: "12px 16px" }}>
-                        <Link href={href} style={{ color: "var(--text-primary)", fontWeight: 500, textDecoration: "none" }}>
-                          {r.name}
-                        </Link>
-                        {r.contact && <div style={{ color: "var(--text-tertiary)", fontSize: 12.5 }}>{r.contact}</div>}
-                      </td>
-                      <td style={{ padding: "12px 16px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{fmtWhen(r.startedAt)}</td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <Badge tone={TONE[r.status]} dot={r.status === "active"}>
-                          {statusLabel(r.status, r.stopReason)}
-                        </Badge>
-                        {r.endedAt && <div style={{ color: "var(--text-tertiary)", fontSize: 12, marginTop: 4 }}>{fmtWhen(r.endedAt)}</div>}
-                      </td>
-                      <td style={{ padding: "12px 16px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                        {r.progress.sent} of {r.progress.messages} sent
-                        {r.progress.failed > 0 && <div style={{ color: "var(--danger, #e5484d)", fontSize: 12 }}>{r.progress.failed} failed</div>}
-                      </td>
-                      <td style={{ padding: "12px 16px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                        {r.progress.lastSentAt ? fmtWhen(r.progress.lastSentAt) : "None yet"}
-                      </td>
-                      <td style={{ padding: "12px 16px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                        {r.status === "active" ? nextStepLabel(r.progress.next, fmtWhen) ?? "None" : "None"}
-                      </td>
-                      <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                        <Link href={href} aria-label={`Open ${r.name}'s steps`} style={{ color: "var(--text-tertiary)" }}>
-                          <ChevronRight size={16} />
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div className="dt-wrap">
+          <table className="dt" style={{ minWidth: 720 }}>
+            <thead>
+              <tr>
+                {["Person", "Entered", "Status", "Messages", "Last sent", "Next", ""].map((h) => (
+                  <th key={h}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const href = `/automations/${triggerKey}/runs/${r.runId}`;
+                return (
+                  <tr key={r.runId}>
+                    <td>
+                      <div className="dt-cell">
+                        <Link href={href}>{r.name}</Link>
+                        {r.contact && <span className="dt-meta">{r.contact}</span>}
+                      </div>
+                    </td>
+                    <td className="dt-nowrap">{fmtWhen(r.startedAt)}</td>
+                    <td>
+                      <div className="dt-cell">
+                        <span>
+                          <Badge tone={TONE[r.status]} dot={r.status === "active"}>
+                            {statusLabel(r.status, r.stopReason)}
+                          </Badge>
+                        </span>
+                        {r.endedAt && <span className="dt-meta">{fmtWhen(r.endedAt)}</span>}
+                      </div>
+                    </td>
+                    <td className="dt-nowrap">
+                      {r.progress.sent} of {r.progress.messages} sent
+                      {r.progress.failed > 0 && <div style={{ color: "var(--danger, #e5484d)", fontSize: 12 }}>{r.progress.failed} failed</div>}
+                    </td>
+                    <td className="dt-nowrap">{r.progress.lastSentAt ? fmtWhen(r.progress.lastSentAt) : "None yet"}</td>
+                    <td className="dt-nowrap">
+                      {r.status === "active" ? nextStepLabel(r.progress.next, fmtWhen) ?? "None" : "None"}
+                    </td>
+                    <td className="dt-num">
+                      <Link href={href} aria-label={`Open ${r.name}'s steps`} style={{ color: "var(--text-tertiary)" }}>
+                        <ChevronRight size={16} />
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
           {total > rows.length && (
-            <div style={{ padding: "10px 16px", fontSize: 12.5, color: "var(--text-tertiary)" }}>
+            <div style={{ padding: "10px var(--dt-pad-x)", fontSize: 12.5, color: "var(--text-tertiary)", borderTop: "1px solid var(--hairline)" }}>
               Showing the newest {rows.length} of {total}.
             </div>
           )}
-        </Card>
+        </div>
       )}
     </div>
   );

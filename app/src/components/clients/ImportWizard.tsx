@@ -248,28 +248,26 @@ export function ImportWizard({
             </label>
           )}
 
-          <div style={{ overflowX: "auto", border: "1px solid var(--hairline)", borderRadius: "var(--radius)" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+          <div className="dt-wrap">
+            <table className="dt">
               <thead>
                 <tr>
                   {["Status", "Name", "Email", "Phone", "Join date", "Plan"].map((h) => (
-                    <th key={h} style={th}>
-                      {h}
-                    </th>
+                    <th key={h}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {preview.view.slice(0, PREVIEW_LIMIT).map((r, i) => (
-                  <tr key={i} style={{ borderTop: "1px solid var(--hairline)" }}>
-                    <td style={td}>
+                  <tr key={i}>
+                    <td className="dt-nowrap">
                       <StatusPill status={r.status} />
                     </td>
-                    <td style={td}>{[r.m.firstName, r.m.lastName].filter(Boolean).join(" ") || <Dim>—</Dim>}</td>
-                    <td style={td}>{r.m.email || <Dim>—</Dim>}</td>
-                    <td style={td}>{r.m.phone || <Dim>—</Dim>}</td>
-                    <td style={td}>{r.m.joinDate ? normalizeDate(r.m.joinDate) ?? <Dim>bad</Dim> : <Dim>—</Dim>}</td>
-                    <td style={td}>{r.m.membershipPlan || <Dim>—</Dim>}</td>
+                    <td className="dt-nowrap">{[r.m.firstName, r.m.lastName].filter(Boolean).join(" ") || <Dim>—</Dim>}</td>
+                    <td className="dt-nowrap">{r.m.email || <Dim>—</Dim>}</td>
+                    <td className="dt-nowrap">{r.m.phone || <Dim>—</Dim>}</td>
+                    <td className="dt-nowrap">{r.m.joinDate ? normalizeDate(r.m.joinDate) ?? <Dim>bad</Dim> : <Dim>—</Dim>}</td>
+                    <td className="dt-nowrap">{r.m.membershipPlan || <Dim>—</Dim>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -404,7 +402,7 @@ function Warn({ children }: { children: React.ReactNode }) {
   );
 }
 function Dim({ children }: { children: React.ReactNode }) {
-  return <span style={{ color: "var(--text-tertiary)" }}>{children}</span>;
+  return <span className="dt-muted">{children}</span>;
 }
 
 const card: React.CSSProperties = {
@@ -438,14 +436,3 @@ const select: React.CSSProperties = {
   color: "var(--text-primary)",
   fontSize: 13,
 };
-const th: React.CSSProperties = {
-  textAlign: "left",
-  padding: "8px 10px",
-  fontSize: 11,
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  color: "var(--text-tertiary)",
-  background: "var(--surface-2)",
-  whiteSpace: "nowrap",
-};
-const td: React.CSSProperties = { padding: "7px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" };

@@ -40,13 +40,8 @@
 .search input { padding-left: 38px !important; }
 .count { font-size: 13px; color: var(--text-tertiary); }
 
-.tableWrap { border: 1px solid var(--hairline); border-radius: 12px; overflow-x: auto; background: var(--surface-1); }
-.table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.table th { text-align: left; font-weight: 600; font-size: 12px; color: var(--text-tertiary); padding: 10px 12px; border-bottom: 1px solid var(--hairline); background: var(--surface-2); }
-.table td { padding: 10px 12px; border-top: 1px solid var(--hairline); color: var(--text-secondary); vertical-align: top; }
-.table tr:first-child td { border-top: 0; }
+/* Look comes from the shared .dt table; these rules only drive the phone layout. */
 .table th:first-child, .table td:first-child { min-width: 190px; }
-.name { color: var(--text-primary); font-weight: 600; }
 .sub { display: block; font-size: 12px; color: var(--text-tertiary); overflow-wrap: anywhere; }
 .more { display: flex; justify-content: center; padding: 12px; border-top: 1px solid var(--hairline); }
 
@@ -62,7 +57,7 @@
   .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
   .table tr { padding: 12px 14px; border-top: 1px solid var(--hairline); }
   .table tr:first-child { border-top: 0; }
-  .table td { border: 0; padding: 2px 0; }
+  table.table td { border: 0; padding: 2px 0; }
   .table td:first-child { min-width: 0; }
   .table td[data-label]::before { content: attr(data-label) ": "; color: var(--text-tertiary); }
 }

@@ -249,9 +249,10 @@ export function VoiceSettingsView({
             No calls yet. Open a lead and press Call to make the first one.
           </p>
         ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 10, fontSize: 13.5 }}>
+          <div className="dt-wrap dt-wrap--flush" style={{ marginTop: 10 }}>
+          <table className="dt">
             <thead>
-              <tr style={{ textAlign: "left", color: "var(--text-tertiary)" }}>
+              <tr>
                 <Th>When</Th>
                 <Th>Number</Th>
                 <Th>Result</Th>
@@ -261,11 +262,11 @@ export function VoiceSettingsView({
             </thead>
             <tbody>
               {recentCalls.map((c) => (
-                <tr key={c.id} style={{ borderTop: "1px solid var(--hairline)" }}>
+                <tr key={c.id}>
                   <Td>{formatDateTime(new Date(c.createdAt))}</Td>
                   <Td>
                     {c.leadId ? (
-                      <Link href={`/leads/${c.leadId}`} style={{ color: "var(--accent)" }}>
+                      <Link href={`/leads/${c.leadId}`}>
                         {c.toNumber ?? "—"}
                       </Link>
                     ) : (
@@ -287,6 +288,7 @@ export function VoiceSettingsView({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </Card>
 
@@ -308,8 +310,8 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 }
 
 function Th({ children }: { children: React.ReactNode }) {
-  return <th style={{ padding: "6px 8px", fontWeight: 500 }}>{children}</th>;
+  return <th>{children}</th>;
 }
 function Td({ children }: { children: React.ReactNode }) {
-  return <td style={{ padding: "8px" }}>{children}</td>;
+  return <td>{children}</td>;
 }
