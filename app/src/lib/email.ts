@@ -9,6 +9,9 @@ import { getGmailConnection, gmailSend, isGmailConnected } from "@/lib/gmail";
 import { getImapConnection, isImapConnected, smtpSend } from "@/lib/imapEmail";
 import { mailgunRouteDomain, sendThroughMailgun } from "@/lib/mailgunRoute";
 import { currentEmailBrand } from "@/lib/emailBrand";
+import { emailAttachmentsRefusal, type EmailAttachment } from "@/lib/email/attachments";
+
+export type { EmailAttachment } from "@/lib/email/attachments";
 
 /**
  * Email sending via Resend. Two moving parts:
@@ -125,10 +128,16 @@ export type SendOpts = {
   replyTo?: string;
   /** Gmail threading, when replying inside an existing conversation. */
   gmailThread?: { threadId?: string; inReplyTo?: string; references?: string };
+  /** Files to attach. Up to 5, 16 MB each, 20 MB in total; a bigger set is refused before anything is sent. */
+  attachments?: EmailAttachment[];
 };
 
 /** Core send: Gmail if the tenant has it connected, else IMAP/SMTP if connected, else Resend. */
 async function sendVia(tenantId: number | null, sender: EmailSender, opts: SendOpts): Promise<SendResult> {
+  const refusal = emailAttachmentsRefusal(opts.attachments);
+  if (refusal) return { ok: false, error: refusal };
+  const attachments = opts.attachments?.length ? opts.attachments : undefined;
+
   if (tenantId !== null && isGmailConnected(tenantId)) {
     const conn = getGmailConnection(tenantId);
     if (conn) {
@@ -141,6 +150,7 @@ async function sendVia(tenantId: number | null, sender: EmailSender, opts: SendO
         threadId: opts.gmailThread?.threadId,
         inReplyTo: opts.gmailThread?.inReplyTo,
         references: opts.gmailThread?.references,
+        ...(attachments ? { attachments } : {}),
       });
       return res.ok ? { ok: true, id: res.id } : { ok: false, error: res.error };
     }
@@ -162,6 +172,7 @@ async function sendVia(tenantId: number | null, sender: EmailSender, opts: SendO
         replyTo: opts.replyTo || sender.replyTo || undefined,
         inReplyTo: opts.gmailThread?.inReplyTo,
         references: opts.gmailThread?.references,
+        ...(attachments ? { attachments } : {}),
       });
     }
     return smtpSend(tenantId, {
@@ -171,6 +182,7 @@ async function sendVia(tenantId: number | null, sender: EmailSender, opts: SendO
       replyTo: opts.replyTo || sender.replyTo || undefined,
       inReplyTo: opts.gmailThread?.inReplyTo,
       references: opts.gmailThread?.references,
+      ...(attachments ? { attachments } : {}),
     });
   }
 
@@ -192,6 +204,9 @@ async function sendVia(tenantId: number | null, sender: EmailSender, opts: SendO
       html: opts.html,
       text: opts.text ?? htmlToText(opts.html),
       replyTo,
+      ...(attachments
+        ? { attachments: attachments.map((a) => ({ filename: a.filename, content: a.content, contentType: a.mime })) }
+        : {}),
     });
     if (error) return { ok: false, error: error.message || "Resend rejected the message." };
     return { ok: true, id: data?.id ?? "" };

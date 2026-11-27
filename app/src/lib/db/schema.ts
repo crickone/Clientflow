@@ -56,6 +56,9 @@ export const emailMessages = sqliteTable(
     clientId: integer("client_id"),
     internalDate: integer("internal_date", { mode: "timestamp_ms" }),
     isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
+    // Files sent with an outbound email: JSON array of lib/inbox/mediaModel
+    // MessageMedia, null when there are none.
+    media: text("media"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -99,6 +102,8 @@ export const clientEmails = sqliteTable("client_emails", {
   status: text("status", { enum: ["sent", "failed"] }).notNull().default("sent"),
   providerId: text("provider_id"),
   error: text("error"),
+  // Files sent with the email: JSON array of lib/inbox/mediaModel MessageMedia, null when none.
+  media: text("media"),
   sentByUserId: integer("sent_by_user_id"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()

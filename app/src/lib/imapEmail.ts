@@ -15,6 +15,7 @@ import { decryptToken, encryptToken } from "@/lib/google/tokenCrypto";
 import { notifyInboundEmail } from "@/lib/notifications/notify";
 import { isAutoReply } from "@/lib/leadFlows/autoReply";
 import { isUnreachableSmtpError } from "@/lib/mailgunRouteModel";
+import type { EmailAttachment } from "@/lib/email/attachments";
 
 /**
  * A tenant's connected IMAP/SMTP mailbox (generic, non-Gmail) — the
@@ -343,6 +344,7 @@ export async function smtpSend(
     replyTo?: string;
     inReplyTo?: string;
     references?: string;
+    attachments?: EmailAttachment[];
   },
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   try {
@@ -369,6 +371,15 @@ export async function smtpSend(
         replyTo: opts.replyTo,
         inReplyTo: opts.inReplyTo,
         references: opts.references,
+        ...(opts.attachments?.length
+          ? {
+              attachments: opts.attachments.map((a) => ({
+                filename: a.filename,
+                content: a.content,
+                contentType: a.mime,
+              })),
+            }
+          : {}),
       });
 
       recordSentMessage(tenantId, creds.email, opts, info.messageId, text);

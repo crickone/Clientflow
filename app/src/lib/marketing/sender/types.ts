@@ -43,6 +43,8 @@ export interface CampaignMessage {
   campaignId?: number;
   contactId?: number;
   tenantId?: number;
+  /** Files attached to a one-to-one email. When present the send goes as multipart/form-data, one `attachment` field per file. */
+  attachments?: { filename: string; mime: string; content: Buffer }[];
 }
 
 /** Every CampaignSender method returns a typed result instead of throwing — see CampaignSender's own doc comment for why. */

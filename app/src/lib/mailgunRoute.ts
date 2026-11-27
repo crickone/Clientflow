@@ -5,6 +5,7 @@ import { recordSentMessage } from "@/lib/imapEmail";
 import { getSendingDomain } from "@/lib/marketing/domains";
 import { getCampaignSender } from "@/lib/marketing/sender";
 import { mailgunFromAddress } from "@/lib/mailgunRouteModel";
+import type { EmailAttachment } from "@/lib/email/attachments";
 
 /**
  * One-to-one email (receipts, vouchers, inbox replies) for a business whose
@@ -41,6 +42,7 @@ export async function sendThroughMailgun(
     replyTo?: string;
     inReplyTo?: string;
     references?: string;
+    attachments?: EmailAttachment[];
   },
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const headers: Record<string, string> = { "Reply-To": opts.replyTo || opts.mailboxEmail };
@@ -49,7 +51,8 @@ export async function sendThroughMailgun(
   const res = await getCampaignSender(tenantId).send(
     domain,
     { name: opts.fromName, email: mailgunFromAddress(opts.mailboxEmail, domain) },
-    { to: opts.to, subject: opts.subject, html: opts.html, text: opts.text, headers, tags: ["one-to-one"], tracking: false, tenantId },
+    { to: opts.to, subject: opts.subject, html: opts.html, text: opts.text, headers, tags: ["one-to-one"], tracking: false, tenantId,
+      ...(opts.attachments?.length ? { attachments: opts.attachments } : {}) },
   );
   if (!res.ok) return { ok: false, error: res.error };
   recordSentMessage(

@@ -18,6 +18,10 @@ import {
 import { logActivity } from "@/lib/queries";
 import { sendWhatsApp } from "@/lib/whatsapp/send";
 import { isEmailConfigured, renderEmailShell, sendEmail, textToParagraphs } from "@/lib/email";
+import { loadAttachments } from "@/lib/attachments/load";
+import { emailAttachmentsFrom, emailAttachmentsRefusal } from "@/lib/email/attachments";
+import { setSentEmailMedia } from "@/lib/email/sentMedia";
+import { mediaPlaceholder } from "@/lib/inbox/mediaModel";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { setStageToId } from "@/lib/pipeline/stage";
 import { dialLead } from "@/lib/voice/dial";
@@ -166,13 +170,22 @@ export async function markMessageSentAction(
  */
 export async function sendLeadEmailAction(
   leadId: number,
-  input: { subject: string; text: string; draftMessageId?: number },
+  input: { subject: string; text: string; draftMessageId?: number; attachments?: string[] },
 ): Promise<{ ok: true; messageId: number } | { ok: false; error: string }> {
   await requireUser();
   const text = input.text.trim();
   const subject = input.subject.trim();
-  if (!text) return { ok: false, error: "Write the email first." };
+  let files;
+  try {
+    files = loadAttachments(input.attachments);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "That attachment has expired. Attach it again." };
+  }
+  if (!text && files.length === 0) return { ok: false, error: "Write the email first." };
   if (!subject) return { ok: false, error: "Add a subject." };
+  const attachments = emailAttachmentsFrom(files);
+  const refusal = emailAttachmentsRefusal(attachments);
+  if (refusal) return { ok: false, error: refusal };
   const lead = db.select().from(leads).where(eq(leads.id, leadId)).get();
   if (!lead?.email) return { ok: false, error: "This lead has no email address." };
   if (!isEmailConfigured()) return { ok: false, error: "Connect an email in Settings > Email first." };
@@ -182,22 +195,32 @@ export async function sendLeadEmailAction(
     subject,
     html: renderEmailShell({ businessName: business, bodyHtml: textToParagraphs(text), footer: `Sent by ${business}.` }),
     text,
+    ...(attachments.length ? { attachments } : {}),
   });
   if (!res.ok) return { ok: false, error: res.error };
 
+  // The files are noted on the timeline row; an email that is only files
+  // keeps a placeholder word so search and the list preview aren't blank.
+  const media = files.map((f) => f.media);
+  const content = text || (media[0] ? mediaPlaceholder(media[0].kind) : text);
+  const mediaJson = media.length ? JSON.stringify(media) : null;
   let messageId = input.draftMessageId ?? 0;
   const draft = messageId
     ? db.select().from(leadMessages).where(eq(leadMessages.id, messageId)).get()
     : undefined;
   if (draft && draft.leadId === leadId) {
-    db.update(leadMessages).set({ content: text, channel: "email", sentAt: new Date() }).where(eq(leadMessages.id, messageId)).run();
+    db.update(leadMessages)
+      .set({ content, channel: "email", sentAt: new Date(), ...(mediaJson ? { media: mediaJson } : {}) })
+      .where(eq(leadMessages.id, messageId))
+      .run();
   } else {
     messageId = db
       .insert(leadMessages)
-      .values({ leadId, direction: "outbound", channel: "email", content: text, sentAt: new Date() })
+      .values({ leadId, direction: "outbound", channel: "email", content, media: mediaJson, sentAt: new Date() })
       .returning({ id: leadMessages.id })
       .get().id;
   }
+  setSentEmailMedia(res.id, media);
   setLeadStatus(leadId, "contacted");
   await rescore(leadId);
   revalidatePath(`/leads/${leadId}`);

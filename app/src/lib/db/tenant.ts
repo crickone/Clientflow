@@ -3216,6 +3216,16 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     }
   }
 
+  // Files sent with a one-to-one email (JSON MessageMedia[], lib/inbox/mediaModel). Additive.
+  for (const table of ["client_emails", "email_messages"]) {
+    try {
+      const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+      if (cols.length && !cols.some((c) => c.name === "media")) sqlite.exec(`ALTER TABLE ${table} ADD COLUMN media TEXT`);
+    } catch (err) {
+      console.error(`[db] ${table}.media migration failed:`, err);
+    }
+  }
+
   // Lead score from Jev (lib/leadScore.ts). Additive.
   try {
     const cols = sqlite.prepare("PRAGMA table_info(leads)").all() as Array<{ name: string }>;

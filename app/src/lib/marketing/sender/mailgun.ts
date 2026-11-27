@@ -259,7 +259,8 @@ export class MailgunSender implements CampaignSender {
       const res = await fetch(`${baseUrl()}/${encodeURIComponent(fromDomain)}/messages`, {
         method: "POST",
         headers: { Authorization: authHeader(key) },
-        body: form,
+        // Without files the body stays the url-encoded form it always was.
+        body: msg.attachments?.length ? mailgunMultipart(form, msg.attachments) : form,
       });
       if (!res.ok) {
         return { ok: false, error: `Mailgun send failed (${res.status}): ${await safeErrorText(res)}` };
@@ -272,6 +273,22 @@ export class MailgunSender implements CampaignSender {
       return { ok: false, error: `Mailgun send failed: ${errorMessage(err)}` };
     }
   }
+}
+
+/**
+ * The same fields as multipart/form-data, plus one `attachment` field per file
+ * (Mailgun's name for it, repeated). fetch writes the boundary.
+ */
+export function mailgunMultipart(
+  fields: URLSearchParams,
+  attachments: NonNullable<CampaignMessage["attachments"]>,
+): FormData {
+  const form = new FormData();
+  for (const [k, v] of fields) form.append(k, v);
+  for (const a of attachments) {
+    form.append("attachment", new Blob([new Uint8Array(a.content)], { type: a.mime }), a.filename);
+  }
+  return form;
 }
 
 // ─── Pure webhook helpers (Task 7 imports both) ────────────────────────────

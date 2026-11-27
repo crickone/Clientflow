@@ -23,6 +23,9 @@ import {
 } from "@/lib/gmail";
 import { syncImapInbox } from "@/lib/imapEmail";
 import { getEmailProvider, renderEmailShell, sendEmail, textToParagraphs } from "@/lib/email";
+import { loadAttachments } from "@/lib/attachments/load";
+import { emailAttachmentsFrom, emailAttachmentsRefusal } from "@/lib/email/attachments";
+import { setSentEmailMedia } from "@/lib/email/sentMedia";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getTheme } from "@/lib/settings";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
@@ -55,14 +58,29 @@ function currentTenantId(): number {
 export async function replyEmailAction(
   messageId: number,
   body: string,
+  /** Attachment tickets from POST /api/messages/attachments. */
+  attachmentTokens?: string[],
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireUser();
+  let files;
+  try {
+    files = loadAttachments(attachmentTokens);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "That attachment has expired. Attach it again." };
+  }
   const parsed = z
-    .object({ messageId: z.number().int(), body: z.string().trim().min(1, "Write a reply first") })
+    .object({
+      messageId: z.number().int(),
+      // Files alone are a reply too.
+      body: files.length ? z.string().trim() : z.string().trim().min(1, "Write a reply first"),
+    })
     .safeParse({ messageId, body });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
   }
+  const attachments = emailAttachmentsFrom(files);
+  const refusal = emailAttachmentsRefusal(attachments);
+  if (refusal) return { ok: false, error: refusal };
 
   const msg = getEmailMessage(messageId);
   if (!msg) return { ok: false, error: "Message not found." };
@@ -91,6 +109,7 @@ export async function replyEmailAction(
       inReplyTo: msg.gmailMessageId,
       references: msg.gmailThreadId ?? msg.gmailMessageId,
     },
+    ...(attachments.length ? { attachments } : {}),
   });
   if (!res.ok) return res;
 
@@ -101,6 +120,9 @@ export async function replyEmailAction(
   if (getEmailProvider() === "gmail") {
     await syncGmailInbox(currentTenantId(), { days: 1, max: 10 });
   }
+  // Note the files on the thread's "out" row (written by smtpSend / the
+  // Mailgun route, or by the Gmail re-sync just above).
+  setSentEmailMedia(res.id, files.map((f) => f.media));
   revalidatePath("/communication");
   return { ok: true };
 }

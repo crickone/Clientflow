@@ -13,6 +13,8 @@ import { mapWithConcurrency } from "@/lib/concurrency";
 import { GMAIL_SYNC_MIN_GAP_MS, isMessageRead, shouldSyncNow } from "@/lib/gmailSync";
 import { notifyInboundEmail } from "@/lib/notifications/notify";
 import { isAutoReply } from "@/lib/leadFlows/autoReply";
+import { buildMime, gmailUploadBody, newMimeBoundary } from "@/lib/gmailMime";
+import type { EmailAttachment } from "@/lib/email/attachments";
 
 // Re-exported so `@/lib/gmail` stays the one import path for anything
 // Gmail-related — callers (e.g. the dashboard brief route) don't need to know
@@ -21,6 +23,8 @@ import { isAutoReply } from "@/lib/leadFlows/autoReply";
 export { GMAIL_SYNC_MIN_GAP_MS, isMessageRead, shouldSyncNow };
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
+/** Media-upload base: sends a message with files (up to 35 MB) that the JSON endpoint would refuse. */
+const GMAIL_UPLOAD_API = "https://gmail.googleapis.com/upload/gmail/v1/users/me";
 
 // ─── Connection storage (control plane, one per tenant) ──────────────────────
 
@@ -131,10 +135,11 @@ async function gmailFetch(
   tenantId: number,
   path: string,
   init?: RequestInit,
+  base: string = GMAIL_API,
 ): Promise<Response> {
   let token = await getAccessToken(tenantId);
   if (!token) throw new Error("Gmail is not connected.");
-  let res = await fetch(`${GMAIL_API}${path}`, {
+  let res = await fetch(`${base}${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, ...(init?.headers ?? {}) },
   });
@@ -146,7 +151,7 @@ async function gmailFetch(
       .where(eq(gmailConnections.tenantId, tenantId))
       .run();
     token = await getAccessToken(tenantId);
-    res = await fetch(`${GMAIL_API}${path}`, {
+    res = await fetch(`${base}${path}`, {
       ...init,
       headers: { Authorization: `Bearer ${token}`, ...(init?.headers ?? {}) },
     });
@@ -167,42 +172,12 @@ export async function fetchGmailProfile(
 
 // ─── Sending ─────────────────────────────────────────────────────────────────
 
-function encodeHeaderWord(value: string): string {
-  // RFC 2047 encode when non-ASCII, else pass through.
-  return /[^\x00-\x7F]/.test(value)
-    ? `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`
-    : value;
-}
-
 function toBase64Url(buf: Buffer | string): string {
   return (Buffer.isBuffer(buf) ? buf : Buffer.from(buf, "utf8"))
     .toString("base64")
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
-}
-
-function buildMime(opts: {
-  fromName: string;
-  fromEmail: string;
-  to: string;
-  subject: string;
-  html: string;
-  inReplyTo?: string;
-  references?: string;
-}): string {
-  const headers = [
-    `From: ${encodeHeaderWord(opts.fromName)} <${opts.fromEmail}>`,
-    `To: ${opts.to}`,
-    `Subject: ${encodeHeaderWord(opts.subject)}`,
-    "MIME-Version: 1.0",
-    'Content-Type: text/html; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64",
-  ];
-  if (opts.inReplyTo) headers.push(`In-Reply-To: ${opts.inReplyTo}`);
-  if (opts.references) headers.push(`References: ${opts.references}`);
-  const body = Buffer.from(opts.html, "utf8").toString("base64").replace(/(.{76})/g, "$1\r\n");
-  return `${headers.join("\r\n")}\r\n\r\n${body}`;
 }
 
 export type GmailSendResult =
@@ -220,25 +195,42 @@ export async function gmailSend(
     threadId?: string;
     inReplyTo?: string;
     references?: string;
+    attachments?: EmailAttachment[];
   },
 ): Promise<GmailSendResult> {
   try {
-    const raw = toBase64Url(
-      buildMime({
-        fromName: opts.fromName,
-        fromEmail: opts.fromEmail,
-        to: opts.to,
-        subject: opts.subject,
-        html: opts.html,
-        inReplyTo: opts.inReplyTo,
-        references: opts.references,
-      }),
-    );
-    const res = await gmailFetch(tenantId, "/messages/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ raw, ...(opts.threadId ? { threadId: opts.threadId } : {}) }),
+    const mime = buildMime({
+      fromName: opts.fromName,
+      fromEmail: opts.fromEmail,
+      to: opts.to,
+      subject: opts.subject,
+      html: opts.html,
+      inReplyTo: opts.inReplyTo,
+      references: opts.references,
+      attachments: opts.attachments,
     });
+    let res: Response;
+    if (opts.attachments?.length) {
+      // Files go through the upload endpoint: the JSON one caps the request size.
+      const boundary = newMimeBoundary();
+      res = await gmailFetch(
+        tenantId,
+        "/messages/send?uploadType=multipart",
+        {
+          method: "POST",
+          headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
+          body: gmailUploadBody(mime, opts.threadId, boundary),
+        },
+        GMAIL_UPLOAD_API,
+      );
+    } else {
+      const raw = toBase64Url(mime);
+      res = await gmailFetch(tenantId, "/messages/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ raw, ...(opts.threadId ? { threadId: opts.threadId } : {}) }),
+      });
+    }
     if (!res.ok) return { ok: false, error: `Gmail send failed: ${res.status} ${await res.text()}` };
     const data = (await res.json()) as { id: string; threadId: string };
     return { ok: true, id: data.id, threadId: data.threadId };
@@ -485,6 +477,8 @@ export type EmailMessageRow = {
   clientId: number | null;
   internalDate: number | null;
   isRead: boolean;
+  /** Files sent with an outbound email: raw JSON MessageMedia[] (parse with lib/inbox/mediaModel parseMedia), null when none. */
+  media: string | null;
 };
 
 function mapRow(r: typeof emailMessages.$inferSelect): EmailMessageRow {
@@ -503,6 +497,7 @@ function mapRow(r: typeof emailMessages.$inferSelect): EmailMessageRow {
     clientId: r.clientId,
     internalDate: r.internalDate ? r.internalDate.getTime() : null,
     isRead: r.isRead,
+    media: r.media ?? null,
   };
 }
 
