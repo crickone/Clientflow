@@ -11,6 +11,7 @@ import { verifySiteEnquiryToken, type SiteEnquiryClaim } from "@/lib/cms/enquiry
 import {
   enquiryNotes,
   isEnquiryHoneypotTripped,
+  isEnquiryLinkSpam,
   safeReturnPath,
   sameOriginRefererPath,
   validateEnquiry,
@@ -100,6 +101,8 @@ export async function POST(req: Request) {
 
   // Honeypot: a bot that fills every field gets a quiet success and nothing stored.
   if (isEnquiryHoneypotTripped(fields)) return respondPublicForm(req, returnTo, true);
+  // A link for a name, or a message that is only a link: same quiet success, nothing stored.
+  if (isEnquiryLinkSpam(fields)) return respondPublicForm(req, returnTo, true);
 
   // The claim is read BEFORE the fields, because it names the site and a
   // programme can only be checked against the list that site's own form

@@ -76,6 +76,22 @@ export function isEnquiryHoneypotTripped(fields: Record<string, string>): boolea
   return asString(fields[ENQUIRY_HONEYPOT_FIELD]).length > 0;
 }
 
+/** A web address anywhere in the text: a scheme, "www." or a bare domain with a path. */
+const LINK_RE = /(:\/\/|\bwww\.|\b[a-z0-9-]+\.(com|ie|net|org|io|pro|info|biz|ru|xyz)\/)/i;
+
+/**
+ * Spam that gets past the honeypot: a bot pasting the page's own address into
+ * the form. No person types a link as their name, and a message that is
+ * nothing but a link says nothing. Answered like the honeypot: a quiet
+ * success, nothing stored, so no lead, no follow-ups, no alert.
+ */
+export function isEnquiryLinkSpam(fields: Record<string, string>): boolean {
+  const name = asString(fields.name);
+  if (LINK_RE.test(name)) return true;
+  const about = asString(fields.about).replace(/^[\s:;,.-]+|[\s:;,.-]+$/g, "");
+  return about.length > 0 && !/\s/.test(about) && LINK_RE.test(about);
+}
+
 export function validateEnquiry(
   fields: Record<string, string>,
   slug: string = DEFAULT_SITE,

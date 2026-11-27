@@ -182,6 +182,12 @@ process.env.EMAIL_TOKEN_SECRET = SECRET;
     assert.equal(((await r4.json()) as { ok: boolean }).ok, true);
     assert.equal(leadCount(), 1);
 
+    // 4b. a link for a name (a bot pasting the page address): silent 200, nothing written
+    const r4b = await post({ name: ":https://www.example.ie/contact:", email: "bot@example.ie", about: ":https://www.example.ie/contact:", token }, "10.77.0.9");
+    assert.equal(r4b.status, 200);
+    assert.equal(((await r4b.json()) as { ok: boolean }).ok, true);
+    assert.equal(leadCount(), 1, "link spam wrote no lead");
+
     // 5. validation
     const r5 = await post({ phone: "1", token }, "10.77.0.4");
     assert.equal(r5.status, 400);

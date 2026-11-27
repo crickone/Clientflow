@@ -5,6 +5,7 @@ import {
   ENQUIRY_HONEYPOT_FIELD,
   enquiryNotes,
   isEnquiryHoneypotTripped,
+  isEnquiryLinkSpam,
   programmeLabel,
   programmesForSite,
   safeReturnPath,
@@ -42,6 +43,13 @@ check("name over 120 chars -> error", (() => { const r = validateEnquiry({ name:
 check("honeypot field name", ENQUIRY_HONEYPOT_FIELD === "company_website");
 check("honeypot tripped when filled", isEnquiryHoneypotTripped({ company_website: "http://spam" }));
 check("honeypot not tripped when blank", !isEnquiryHoneypotTripped({ company_website: "  " }));
+
+check("link spam: link as the name", isEnquiryLinkSpam({ name: ":https://www.example.ie/contact:", about: "" }));
+check("link spam: www. in the name", isEnquiryLinkSpam({ name: "www.example.com", about: "hello" }));
+check("link spam: message that is only a link", isEnquiryLinkSpam({ name: "Alice", about: ":https://www.example.ie/contact:" }));
+check("not spam: a real name and message", !isEnquiryLinkSpam({ name: "Aoife Ryan", about: "Back pain, interested in infrared" }));
+check("not spam: a sentence that mentions a site", !isEnquiryLinkSpam({ name: "Aoife", about: "I saw your post on www.facebook.com about HBOT" }));
+check("not spam: name with a dot", !isEnquiryLinkSpam({ name: "J. Murphy", about: "" }));
 
 check("return path: relative kept", safeReturnPath("/contact") === "/contact");
 check("return path: query and hash stripped", safeReturnPath("/site/healthwise/contact?x=1#book") === "/site/healthwise/contact");
