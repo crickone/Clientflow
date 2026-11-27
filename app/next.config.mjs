@@ -58,6 +58,12 @@ const nextConfig = {
   // Revisit once the backlog is cleared (see the Lint step's comment in
   // .github/workflows/ci.yml).
   eslint: { ignoreDuringBuilds: true },
+  // The middleware runs on every path, and Next buffers each request body for
+  // it up to this size; past it the body is CUT SHORT (default 10 MB). Chat
+  // attachments go up to 16 MB in one multipart upload
+  // (api/messages/attachments, lib/attachments/outgoingModel.ts), so the
+  // buffer is 20 MB to leave room for the multipart framing.
+  experimental: { middlewareClientMaxBodySize: "20mb" },
     // Next 15: instrumentation.ts is always on, so the old
     // experimental.instrumentationHook flag is gone.
     // better-sqlite3/sharp ship native bindings — keep them server-only.
