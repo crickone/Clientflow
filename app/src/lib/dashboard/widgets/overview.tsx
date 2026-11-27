@@ -20,20 +20,30 @@ import {
   dashboardKpis,
   getTherapyMap,
   listAppointmentsForDate,
+  prepaidOutstanding,
   recentActivity,
   revenueSeries,
 } from "@/lib/queries";
 import { formatEur, relativeTime } from "@/lib/utils";
 import type { OverviewKey } from "./keys";
 import { cached } from "./cache";
-import { deltaPct } from "../range";
+import { deltaPct, resolveRange } from "../range";
 import { fillDays } from "../series";
-import { bucketIndex, seriesBuckets } from "../metrics/stats";
+import { bucketIndex, dublinIso, seriesBuckets } from "../metrics/stats";
+import { sumAmounts } from "../metrics/breakdown";
+import { paymentLines } from "../metrics/breakdownQueries";
+import { moneyHref } from "../moneyHref";
 import type { WidgetCtx, WidgetImpl } from "../types";
 
 export { fillDays };
 
 const kpis = (ctx: WidgetCtx) => cached(ctx, "dashboardKpis", dashboardKpis);
+
+/** Every payment on the Irish day, as the Cash today breakdown lists them. */
+function todayCash(ctx: WidgetCtx): number {
+  const r = resolveRange("today", ctx.now);
+  return sumAmounts(paymentLines(r.fromMs, r.toMs));
+}
 const gym = (ctx: WidgetCtx) => cached(ctx, "gymDashboard", getGymDashboard);
 
 function countLeads(fromMs: number, toMs: number): number {
@@ -81,6 +91,7 @@ export const OVERVIEW_WIDGETS = {
     render: kpi,
   },
   "overview.todaysEarnings": {
+    href: moneyHref("services"),
     async load(ctx) {
       const k = await kpis(ctx);
       return { value: formatEur(k.todaysEarnings), sub: "From sessions completed today" };
@@ -88,16 +99,16 @@ export const OVERVIEW_WIDGETS = {
     render: kpi,
   },
   "overview.cashToday": {
+    href: moneyHref("cash"),
     async load(ctx) {
-      const k = await kpis(ctx);
-      return { value: formatEur(k.todaysCash), sub: "All payments today, including vouchers and packages" };
+      return { value: formatEur(todayCash(ctx)), sub: "All payments today, including vouchers and packages" };
     },
     render: kpi,
   },
   "overview.deferredRevenue": {
+    href: moneyHref("deferred"),
     async load(ctx) {
-      const k = await kpis(ctx);
-      return { value: formatEur(k.deferredRevenue), sub: "Unused credits and open vouchers" };
+      return { value: formatEur(prepaidOutstanding(dublinIso(ctx.now.getTime()))), sub: "Unused credits and open vouchers" };
     },
     render: kpi,
   },
@@ -163,9 +174,9 @@ export const OVERVIEW_WIDGETS = {
     async load(ctx): Promise<StatRow[]> {
       const k = await kpis(ctx);
       return [
-        { label: "Earnings", sub: "Sessions completed today", value: formatEur(k.todaysEarnings) },
-        { label: "Cash taken", sub: "Today, incl. vouchers and packages", value: formatEur(k.todaysCash) },
-        { label: "Deferred revenue", sub: "Unused credits and open vouchers", value: formatEur(k.deferredRevenue) },
+        { label: "Earnings", sub: "Sessions completed today", value: formatEur(k.todaysEarnings), href: "/dashboard/money/services?range=today" },
+        { label: "Cash taken", sub: "Today, incl. vouchers and packages", value: formatEur(todayCash(ctx)), href: "/dashboard/money/cash?range=today" },
+        { label: "Deferred revenue", sub: "Unused credits and open vouchers", value: formatEur(prepaidOutstanding(dublinIso(ctx.now.getTime()))), href: "/dashboard/money/deferred" },
       ];
     },
     render: (rows) => <StatList rows={rows} />,

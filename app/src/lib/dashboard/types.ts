@@ -90,8 +90,8 @@ export interface WidgetCtx {
 export interface WidgetImpl<T = unknown> {
   /** Title override that needs tenant vocabulary; falls back to meta.title. */
   label?: (ctx: WidgetCtx) => string;
-  /** Click-through for the tile header. */
-  href?: string;
+  /** Click-through for the tile: a fixed page, or one built from the tile's range. */
+  href?: string | ((ctx: WidgetCtx) => string);
   load(ctx: WidgetCtx): Promise<T>;
   render(data: T, ctx: WidgetCtx): ReactNode;
 }

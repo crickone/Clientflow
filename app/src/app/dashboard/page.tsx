@@ -30,6 +30,11 @@ import { getVocab } from "@/lib/vocabulary";
 
 const NEEDS_YOU_KEY = "overview.needsYou";
 
+/** Remember the tab on a breakdown link so its back link returns to it. */
+function withTab(href: string, tab: number): string {
+  return tab > 0 ? `${href}${href.includes("?") ? "&" : "?"}tab=${tab}` : href;
+}
+
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage(
@@ -85,11 +90,12 @@ export default async function DashboardPage(
           : tabRange;
     const ctx: WidgetCtx = { venue, vocab, range, previous: previousRange(range), now, cache, tenantId, recorderStart };
     const unmet = (meta.requires as readonly Requirement[] | undefined)?.find((r) => !reqs[r]);
-    const impl = (WIDGET_IMPLS as Record<string, { label?: (c: WidgetCtx) => string; href?: string }>)[ref.key];
+    const impl = (WIDGET_IMPLS as Record<string, { label?: (c: WidgetCtx) => string; href?: string | ((c: WidgetCtx) => string) }>)[ref.key];
+    const href = typeof impl?.href === "function" ? withTab(impl.href(ctx), active) : impl?.href;
     return {
       ref,
       title: impl?.label?.(ctx) ?? meta.title,
-      href: impl?.href,
+      href,
       node: unmet ? (
         <RequirementCta requirement={unmet === "google" && googleAccount ? "googleListingPending" : unmet} />
       ) : (

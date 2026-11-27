@@ -22,6 +22,7 @@ import { deltaPct } from "../range";
 import type { WidgetCtx, WidgetImpl } from "../types";
 import { cached } from "./cache";
 import type { FinanceKey } from "./keys";
+import { moneyHref } from "../moneyHref";
 
 const payments = (ctx: WidgetCtx, previous = false) => {
   const r = previous ? ctx.previous : ctx.range;
@@ -36,7 +37,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 export const FINANCE_WIDGETS = {
   "finance.revenue": {
-    href: "/reports",
+    href: moneyHref("payments"),
     async load(ctx) {
       const cur = revenueSummary(await payments(ctx));
       const prev = revenueSummary(await payments(ctx, true));
@@ -50,7 +51,7 @@ export const FINANCE_WIDGETS = {
     render: kpi,
   },
   "finance.avgSpend": {
-    href: "/reports",
+    href: moneyHref("clients"),
     async load(ctx) {
       const cur = revenueSummary(await payments(ctx));
       const prev = revenueSummary(await payments(ctx, true));
@@ -66,7 +67,7 @@ export const FINANCE_WIDGETS = {
     render: kpi,
   },
   "finance.revenueTrend": {
-    href: "/reports",
+    href: moneyHref("payments"),
     async load(ctx) {
       const [cur, prev] = await Promise.all([payments(ctx), payments(ctx, true)]);
       const buckets = seriesBuckets(ctx.range.fromMs, ctx.range.toMs);
@@ -91,14 +92,14 @@ export const FINANCE_WIDGETS = {
       ),
   },
   "finance.byMethod": {
-    href: "/reports",
+    href: moneyHref("cash"),
     async load(ctx) {
       return methodTotals(await payments(ctx));
     },
     render: (data: { label: string; value: number }[]) => <DonutView data={data} empty="No payments in this period." />,
   },
   "finance.topClients": {
-    href: "/clients",
+    href: moneyHref("clients"),
     async load(ctx) {
       return topSpenders(await payments(ctx), 8);
     },
@@ -129,7 +130,7 @@ export const FINANCE_WIDGETS = {
     },
   },
   "finance.byService": {
-    href: "/reports",
+    href: moneyHref("services"),
     async load(ctx) {
       return revenueByService(ctx.range.fromIso, ctx.range.toIso, 8);
     },
@@ -141,7 +142,7 @@ export const FINANCE_WIDGETS = {
     ),
   },
   "finance.packages": {
-    href: "/packages",
+    href: moneyHref("packages"),
     async load() {
       return packageUse();
     },

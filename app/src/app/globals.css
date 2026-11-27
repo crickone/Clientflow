@@ -6691,3 +6691,32 @@ table.dt, .ib-table, .cy-phase-table {
 .at-failed { font-size: 12.5px; line-height: 1.5; color: var(--danger); }
 .at-sent-files { margin-top: 8px; }
 .lv-box .at-tray { margin-top: 8px; }
+
+/* Money breakdowns (/dashboard/money/<view>): the rows behind a dashboard tile. */
+.money-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1px;
+  background: var(--hairline);
+  border: 1px solid var(--hairline);
+  border-radius: var(--dt-radius);
+  overflow: hidden;
+  margin-bottom: 28px;
+}
+.money-summary-item { display: grid; gap: 6px; padding: 18px 20px; background: var(--surface-1); min-width: 0; }
+.money-summary-label { font-size: 13px; color: var(--text-tertiary); }
+.money-summary-value { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.money-section { margin-bottom: 28px; }
+.money-section-head { display: grid; gap: 4px; margin-bottom: 12px; }
+.money-section-head h2 { font-size: 16px; font-weight: 600; margin: 0; color: var(--text-primary); }
+.money-section-head p { font-size: 13.5px; margin: 0; color: var(--text-tertiary); }
+.money-ranges { display: flex; flex-wrap: wrap; gap: 6px; }
+.money-ranges .btn { text-decoration: none; }
+.money-foot { font-size: 14px; margin: -12px 0 28px; }
+.money-foot a { color: var(--text-secondary); text-decoration: underline; text-decoration-color: var(--hairline-strong); text-underline-offset: 3px; }
+.money-foot a:hover { color: var(--text-primary); }
+@media (max-width: 600px) {
+  .money-summary { grid-template-columns: 1fr 1fr; }
+  .money-summary-item:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .money-summary-value { font-size: 20px; }
+}
