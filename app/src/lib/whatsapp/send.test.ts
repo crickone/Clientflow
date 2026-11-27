@@ -112,6 +112,8 @@ function file(kind: MessageMedia["kind"], mime: string, name?: string): Outgoing
       ok(rows[1].status === "sent" && rows[1].error === null, "the next file still went");
       ok(rows[0].id < rows[1].id, "rows stay in the order the files were attached");
       ok(p.messageId === rows[1].id && p.failed.length === 1 && p.failed[0].startsWith("big.mp4: "), "failed lists the file by name with the reason");
+      ok(p.failedFiles.length === 1 && p.failedFiles[0] === big.media.file, "failedFiles names the refused file's stored name, in step with failed");
+      ok(r.failedFiles.length === 0, "everything went: no failedFiles");
 
       // Nothing goes: throws, stores nothing.
       failNames = new Set(["a.pdf", "b.pdf"]);

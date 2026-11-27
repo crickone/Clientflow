@@ -8,6 +8,8 @@ import { boundTenantId, getCurrentTenant } from "@/lib/db/tenant";
 import { ingestMessageMediaLater } from "@/lib/inbox/media";
 import { mediaPlaceholder, nameFromUrl, type MessageMedia } from "@/lib/inbox/mediaModel";
 import { attachmentLabel, checkOutgoingSet, type OutgoingFile } from "@/lib/attachments/outgoingModel";
+import { publicFileUrl } from "@/lib/attachments/publicLink";
+import { getAppBaseUrl } from "@/lib/appUrl";
 import { GRAPH_BASE, metaApiError } from "@/lib/facebook/graph";
 import { notePageRefusal } from "@/lib/facebook/health";
 import { getPageTokenForTenant } from "@/lib/facebook/pages";
@@ -295,7 +297,8 @@ const META_ATTACHMENT_TYPE: Record<MessageMedia["kind"], "image" | "video" | "au
 };
 
 /**
- * The multipart body that uploads one file with a reply: `recipient` and
+ * Messenger only (Instagram takes a URL, see dmAttachmentUrlBody). The
+ * multipart body that uploads one file with a reply: `recipient` and
  * `message` as JSON strings, the messaging type (and tag) for the window,
  * and the file as `filedata`. Pure.
  */
@@ -317,13 +320,30 @@ export function dmAttachmentForm(input: {
 }
 
 /**
+ * The JSON body that sends one file on Instagram. Instagram takes a file only
+ * by URL (no multipart upload), so the URL is a short-lived signed public link
+ * Meta fetches (lib/attachments/publicLink.ts). Same window fields as text. Pure.
+ */
+export function dmAttachmentUrlBody(input: { recipientId: string; window: ReplyWindow; kind: MessageMedia["kind"]; url: string }): Record<string, unknown> {
+  const type = META_ATTACHMENT_TYPE[input.kind] ?? "file";
+  return {
+    recipient: { id: input.recipientId },
+    message: { attachment: { type, payload: { url: input.url } } },
+    ...messagingFields(input.window),
+  };
+}
+
+/** How long a file send may take before it is given up on. */
+export const DM_FILE_TIMEOUT_MS = 60_000;
+
+/**
  * Reply on the contact's Messenger / Instagram conversation and record it.
  * Text goes first, then each file as its own message and row. Throws with a
  * plain reason when Meta would refuse (window closed, Page disconnected), or
  * when nothing at all was sent, so the caller keeps the draft. A file Meta
  * refuses after something went is stored as a failed row with its reason.
  */
-export async function sendDm(input: SendDmInput): Promise<{ messageId: number; providerMessageId: string; channel: DmChannel; failed: string[] }> {
+export async function sendDm(input: SendDmInput): Promise<{ messageId: number; providerMessageId: string; channel: DmChannel; failed: string[]; failedFiles: string[] }> {
   const text = (input.text ?? "").trim();
   const files = input.attachments ?? [];
   if (!text && files.length === 0) throw new Error("Message is empty.");
@@ -336,12 +356,21 @@ export async function sendDm(input: SendDmInput): Promise<{ messageId: number; p
   }
   const refusal = dmSendRefusal(target.window, { label, aiGenerated: input.aiGenerated, humanAgentApproved: humanAgentApproved() });
   if (refusal) throw new Error(refusal);
-  const token = getPageTokenForTenant(boundTenantId() ?? getCurrentTenant().id, target.pageId);
+  const tenantId = boundTenantId() ?? getCurrentTenant().id;
+  const token = getPageTokenForTenant(tenantId, target.pageId);
   if (!token) throw new Error("The Facebook Page for this conversation is no longer connected.");
 
   const url = `${GRAPH_BASE}/${encodeURIComponent(target.pageId)}/messages?` + new URLSearchParams({ access_token: token });
   const post = async (init: RequestInit): Promise<string> => {
-    const res = await fetch(url, { method: "POST", ...init });
+    let res: Response;
+    try {
+      res = await fetch(url, { method: "POST", ...init });
+    } catch (err) {
+      if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+        throw new Error(`${label} took more than a minute to take the file. Check the conversation before you send it again.`);
+      }
+      throw err;
+    }
     const json = (await res.json().catch(() => ({}))) as { message_id?: string; error?: { message?: string } };
     if (!res.ok || !json.message_id) {
       const err = metaApiError(json, res.status, `${label} send failed (${res.status}).`);
@@ -372,12 +401,25 @@ export async function sendDm(input: SendDmInput): Promise<{ messageId: number; p
 
   // As in sendWhatsApp: failures before anything went wait, so a send where nothing went stores nothing.
   const failed: string[] = [];
+  const failedFiles: string[] = [];
   let waiting: Array<{ media: MessageMedia; error: string }> = [];
   for (const f of files) {
     try {
-      const providerMessageId = await post({
-        body: dmAttachmentForm({ recipientId: target.externalId, window: target.window, file: { kind: f.media.kind, mime: f.media.mime, name: f.media.name, bytes: f.bytes } }),
-      });
+      let init: RequestInit;
+      if (target.channel === "instagram") {
+        // Instagram fetches the file from a URL; Messenger takes the upload.
+        const link = publicFileUrl(getAppBaseUrl(), { tenantId, file: f.media.file });
+        if (!link) throw new Error("Files can't be sent on Instagram from this server yet.");
+        init = {
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dmAttachmentUrlBody({ recipientId: target.externalId, window: target.window, kind: f.media.kind, url: link })),
+        };
+      } else {
+        init = {
+          body: dmAttachmentForm({ recipientId: target.externalId, window: target.window, file: { kind: f.media.kind, mime: f.media.mime, name: f.media.name, bytes: f.bytes } }),
+        };
+      }
+      const providerMessageId = await post({ ...init, signal: AbortSignal.timeout(DM_FILE_TIMEOUT_MS) });
       for (const w of waiting) store({ content: mediaPlaceholder(w.media.kind), providerMessageId: null, media: [w.media], status: "failed", error: w.error });
       waiting = [];
       const stored = store({ content: mediaPlaceholder(f.media.kind), providerMessageId, media: [f.media] });
@@ -385,6 +427,7 @@ export async function sendDm(input: SendDmInput): Promise<{ messageId: number; p
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       failed.push(`${attachmentLabel(f.media)}: ${reason}`);
+      failedFiles.push(f.media.file);
       if (first) store({ content: mediaPlaceholder(f.media.kind), providerMessageId: null, media: [f.media], status: "failed", error: reason });
       else waiting.push({ media: f.media, error: reason });
     }
@@ -392,7 +435,7 @@ export async function sendDm(input: SendDmInput): Promise<{ messageId: number; p
   if (!first) throw new Error(failed.length === 1 ? failed[0] : `Nothing was sent. ${failed.join(" ")}`);
 
   await logActivity(`${target.channel}.sent`, `${label} reply sent`, input.subjectType === "lead" ? { leadId: input.subjectId } : { clientId: input.subjectId });
-  return { ...first, channel: target.channel, failed };
+  return { ...first, channel: target.channel, failed, failedFiles };
 }
 
 const NAME_FILL_EVERY_MS = 6 * 60 * 60 * 1000;

@@ -58,7 +58,7 @@ export async function uploadToDrive(
   const body = Buffer.concat([pre, file.bytes, post]);
   const res = await fetch(`${DRIVE_UPLOAD}?uploadType=multipart&fields=id,webViewLink`, {
     method: "POST",
-    headers: { ...headers, "Content-Type": `multipart/related; boundary=${boundary}` },
+    headers: { ...headers, "Content-Type": `multipart/related; boundary="${boundary}"` },
     body,
   });
   if (!res.ok) throw new Error(`Drive upload failed: ${res.status} ${await res.text()}`);

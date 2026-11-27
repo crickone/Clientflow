@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { sendClientWhatsAppAction } from "@/app/clients/actions";
 import { ConversationThread, type ThreadMessage } from "./ConversationThread";
-import { failedFilesNote } from "./attachmentsModel";
+import { failedFilesNote, type SendOutcome } from "./attachmentsModel";
 
 export function ClientConversation({
   clientId,
@@ -39,13 +39,13 @@ export function ClientConversation({
     };
   }, [clientId, hasPhone, router]);
 
-  function handleSend(text: string, attachments: string[]): Promise<boolean> {
+  function handleSend(text: string, attachments: string[]): Promise<SendOutcome> {
     return new Promise((resolve) => {
       start(async () => {
         const res = await sendClientWhatsAppAction(clientId, text, attachments.length ? attachments : undefined);
         if (!res.ok) {
           toast.error(res.error);
-          resolve(false);
+          resolve(res);
           return;
         }
         if (attachments.length) {
@@ -68,7 +68,7 @@ export function ClientConversation({
         const note = failedFilesNote(res.failed);
         if (note) toast.error(note);
         else toast.success("Sent via WhatsApp.");
-        resolve(true);
+        resolve(res);
       });
     });
   }

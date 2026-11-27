@@ -218,7 +218,7 @@ export async function gmailSend(
         "/messages/send?uploadType=multipart",
         {
           method: "POST",
-          headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
+          headers: { "Content-Type": `multipart/related; boundary="${boundary}"` },
           body: gmailUploadBody(mime, opts.threadId, boundary),
         },
         GMAIL_UPLOAD_API,

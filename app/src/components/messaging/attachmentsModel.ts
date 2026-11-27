@@ -5,7 +5,7 @@
  * shown when some files did not go. No DOM, no React, so it is tested bare
  * (attachmentsModel.test.ts); useAttachments.ts drives it.
  */
-import { checkOutgoingFile, OUTGOING_LIMITS, OUTGOING_TOO_MANY_ERROR } from "@/lib/attachments/outgoingModel";
+import { ATTACHMENT_EXPIRED_ERROR, checkOutgoingFile, OUTGOING_LIMITS, OUTGOING_TOO_MANY_ERROR } from "@/lib/attachments/outgoingModel";
 import type { MediaKind, MessageMedia } from "@/lib/inbox/mediaModel";
 
 export type AttachmentStatus = "uploading" | "ready" | "error";
@@ -22,6 +22,8 @@ export interface AttachmentItem {
   token?: string;
   /** The stored file's record, once uploaded. */
   media?: MessageMedia;
+  /** When the ticket runs out (this browser's clock), once uploaded. */
+  expiresAt?: number;
   error?: string;
 }
 
@@ -82,6 +84,40 @@ export function composerReady(text: string, items: ReadonlyArray<Pick<Attachment
 /** The tickets of the uploaded files, in the order they were added. */
 export function readyTokens(items: ReadonlyArray<Pick<AttachmentItem, "status" | "token">>): string[] {
   return items.filter((i) => i.status === "ready" && i.token).map((i) => i.token as string);
+}
+
+/** The chip line for a file whose ticket ran out. */
+export const EXPIRED_CHIP_ERROR = "Expired. Attach it again.";
+
+/**
+ * What the send told the composer: it went (perhaps with some files refused,
+ * named by their stored file names in `failedFiles`), or it did not. The send
+ * actions' own results have this shape.
+ */
+export type SendOutcome = { ok: true; failedFiles?: ReadonlyArray<string> } | { ok: false; error: string };
+
+/**
+ * What to do with the chips that were in a send, once it answers:
+ * - it went: take off every file that went; a refused file stays, ready to
+ *   send again;
+ * - refused as expired: mark the files whose ticket has run out (all of them
+ *   when none looks out of date, as when a file has gone from the server), so
+ *   they don't look ready;
+ * - any other refusal: leave everything as it was.
+ * Chips added while the send was out are not in `sent` and are never touched.
+ */
+export function trayAfterSend(
+  sent: ReadonlyArray<Pick<AttachmentItem, "id" | "media" | "expiresAt">>,
+  outcome: SendOutcome,
+  now: number,
+): { remove: string[]; expire: string[] } {
+  if (outcome.ok) {
+    const refused = new Set(outcome.failedFiles ?? []);
+    return { remove: sent.filter((i) => !(i.media && refused.has(i.media.file))).map((i) => i.id), expire: [] };
+  }
+  if (outcome.error !== ATTACHMENT_EXPIRED_ERROR) return { remove: [], expire: [] };
+  const old = sent.filter((i) => i.expiresAt !== undefined && i.expiresAt <= now);
+  return { remove: [], expire: (old.length ? old : sent).map((i) => i.id) };
 }
 
 /** The line shown when a send went but some files did not; null when everything went. */

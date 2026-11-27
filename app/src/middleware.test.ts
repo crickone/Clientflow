@@ -46,6 +46,14 @@ async function main() {
     const res = middleware(new NextRequest(`https://app.adonisagent.ie${path}`, { headers: { host: "app.adonisagent.ie" } }));
     assert.equal(res?.headers.get("location") ?? null, null, `${path}: reachable without a session`);
   }
+  // Instagram takes a sent file only by URL, fetched by Meta with no session.
+  // The signed link is public; the upload route beside it is not.
+  {
+    const pub = middleware(new NextRequest("https://app.adonisagent.ie/api/messages/attachments/public/sometoken", { headers: { host: "app.adonisagent.ie" } }));
+    assert.equal(pub?.status === 401 || pub?.headers.get("location") ? "blocked" : "open", "open", "instagram file link: reachable without a session");
+    const up = middleware(new NextRequest("https://app.adonisagent.ie/api/messages/attachments", { method: "POST", headers: { host: "app.adonisagent.ie" } }));
+    assert.ok(up?.status === 401 || !!up?.headers.get("location"), "upload route: still needs a session");
+  }
   // A client domain through the Cloudflare Worker: trusted only with the
   // secret, rewritten under the placeholder slug, the domain handed on to the
   // page and the secret never passed further.

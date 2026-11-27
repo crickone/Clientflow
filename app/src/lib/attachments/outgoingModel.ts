@@ -15,7 +15,7 @@ import { baseMime, classifyMime, type MediaKind, type MessageMedia } from "@/lib
 export const OUTGOING_LIMITS = {
   maxFiles: 5,
   maxFileBytes: 16 * 1024 * 1024,
-  maxEmailBytes: 20 * 1024 * 1024,
+  maxEmailBytes: 18 * 1024 * 1024,
 } as const;
 
 export type OutgoingChannel = "whatsapp" | "messenger" | "instagram" | "email" | "note";
@@ -31,8 +31,12 @@ export const OUTGOING_TYPE_ERROR =
 export const OUTGOING_TOO_BIG_ERROR = "That file is too big. Files can be up to 16 MB.";
 export const OUTGOING_EMPTY_ERROR = "That file is empty.";
 export const OUTGOING_TOO_MANY_ERROR = "You can attach up to 5 files.";
-export const OUTGOING_EMAIL_TOTAL_ERROR = "Email attachments can be up to 20 MB in total.";
+export const OUTGOING_EMAIL_TOTAL_ERROR = "Email attachments can be up to 18 MB in total.";
 export const OUTGOING_MISMATCH_ERROR = "That file isn't what its name says. Attach a different file.";
+/** A send whose ticket has run out (or whose file has gone) is refused with this. */
+export const ATTACHMENT_EXPIRED_ERROR = "That attachment has expired. Attach it again.";
+/** How long an upload ticket lasts (lib/attachments/token.ts); the composer uses it to tell which chips ran out. */
+export const ATTACHMENT_TICKET_TTL_MS = 2 * 60 * 60 * 1000;
 
 /** The allowed types and the file extensions that name them. */
 const ALLOWED: Record<string, string[]> = {
@@ -167,7 +171,7 @@ export function sniffMatches(mime: string, head: Uint8Array): boolean {
 
 /**
  * The rules for the whole set on one message: at most 5 files, each within
- * the per-file cap, and for email no more than 20 MB together.
+ * the per-file cap, and for email no more than 18 MB together (base64 makes that about 24 MB on the wire, under the 25 MB providers allow).
  */
 export function checkOutgoingSet(
   files: ReadonlyArray<{ size: number }>,

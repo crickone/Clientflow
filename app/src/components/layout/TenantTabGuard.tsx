@@ -9,6 +9,7 @@ import {
   TENANT_STAMP_HEADER,
   isOwnApiUrl,
 } from "@/lib/api/tenantStampRules";
+import { TENANT_MISMATCH_EVENT, setTabTenant } from "@/lib/api/tabTenant";
 
 /**
  * Keeps a browser tab honest about which clinic it is in.
@@ -35,9 +36,23 @@ import {
  *
  * `tenantId` null (login, select-account, the bare pages) stamps nothing: there
  * is no clinic to be wrong about yet.
+ *
+ * Requests made with XMLHttpRequest (file uploads, for progress) do not pass
+ * through fetch; they read the same tenant from @/lib/api/tabTenant, and report
+ * a stale-tab 409 back here through TENANT_MISMATCH_EVENT.
  */
 export function TenantTabGuard({ tenantId }: { tenantId: number | null }) {
   const [stale, setStale] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTabTenant(tenantId);
+    const onMismatch = (e: Event) => setStale((e as CustomEvent<string>).detail ?? null);
+    window.addEventListener(TENANT_MISMATCH_EVENT, onMismatch);
+    return () => {
+      window.removeEventListener(TENANT_MISMATCH_EVENT, onMismatch);
+      setTabTenant(null);
+    };
+  }, [tenantId]);
 
   useEffect(() => {
     if (tenantId == null) return;

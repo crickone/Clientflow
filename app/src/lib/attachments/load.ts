@@ -4,12 +4,12 @@ import fs from "node:fs";
 
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { inboxMediaPath } from "@/lib/inbox/media";
-import { OUTGOING_LIMITS, OUTGOING_TOO_MANY_ERROR, type OutgoingFile } from "./outgoingModel";
+import { ATTACHMENT_EXPIRED_ERROR, OUTGOING_LIMITS, OUTGOING_TOO_MANY_ERROR, type OutgoingFile } from "./outgoingModel";
 import { verifyAttachment } from "./token";
 
 export type { OutgoingFile } from "./outgoingModel";
 
-export const ATTACHMENT_EXPIRED_ERROR = "That attachment has expired. Attach it again.";
+export { ATTACHMENT_EXPIRED_ERROR };
 
 /**
  * Turn the tickets a composer sent with its message into the files to send.

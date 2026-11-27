@@ -44,12 +44,12 @@ export async function sendReply(input: {
   aiGenerated?: boolean;
   /** Files to send after the text, on the same channel. */
   attachments?: OutgoingFile[];
-}): Promise<{ messageId: number; channel: ReplyChannel; failed: string[] }> {
+}): Promise<{ messageId: number; channel: ReplyChannel; failed: string[]; failedFiles: string[] }> {
   const channel = lastInboundChannel(input.subjectType, input.subjectId);
   if (channel === "messenger" || channel === "instagram") {
     const sent = await sendDm(input);
-    return { messageId: sent.messageId, channel: sent.channel, failed: sent.failed };
+    return { messageId: sent.messageId, channel: sent.channel, failed: sent.failed, failedFiles: sent.failedFiles };
   }
   const sent = await sendWhatsApp(input);
-  return { messageId: sent.messageId, channel: "whatsapp", failed: sent.failed };
+  return { messageId: sent.messageId, channel: "whatsapp", failed: sent.failed, failedFiles: sent.failedFiles };
 }

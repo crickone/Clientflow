@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/Input";
 import { isMediaPlaceholder, type MessageMedia } from "@/lib/inbox/mediaModel";
 import { MessageBody } from "./MessageBody";
 import { AttachButton, AttachmentTray, DropHint } from "./AttachmentTray";
-import { useAttachments } from "./useAttachments";
+import { useAttachments, type SendOutcome } from "./useAttachments";
 
 export interface ThreadMessage {
   id: number;
@@ -64,7 +64,12 @@ export function ConversationThread({
   messages: ThreadMessage[];
   canSend: boolean;
   sending: boolean;
-  onSend: (text: string, attachments: string[]) => void | boolean | Promise<boolean | void>;
+  /**
+   * Returns false (or a failed outcome) when nothing went, so the text and
+   * files stay. A send's outcome (`{ ok, failedFiles }`) also keeps any file
+   * that was refused while the rest went, and marks expired tickets.
+   */
+  onSend: (text: string, attachments: string[]) => void | boolean | SendOutcome | Promise<boolean | void | SendOutcome>;
   emptyHint?: string;
   seedText?: string;
   /** The channel the reply goes out on, for the placeholder and button. */
@@ -81,6 +86,7 @@ export function ConversationThread({
   const [text, setText] = useState("");
   const att = useAttachments({ disabled: !canSend });
   const scroller = useRef<HTMLDivElement>(null);
+  const inFlight = useRef(false);
   // Lets the parent drop an AI draft into the composer ("Edit" on the draft banner).
   useEffect(() => {
     if (seedText) setText(seedText);
@@ -93,16 +99,26 @@ export function ConversationThread({
 
   async function send() {
     const t = text.trim();
-    if (!att.readyWith(t)) return;
+    // One send at a time: the files stay in the tray until it answers, so a
+    // second Enter before `sending` re-renders would send them twice.
+    if (inFlight.current || !att.readyWith(t)) return;
     const tokens = att.tokens;
+    const sentItems = att.ready;
     setText("");
-    const result = await onSend(t, tokens);
-    if (result === false) {
-      // Keep what was written; the files are still in the tray.
-      setText((now) => (now.trim() ? now : t));
-      return;
+    inFlight.current = true;
+    let result: Awaited<ReturnType<typeof onSend>>;
+    try {
+      result = await onSend(t, tokens);
+    } finally {
+      inFlight.current = false;
     }
-    att.clear();
+    const outcome: SendOutcome =
+      result === false ? { ok: false, error: "" } : result && typeof result === "object" ? result : { ok: true };
+    if (!outcome.ok) {
+      // Keep what was written; the files stay in the tray (expired ones marked).
+      setText((now) => (now.trim() ? now : t));
+    }
+    att.afterSend(sentItems, outcome);
   }
 
   let lastDay = "";

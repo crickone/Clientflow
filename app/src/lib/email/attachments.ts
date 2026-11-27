@@ -36,7 +36,7 @@ export function emailAttachmentsFrom(files: ReadonlyArray<OutgoingFile> | undefi
 
 /**
  * Why a set of email attachments can't go, or null when it can: more than 5
- * files, a file over 16 MB, or more than 20 MB in total (the same rules and
+ * files, a file over 16 MB, or more than 18 MB in total (the same rules and
  * copy the composer uses, lib/attachments/outgoingModel). Checked before
  * anything is sent.
  */

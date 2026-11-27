@@ -3,12 +3,16 @@
 // The message-box attachments refuse a bad file the moment it is picked,
 // read the upload route's answer (including the non-JSON ones a proxy or a
 // dropped connection gives), decide whether Send is ready, and word the line
-// shown when some files did not go. All pure, so tested here.
+// shown when some files did not go. After a send, only the files that went
+// come off the tray: a refused file stays, and an expired ticket is marked as
+// an error rather than left looking ready. All pure, so tested here.
 import assert from "node:assert/strict";
 
 import {
   composerReady,
+  EXPIRED_CHIP_ERROR,
   failedFilesNote,
+  trayAfterSend,
   parseUploadResponse,
   precheckFiles,
   readyTokens,
@@ -141,5 +145,29 @@ eq(
   "2 files were not sent. a.pdf: Too large. Photo: Refused.",
   "several files, each ends with a full stop",
 );
+
+// What a send does to the tray.
+{
+  const T0 = 1_000_000;
+  const media = (file: string) => ({ kind: "file" as const, file, mime: "application/pdf", size: 1 });
+  const sent = [
+    { id: "a", media: media("a".repeat(32) + ".pdf"), expiresAt: T0 - 1 },
+    { id: "b", media: media("b".repeat(32) + ".pdf"), expiresAt: T0 + 60_000 },
+    { id: "c", media: media("c".repeat(32) + ".pdf"), expiresAt: T0 + 60_000 },
+  ];
+  const all = trayAfterSend(sent, { ok: true }, T0);
+  eq(all.remove.join(","), "a,b,c", "all went: every sent chip comes off");
+  const part = trayAfterSend(sent, { ok: true, failedFiles: ["b".repeat(32) + ".pdf"] }, T0);
+  eq(part.remove.join(","), "a,c", "partial: the refused file stays");
+  eq(part.expire.length, 0, "partial: nothing marked expired");
+  const exp = trayAfterSend(sent, { ok: false, error: "That attachment has expired. Attach it again." }, T0);
+  eq(exp.expire.join(","), "a", "expired: only the chip whose ticket ran out is marked");
+  eq(exp.remove.length, 0, "expired: nothing taken off");
+  const gone = trayAfterSend([sent[1], sent[2]], { ok: false, error: "That attachment has expired. Attach it again." }, T0);
+  eq(gone.expire.join(","), "b,c", "expired but none look old (file gone): all sent chips marked");
+  const other = trayAfterSend(sent, { ok: false, error: "WhatsApp is not connected." }, T0);
+  eq(other.remove.length + other.expire.length, 0, "other refusal: tray left as it was");
+  eq(EXPIRED_CHIP_ERROR, "Expired. Attach it again.", "expired chip copy");
+}
 
 console.log(`attachmentsModel: ${checks} checks passed`);

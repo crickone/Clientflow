@@ -5,7 +5,10 @@
 // HUMAN_AGENT tag past 24 hours); the reply-window rules refuse a send with
 // files exactly as they refuse text; and sendDm, on a scratch business with a
 // stand-in Graph API, posts the text as JSON then each file as multipart,
-// one row each, a refused file stored failed with its reason.
+// one row each, a refused file stored failed with its reason. Instagram takes
+// files only by URL: each goes as JSON with a signed 15-minute public link
+// that the public route serves back. A stalled file send gives up after a
+// minute with a plain reason.
 import Module from "node:module";
 
 type Loader = (request: string, ...rest: unknown[]) => unknown;
@@ -31,6 +34,9 @@ import { makeScratchTenant } from "@/lib/leadFlows/testing/harness";
 import { parseMedia, type MessageMedia } from "@/lib/inbox/mediaModel";
 import type { OutgoingFile } from "@/lib/attachments/outgoingModel";
 
+process.env.APP_URL = "https://app.example.test";
+if (!process.env.SOCIAL_TOKEN_SECRET && !process.env.EMAIL_TOKEN_SECRET) process.env.EMAIL_TOKEN_SECRET = "dm-send-test-secret";
+
 fs.rmSync(path.join(process.cwd(), "data", "tenants", "dm-send-test"), { recursive: true, force: true });
 const scratch = makeScratchTenant("dm-send-test");
 
@@ -44,9 +50,16 @@ function file(kind: MessageMedia["kind"], mime: string, name?: string): Outgoing
 type Posted = { json?: Record<string, unknown>; form?: FormData; url: string };
 let posted: Posted[] = [];
 let refuseMime = "";
+let stall = false;
 let seq = 0;
 globalThis.fetch = (async (url: string, init: RequestInit) => {
   const p: Posted = { url: String(url) };
+  if (stall) {
+    // Never answers; only the caller's timeout signal ends it.
+    return new Promise<Response>((_resolve, reject) => {
+      init.signal?.addEventListener("abort", () => reject(init.signal!.reason));
+    });
+  }
   if (init.body instanceof FormData) p.form = init.body;
   else p.json = JSON.parse(String(init.body));
   const mime = p.form ? (p.form.get("filedata") as File).type : "";
@@ -58,7 +71,8 @@ globalThis.fetch = (async (url: string, init: RequestInit) => {
 }) as typeof fetch;
 
 (async () => {
-  const { dmAttachmentForm, dmSendRefusal, sendDm } = await import("./dm");
+  const { dmAttachmentForm, dmAttachmentUrlBody, dmSendRefusal, sendDm } = await import("./dm");
+  const { verifyPublicFile } = await import("@/lib/attachments/publicLink");
   let n = 0;
   const ok = (c: boolean, m: string) => {
     assert.ok(c, m);
@@ -81,6 +95,16 @@ globalThis.fetch = (async (url: string, init: RequestInit) => {
   const late = dmAttachmentForm({ recipientId: "psid-1", window: "human_only", file: { kind: "image", mime: "image/png", bytes } });
   ok(late.get("messaging_type") === "MESSAGE_TAG" && late.get("tag") === "HUMAN_AGENT", "past 24h: HUMAN_AGENT tag");
   ok((late.get("filedata") as File).name === "image", "an unnamed file still gets a name");
+
+  // The Instagram URL body.
+  for (const [kind, type] of kinds) {
+    const b = dmAttachmentUrlBody({ recipientId: "igsid-1", window: "open", kind, url: "https://x.test/f" }) as { message: { attachment: { type: string; payload: { url: string } } } };
+    ok(b.message.attachment.type === type && b.message.attachment.payload.url === "https://x.test/f", `instagram ${kind} -> ${type} by url`);
+  }
+  const igOpen = dmAttachmentUrlBody({ recipientId: "igsid-1", window: "open", kind: "image", url: "https://x.test/f" });
+  ok(JSON.stringify(igOpen) === JSON.stringify({ recipient: { id: "igsid-1" }, message: { attachment: { type: "image", payload: { url: "https://x.test/f" } } }, messaging_type: "RESPONSE" }), "instagram body: recipient, url attachment, RESPONSE");
+  const igLate = dmAttachmentUrlBody({ recipientId: "igsid-1", window: "human_only", kind: "file", url: "https://x.test/f" });
+  ok(igLate.messaging_type === "MESSAGE_TAG" && igLate.tag === "HUMAN_AGENT", "instagram past 24h: HUMAN_AGENT tag");
 
   // The window rules (the same for text and files).
   ok(dmSendRefusal("open", { label: "Messenger", humanAgentApproved: false }) === null, "open: allowed");
@@ -123,6 +147,7 @@ globalThis.fetch = (async (url: string, init: RequestInit) => {
       const part = rows().slice(before);
       ok(part.length === 2 && part[0].status === "failed" && /Upload attachment failure/.test(part[0].error ?? "") && part[0].providerMessageId === null, "the refused file: failed with Meta's reason");
       ok(part[1].status === "sent" && p.messageId === part[1].id && p.failed.length === 1 && p.failed[0].startsWith("clip.mp4: "), "the other file went, failed names the refused one");
+      ok(p.failedFiles.length === 1 && parseMedia(part[0].media)[0]?.file === p.failedFiles[0], "failedFiles names the refused file's stored name");
 
       // Nothing goes: throws, nothing stored.
       const beforeNone = rows().length;
@@ -160,6 +185,36 @@ globalThis.fetch = (async (url: string, init: RequestInit) => {
       db.insert(schema.leadMessages).values({ leadId: lead.id, direction: "inbound", channel: "messenger", content: "Hi", providerMessageId: "mid.in-1" }).run();
       const reply = await sendReply({ subjectType: "lead", subjectId: lead.id, text: "", attachments: [file("file", "application/pdf", "menu.pdf")] });
       ok(reply.channel === "messenger" && posted.length === 1 && !!posted[0].form && reply.failed.length === 0, "sendReply: the file goes on Messenger");
+
+      // A file send that never answers gives up with a plain reason (shortened timeout).
+      const realTimeout = AbortSignal.timeout;
+      AbortSignal.timeout = () => realTimeout.call(AbortSignal, 20);
+      stall = true;
+      const beforeStall = rows().length;
+      await assert.rejects(() => sendDm({ subjectType: "lead", subjectId: lead.id, attachments: [file("image", "image/png", "slow.png")] }), /slow\.png: Messenger took more than a minute/);
+      stall = false;
+      AbortSignal.timeout = realTimeout;
+      ok(rows().length === beforeStall, "timed out: nothing stored");
+
+      // Instagram: text as before, each file as JSON with a signed public link.
+      const [igLead] = db.insert(schema.leads).values({ source: "instagram", firstName: "Insta", inboxOnly: true }).returning().all();
+      db.insert(schema.socialContacts).values({ channel: "instagram", externalId: "igsid-9", pageId: "page-1", ownerType: "lead", ownerId: igLead.id, lastInboundAt: new Date() }).run();
+      posted = [];
+      const igPhoto = file("image", "image/jpeg", "room.jpg");
+      const igPdf = file("file", "application/pdf", "menu.pdf");
+      const ig = await sendDm({ subjectType: "lead", subjectId: igLead.id, text: "Here", attachments: [igPhoto, igPdf] });
+      ok(ig.channel === "instagram" && ig.failed.length === 0 && posted.length === 3, "instagram: text and two files sent");
+      ok(posted.every((p) => !!p.json && !p.form), "instagram: every post is JSON, no multipart");
+      const att = (i: number) => (posted[i].json!.message as { attachment: { type: string; payload: { url: string } } }).attachment;
+      ok(att(1).type === "image" && att(2).type === "file", "instagram: types follow the files");
+      const prefix = "https://app.example.test/api/messages/attachments/public/";
+      ok(att(1).payload.url.startsWith(prefix) && att(2).payload.url.startsWith(prefix), "instagram: links on the app's public base url");
+      const claim = verifyPublicFile(decodeURIComponent(att(1).payload.url.slice(prefix.length)));
+      ok(!!claim && claim.tenantId === scratch.tid && claim.file === igPhoto.media.file, "instagram: the link names this business and that file");
+      ok(!!claim && claim.expiresAt - Date.now() <= 15 * 60 * 1000 && claim.expiresAt - Date.now() > 14 * 60 * 1000, "instagram: the link lasts 15 minutes");
+      ok((posted[1].json!.recipient as { id: string }).id === "igsid-9" && posted[1].json!.messaging_type === "RESPONSE", "instagram: recipient and window fields");
+      const igRows = db.select().from(schema.leadMessages).where(eq(schema.leadMessages.leadId, igLead.id)).orderBy(asc(schema.leadMessages.id)).all();
+      ok(igRows.length === 3 && igRows.every((x) => x.status === "sent" && x.channel === "instagram") && parseMedia(igRows[2].media)[0]?.name === "menu.pdf", "instagram: three rows, media on the file rows");
     });
     console.log(`dm send: ${n} checks passed.`);
   } finally {

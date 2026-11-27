@@ -5,7 +5,7 @@
 // travels inline as a data URL with its name encoded, and sendMedia posts it
 // with the same auth and reply parsing as sendText. No real provider is hit.
 import assert from "node:assert/strict";
-import { WhapiBridge, whapiMediaPayload } from "./whapi";
+import { WHAPI_MEDIA_TIMEOUT_ERROR, WHAPI_MEDIA_TIMEOUT_MS, WhapiBridge, whapiMediaPayload } from "./whapi";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -72,6 +72,21 @@ check("a name with ; and , cannot break the data URL", semicolon.body.media.star
 
   await assert.rejects(() => bridge.sendMedia("", { kind: "image", mime: "image/png", bytes }), /empty after normalization/);
   passed++;
+
+  // A file send carries a one-minute timeout, and a stall gives the plain reason.
+  check("timeout is a minute", WHAPI_MEDIA_TIMEOUT_MS === 60_000);
+  reply = new Response(JSON.stringify({ message: { id: "m-2" } }), { status: 200 });
+  await bridge.sendMedia("353800000001", { kind: "image", mime: "image/png", bytes });
+  check("sendMedia passes an abort signal", calls[calls.length - 1].init.signal instanceof AbortSignal);
+  const realTimeout = AbortSignal.timeout;
+  AbortSignal.timeout = () => realTimeout.call(AbortSignal, 20);
+  globalThis.fetch = ((_url: string, init: RequestInit) =>
+    new Promise<Response>((_resolve, reject) => {
+      init.signal?.addEventListener("abort", () => reject(init.signal!.reason));
+    })) as typeof fetch;
+  await assert.rejects(() => bridge.sendMedia("353800000001", { kind: "video", mime: "video/mp4", bytes }), (e: Error) => e.message === WHAPI_MEDIA_TIMEOUT_ERROR);
+  passed++;
+  AbortSignal.timeout = realTimeout;
 
   console.log(`whapi send: ${passed} checks passed.`);
 })().catch((err) => {

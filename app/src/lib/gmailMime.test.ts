@@ -148,8 +148,8 @@ ok(emailAttachmentsFrom(undefined).length === 0, "none -> []");
 const mb = 1024 * 1024;
 const att = (size: number) => ({ content: Buffer.alloc(size) });
 ok(emailAttachmentsRefusal(undefined) === null && emailAttachmentsRefusal([]) === null, "no files: nothing to refuse");
-ok(emailAttachmentsRefusal([att(10 * mb), att(10 * mb)]) === null, "exactly 20 MB ok");
-ok(emailAttachmentsRefusal([att(10 * mb), att(10 * mb + 1)]) === OUTGOING_EMAIL_TOTAL_ERROR, "over 20 MB refused");
+ok(emailAttachmentsRefusal([att(9 * mb), att(9 * mb)]) === null, "exactly 18 MB ok");
+ok(emailAttachmentsRefusal([att(9 * mb), att(9 * mb + 1)]) === OUTGOING_EMAIL_TOTAL_ERROR, "over 18 MB refused");
 ok(emailAttachmentsRefusal([att(1), att(1), att(1), att(1), att(1), att(1)]) === OUTGOING_TOO_MANY_ERROR, "6 files refused");
 
 console.log(`gmailMime: ${n} checks passed.`);

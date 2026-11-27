@@ -21,18 +21,18 @@ export async function sendClientWhatsAppAction(
   text: string,
   /** Attachment tickets from the upload route; optional. */
   attachmentTokens?: string[],
-): Promise<{ ok: true; messageId: number; failed: string[] } | { ok: false; error: string }> {
+): Promise<{ ok: true; messageId: number; failed: string[]; failedFiles: string[] } | { ok: false; error: string }> {
   await requireUser();
   try {
     const attachments = loadAttachments(attachmentTokens);
-    const { messageId, failed } = await sendWhatsApp({
+    const { messageId, failed, failedFiles } = await sendWhatsApp({
       subjectType: "client",
       subjectId: clientId,
       text,
       ...(attachments.length ? { attachments } : {}),
     });
     revalidatePath(`/clients/${clientId}`);
-    return { ok: true, messageId, failed };
+    return { ok: true, messageId, failed, failedFiles };
   } catch (err) {
     return {
       ok: false,

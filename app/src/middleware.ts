@@ -37,6 +37,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/site-events", // public first-party page-view beacon (cookieless, rate-limited, host-verified, always 204)
   "/api/social/render/", // slide images Meta fetches when publishing a post — signed-token-verified inside the route handler
   "/api/social/video/", // video ads Meta fetches when an ad is uploaded — signed-token-verified inside the route handler
+  "/api/messages/attachments/public/", // files sent on Instagram, which Meta fetches by URL: signed 15-minute link, verified inside the route handler (the upload route beside it stays staff-only)
   "/api/stripe/webhook", // Stripe Connect events (payments on businesses' accounts) — Stripe-Signature-verified inside the route handler
   "/api/offers/checkout", // landing-page Buy button → Stripe Checkout; signed-token-verified inside the route handler, rate-limited
   "/api/voucher-store/checkout", // the voucher store's Pay button → Stripe Checkout; signed-token-verified inside the route handler, rate-limited

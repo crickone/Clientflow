@@ -1,7 +1,7 @@
 // Run: npm test -- src/lib/attachments/outgoingModel.test.ts
 //
 // The outgoing file rules: the type allowlist (and what is refused), the
-// 16 MB per-file cap, 5 files per message, 20 MB per email, and the
+// 16 MB per-file cap, 5 files per message, 18 MB per email, and the
 // first-bytes check against the declared type.
 import assert from "node:assert/strict";
 
@@ -26,7 +26,7 @@ function check(name: string, cond: boolean) {
 const MB = 1024 * 1024;
 
 // Limits, verbatim.
-check("limits", OUTGOING_LIMITS.maxFiles === 5 && OUTGOING_LIMITS.maxFileBytes === 16 * MB && OUTGOING_LIMITS.maxEmailBytes === 20 * MB);
+check("limits", OUTGOING_LIMITS.maxFiles === 5 && OUTGOING_LIMITS.maxFileBytes === 16 * MB && OUTGOING_LIMITS.maxEmailBytes === 18 * MB);
 
 // Every allowed type is ok, with the kind it is shown as.
 const allowed: Array<[string, string, string]> = [
@@ -102,11 +102,11 @@ for (const ch of ["whatsapp", "messenger", "instagram", "email", "note"] as cons
   check(`6 files refused on ${ch}`, !r.ok && r.error === OUTGOING_TOO_MANY_ERROR);
 }
 check("no files ok", checkOutgoingSet([], "email").ok);
-const twoBig = [{ size: 11 * MB }, { size: 10 * MB }];
+const twoBig = [{ size: 9 * MB }, { size: 9 * MB + 1 }];
 const emailOver = checkOutgoingSet(twoBig, "email");
-check("email over 20 MB total refused", !emailOver.ok && emailOver.error === OUTGOING_EMAIL_TOTAL_ERROR);
-check("email exactly 20 MB ok", checkOutgoingSet([{ size: 10 * MB }, { size: 10 * MB }], "email").ok);
-check("same 21 MB on WhatsApp ok (no total rule)", checkOutgoingSet(twoBig, "whatsapp").ok);
+check("email over 18 MB total refused", !emailOver.ok && emailOver.error === OUTGOING_EMAIL_TOTAL_ERROR);
+check("email exactly 18 MB ok", checkOutgoingSet([{ size: 9 * MB }, { size: 9 * MB }], "email").ok);
+check("same 18 MB plus a byte on WhatsApp ok (no total rule)", checkOutgoingSet(twoBig, "whatsapp").ok);
 check("one file over 16 MB in a set refused", !checkOutgoingSet([{ size: 16 * MB + 1 }], "note").ok);
 
 // Sniff table.

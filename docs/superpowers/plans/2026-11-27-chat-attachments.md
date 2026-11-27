@@ -11,7 +11,7 @@
 **Tech:** Next.js 15 App Router, TypeScript, SQLite/drizzle, better-sqlite3. Tests are plain `tsx` scripts run with `npm test -- <file>` (see any `*.test.ts`).
 
 ## Global constraints (every task)
-- Limits: max 5 files per message; max **16 MB per file**; email total max **20 MB**.
+- Limits: max 5 files per message; max **16 MB per file**; email total max **18 MB** (raw bytes; base64 makes it about 24 MB, under the providers' 25 MB).
 - Allowed types only (outgoing allowlist): image/jpeg, image/png, image/webp, image/gif; application/pdf, msword, docx, ms-excel, xlsx, ms-powerpoint, pptx, text/plain, text/csv; video/mp4, video/quicktime; audio/mpeg, audio/mp4 (m4a), audio/ogg. Everything else refused with a plain reason, e.g. "That kind of file can't be sent. Send a photo, PDF, Word, Excel, PowerPoint, video or audio file." SVG and executables are never allowed.
 - Never trust the browser's mime alone: sniff magic bytes for images/PDF/zip-based Office/mp4 where cheap; reject a mismatch.
 - Tenant isolation: tokens carry the tenant id and are refused in another tenant. Files live in `data/tenants/<slug>/inbox-media/` (mode 0600), served only via `/api/inbox/media/[file]` to signed-in staff of that tenant.
@@ -34,7 +34,7 @@
 - `loadAttachments(tokens: string[] | undefined): OutgoingFile[]` in `load.ts`, where `OutgoingFile = { media: MessageMedia; bytes: Buffer }`. Verifies every token for the current tenant (`getCurrentTenant()`), reads bytes via `inboxMediaPath`, throws `Error("That attachment has expired. Attach it again.")` on any bad token. Empty/undefined -> [].
 - Route `POST /api/messages/attachments`: `guard("user")` like other staff routes; multipart form field `file`; reject > 16 MB before buffering where possible (content-length), then check type, sniff, save with `saveMediaFile(tenant.slug, buf, mime, name)`, respond `{ ok: true, token, media: { kind, file, mime, name, size } }` or `{ ok: false, error }` with 400/413. Also add an app-level route body size note: route handlers read `req.formData()`, no server-action body limit applies.
 
-**Tests:** model rules (each allowed type ok, svg/exe/zip refused, 16 MB+1 refused, 6 files refused, email total over 20 MB refused), sniff table, token round trip, wrong tenant -> null, expired -> null, tampered -> null; route: allowed PDF upload returns token and writes the file; SVG -> 400; mismatched bytes (png mime, pdf bytes) -> 400; unauthenticated -> 401/redirect as the guard does elsewhere (copy the pattern from an existing route test that runs a route in a scratch tenant).
+**Tests:** model rules (each allowed type ok, svg/exe/zip refused, 16 MB+1 refused, 6 files refused, email total over 18 MB refused), sniff table, token round trip, wrong tenant -> null, expired -> null, tampered -> null; route: allowed PDF upload returns token and writes the file; SVG -> 400; mismatched bytes (png mime, pdf bytes) -> 400; unauthenticated -> 401/redirect as the guard does elsewhere (copy the pattern from an existing route test that runs a route in a scratch tenant).
 
 ### Task 2: WhatsApp and Messenger/Instagram media sending
 **Files:** modify `src/lib/whatsapp/whapi.ts`, `src/lib/whatsapp/types.ts`, `src/lib/whatsapp/send.ts`, `src/lib/social/dm.ts`, `src/lib/messaging/reply.ts`; tests next to them.
@@ -53,7 +53,7 @@
 - `lib/clientEmail.ts` send path and the lead email send (`sendLeadEmailAction` -> lead_messages row) accept `attachments?: OutgoingFile[]`, pass them to `sendEmail`, and store `media` on the stored row.
 - The Inbox email reply (`replyEmailAction` path) does the same and stores `media` on its `email_messages` row.
 
-**Tests:** `buildMime` with 0 attachments is byte-identical to today (golden), with 2 attachments is multipart/mixed with the html part first and correct headers; a non-ASCII filename is encoded; Mailgun form has one `attachment` per file; total over 20 MB refused before any send.
+**Tests:** `buildMime` with 0 attachments is byte-identical to today (golden), with 2 attachments is multipart/mixed with the html part first and correct headers; a non-ASCII filename is encoded; Mailgun form has one `attachment` per file; total over 18 MB refused before any send.
 
 ### Task 4: Actions + composer UI
 **Files:** modify the actions `src/app/communication/actions.ts` (`sendInboxMessageAction`, `replyEmailAction`), `src/app/leads/actions.ts` (`sendLeadWhatsAppAction`, `sendLeadEmailAction`, `addLeadNoteAction`), `src/app/clients/actions.ts` (`sendClientWhatsAppAction`), the client email action used by `ClientEmailPanel`; each takes `attachments?: string[]` and calls `loadAttachments`. A team note stores `media` on its `note` row (no sending).

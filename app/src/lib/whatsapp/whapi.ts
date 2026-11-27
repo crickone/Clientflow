@@ -25,6 +25,10 @@ const DEFAULT_BASE = "https://gate.whapi.cloud";
  * credentials in the verification phase; they're isolated here so a tweak never
  * touches callers.
  */
+/** How long one file send to Whapi may take. */
+export const WHAPI_MEDIA_TIMEOUT_MS = 60_000;
+export const WHAPI_MEDIA_TIMEOUT_ERROR = "WhatsApp took more than a minute to take the file. Check the chat before you send it again.";
+
 export class WhapiBridge implements WhatsAppBridge {
   private readonly base: string;
   private readonly token: string;
@@ -59,7 +63,11 @@ export class WhapiBridge implements WhatsAppBridge {
     return parseSendResponse(res);
   }
 
-  /** Send one photo, video, audio file or document, inline as a data URL. */
+  /**
+   * Send one photo, video, audio file or document, inline as a data URL.
+   * Gives up after a minute (WHAPI_MEDIA_TIMEOUT_MS) with a plain reason, so
+   * a stalled upload doesn't leave the composer on "Sending" for ever.
+   */
   async sendMedia(
     toPhone: string,
     file: OutgoingMediaFile,
@@ -67,11 +75,18 @@ export class WhapiBridge implements WhatsAppBridge {
     const to = normalizePhone(toPhone);
     if (!to) throw new Error("Recipient phone is empty after normalization.");
     const { path, body } = whapiMediaPayload(to, file);
-    const res = await fetch(`${this.base}/messages/${path}`, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify(body),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${this.base}/messages/${path}`, {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(WHAPI_MEDIA_TIMEOUT_MS),
+      });
+    } catch (err) {
+      if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) throw new Error(WHAPI_MEDIA_TIMEOUT_ERROR);
+      throw err;
+    }
     return parseSendResponse(res);
   }
 

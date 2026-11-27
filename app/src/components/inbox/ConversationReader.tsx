@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { ConversationThread, type ThreadMessage } from "@/components/messaging/ConversationThread";
 import { loadThreadAction, retriageAction, sendInboxMessageAction } from "@/app/communication/actions";
 import type { ConversationDetail } from "@/lib/conversations";
-import { failedFilesNote } from "@/components/messaging/attachmentsModel";
+import { failedFilesNote, type SendOutcome } from "@/components/messaging/attachmentsModel";
 
 const CHANNEL_LABELS = { whatsapp: "WhatsApp", messenger: "Messenger", instagram: "Instagram" } as const;
 
@@ -54,13 +54,13 @@ export function ConversationReader({
     if (focusReplyToken) composer.current?.focus();
   }, [focusReplyToken]);
 
-  function handleSend(text: string, attachments: string[] = [], fromDraft = false): Promise<boolean> {
+  function handleSend(text: string, attachments: string[] = [], fromDraft = false): Promise<SendOutcome> {
     return new Promise((resolve) => {
       startSend(async () => {
         const res = await sendInboxMessageAction(kind, contactId, text, attachments.length ? attachments : undefined);
         if (!res.ok) {
           toast.error(res.error);
-          resolve(false);
+          resolve(res);
           return;
         }
         if (attachments.length) {
@@ -77,7 +77,7 @@ export function ConversationReader({
         const note = failedFilesNote(res.failed);
         if (note) toast.error(note);
         else toast.success(fromDraft ? "AI reply approved and sent." : `Sent on ${CHANNEL_LABELS[res.channel]}.`);
-        resolve(true);
+        resolve(res);
       });
     });
   }

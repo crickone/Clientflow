@@ -47,13 +47,14 @@ export function ClientEmailPanel({
       return;
     }
     const tokens = att.tokens;
+    const sentItems = att.ready;
     start(async () => {
       const res = await sendClientEmailAction(clientId, { subject, body, ...(tokens.length ? { attachments: tokens } : {}) });
+      att.afterSend(sentItems, res);
       if (!res.ok) { toast.error(res.error); return; }
       toast.success(`Email sent to ${clientEmail}`);
       setSubject("");
       setBody("");
-      att.clear();
     });
   }
 

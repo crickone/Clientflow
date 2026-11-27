@@ -4,13 +4,18 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent,
 
 import {
   composerReady,
+  EXPIRED_CHIP_ERROR,
   parseUploadResponse,
   precheckFiles,
   readyTokens,
+  trayAfterSend,
   type AttachmentItem,
+  type SendOutcome,
 } from "./attachmentsModel";
+import { ATTACHMENT_TICKET_TTL_MS } from "@/lib/attachments/outgoingModel";
+import { reportTenantMismatch, tabTenantHeaders, tenantMismatchMessage } from "@/lib/api/tabTenant";
 
-export type { AttachmentItem } from "./attachmentsModel";
+export type { AttachmentItem, SendOutcome } from "./attachmentsModel";
 
 const UPLOAD_URL = "/api/messages/attachments";
 
@@ -45,13 +50,17 @@ export function useAttachments(opts: { disabled?: boolean } = {}) {
       const xhr = new XMLHttpRequest();
       xhrs.current.set(id, xhr);
       xhr.open("POST", UPLOAD_URL);
+      // TenantTabGuard stamps fetch, not XHR: send the same tab stamp here.
+      for (const [k, v] of Object.entries(tabTenantHeaders())) xhr.setRequestHeader(k, v);
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable && e.total > 0) patch(id, { progress: Math.min(0.99, e.loaded / e.total) });
       };
       const finish = (status: number, body: string) => {
         xhrs.current.delete(id);
+        const stale = tenantMismatchMessage(status, body);
+        if (stale) reportTenantMismatch(stale);
         const res = parseUploadResponse(status, body);
-        if (res.ok) patch(id, { status: "ready", progress: 1, token: res.token, media: res.media, kind: res.media.kind });
+        if (res.ok) patch(id, { status: "ready", progress: 1, token: res.token, media: res.media, kind: res.media.kind, expiresAt: Date.now() + ATTACHMENT_TICKET_TTL_MS });
         else patch(id, { status: "error", progress: 0, error: res.error });
       };
       xhr.onload = () => finish(xhr.status, xhr.responseText);
@@ -105,6 +114,24 @@ export function useAttachments(opts: { disabled?: boolean } = {}) {
     setItems([]);
   }, []);
 
+  /**
+   * After a send answers: take off the files that went, keep the refused
+   * ones, and mark expired tickets as errors (see trayAfterSend). `sent` is
+   * the `ready` list captured when Send was pressed.
+   */
+  const afterSend = useCallback((sent: ReadonlyArray<AttachmentItem>, outcome: SendOutcome) => {
+    const { remove, expire } = trayAfterSend(sent, outcome, Date.now());
+    if (remove.length === 0 && expire.length === 0) return;
+    const gone = new Set(remove);
+    const dead = new Set(expire);
+    const apply = (list: AttachmentItem[]) =>
+      list
+        .filter((i) => !gone.has(i.id))
+        .map((i) => (dead.has(i.id) ? { ...i, status: "error" as const, progress: 0, token: undefined, error: EXPIRED_CHIP_ERROR } : i));
+    itemsRef.current = apply(itemsRef.current);
+    setItems(apply);
+  }, []);
+
   // Stop any upload still running when the message box goes away.
   useEffect(() => {
     const map = xhrs.current;
@@ -155,6 +182,8 @@ export function useAttachments(opts: { disabled?: boolean } = {}) {
   );
 
   const tokens = useMemo(() => readyTokens(items), [items]);
+  /** The chips a send would carry now: capture this with `tokens` when Send is pressed. */
+  const ready = useMemo(() => items.filter((i) => i.status === "ready" && !!i.token), [items]);
   const busy = items.some((i) => i.status === "uploading");
 
   return {
@@ -163,6 +192,8 @@ export function useAttachments(opts: { disabled?: boolean } = {}) {
     remove,
     clear,
     tokens,
+    ready,
+    afterSend,
     busy,
     dragging,
     dropProps,

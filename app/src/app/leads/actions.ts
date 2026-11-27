@@ -240,11 +240,11 @@ export async function sendLeadWhatsAppAction(
   replaceMessageId?: number,
   /** Attachment tickets from the upload route; optional. */
   attachmentTokens?: string[],
-): Promise<{ ok: true; messageId: number; failed: string[] } | { ok: false; error: string }> {
+): Promise<{ ok: true; messageId: number; failed: string[]; failedFiles: string[] } | { ok: false; error: string }> {
   await requireUser();
   try {
     const attachments = loadAttachments(attachmentTokens);
-    const { messageId, failed } = await sendWhatsApp({
+    const { messageId, failed, failedFiles } = await sendWhatsApp({
       subjectType: "lead",
       subjectId: leadId,
       text,
@@ -259,7 +259,7 @@ export async function sendLeadWhatsAppAction(
     await rescore(leadId);
     revalidatePath(`/leads/${leadId}`);
     revalidatePath("/leads");
-    return { ok: true, messageId, failed };
+    return { ok: true, messageId, failed, failedFiles };
   } catch (err) {
     return {
       ok: false,

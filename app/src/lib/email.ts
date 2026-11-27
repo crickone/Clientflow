@@ -128,7 +128,7 @@ export type SendOpts = {
   replyTo?: string;
   /** Gmail threading, when replying inside an existing conversation. */
   gmailThread?: { threadId?: string; inReplyTo?: string; references?: string };
-  /** Files to attach. Up to 5, 16 MB each, 20 MB in total; a bigger set is refused before anything is sent. */
+  /** Files to attach. Up to 5, 16 MB each, 18 MB in total; a bigger set is refused before anything is sent. */
   attachments?: EmailAttachment[];
 };
 

@@ -189,13 +189,13 @@ export async function sendInboxMessageAction(
   /** Attachment tickets from the upload route; optional, text-only sends pass none. */
   attachmentTokens?: string[],
 ): Promise<
-  | { ok: true; messageId: number; channel: ReplyChannel; failed: string[] }
+  | { ok: true; messageId: number; channel: ReplyChannel; failed: string[]; failedFiles: string[] }
   | { ok: false; error: string }
 > {
   try {
     await requireUser();
     const attachments = loadAttachments(attachmentTokens);
-    const { messageId, channel, failed } = await sendReply({
+    const { messageId, channel, failed, failedFiles } = await sendReply({
       subjectType: kind,
       subjectId: contactId,
       text,
@@ -214,7 +214,7 @@ export async function sendInboxMessageAction(
       revalidatePath(`/clients/${contactId}`);
     }
     revalidatePath("/communication");
-    return { ok: true, messageId, channel, failed };
+    return { ok: true, messageId, channel, failed, failedFiles };
   } catch (err) {
     return {
       ok: false,

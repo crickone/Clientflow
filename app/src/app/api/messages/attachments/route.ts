@@ -3,8 +3,11 @@ import { NextResponse } from "next/server";
 import { guard } from "@/lib/api/guard";
 import { checkOutgoingFile, OUTGOING_LIMITS, OUTGOING_MISMATCH_ERROR, OUTGOING_TOO_BIG_ERROR, sniffMatches } from "@/lib/attachments/outgoingModel";
 import { attachmentTokensConfigured, signAttachment } from "@/lib/attachments/token";
+import { getSessionUser } from "@/lib/auth";
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { saveMediaFile } from "@/lib/inbox/media";
+import { rateLimit } from "@/lib/rateLimit";
+import { UPLOAD_RATE_ERROR, UPLOAD_RATE_LIMIT, UPLOAD_RATE_WINDOW_MS } from "@/lib/attachments/uploadRate";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +33,12 @@ const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
 export async function POST(req: Request) {
   const denied = await guard("user");
   if (denied) return denied;
+
+  const user = await getSessionUser();
+  const rl = rateLimit(`attachment-upload:${user?.id ?? "unknown"}`, UPLOAD_RATE_LIMIT, UPLOAD_RATE_WINDOW_MS);
+  if (!rl.ok) {
+    return NextResponse.json({ ok: false, error: UPLOAD_RATE_ERROR }, { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } });
+  }
 
   const declared = Number(req.headers.get("content-length") ?? 0);
   if (declared > OUTGOING_LIMITS.maxFileBytes + MULTIPART_OVERHEAD_BYTES) {

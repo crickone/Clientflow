@@ -89,15 +89,16 @@ export function EmailReader({
   function send() {
     if (!last || !att.readyWith(reply)) return;
     const tokens = att.tokens;
+    const sentItems = att.ready;
     startSend(async () => {
       const res = await replyEmailAction(last.id, reply, tokens.length ? tokens : undefined);
+      att.afterSend(sentItems, res);
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
       toast.success("Reply sent");
       setReply("");
-      att.clear();
       await load();
     });
   }

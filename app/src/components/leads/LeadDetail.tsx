@@ -336,6 +336,9 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
   const [draftId, setDraftId] = useState<number | null>(null);
   const [filter, setFilter] = useState<ActivityFilter>("all");
   const boxRef = useRef<HTMLTextAreaElement>(null);
+  // Set the moment a send starts, before `pending` re-renders, so a second
+  // Cmd+Enter can't send the text and files twice.
+  const sendingRef = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
   // Files in the message box (WhatsApp, email and team notes all take them).
   const att = useAttachments();
@@ -361,21 +364,32 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
   }
 
   function sendFromBox() {
+    if (pending || sendingRef.current) return;
     const t = text.trim();
     if (!att.readyWith(t)) return;
     const tokens = att.tokens;
+    const sentItems = att.ready;
     const files = tokens.length ? tokens : undefined;
     // The uploaded files' records, so the new row shows them straight away.
-    const sentMedia = att.items.flatMap((i) => (i.status === "ready" && i.media ? [i.media] : []));
+    const sentMedia = sentItems.flatMap((i) => (i.media ? [i.media] : []));
     const mediaJson = sentMedia.length ? JSON.stringify(sentMedia) : null;
+    sendingRef.current = true;
     start(async () => {
+      try {
+        await sendNow();
+      } finally {
+        sendingRef.current = false;
+      }
+    });
+
+    async function sendNow() {
       const now = new Date();
       if (channel === "note") {
         const res = await addLeadNoteAction(lead.id, t, files);
+        att.afterSend(sentItems, res);
         if (!res.ok) return void toast.error(res.error);
         setMessages((prev) => [...prev, { id: res.messageId, leadId: lead.id, direction: "note", channel: "manual", content: t, media: mediaJson, aiGenerated: false, sentAt: now, createdAt: now } as LeadMessage]);
         setText("");
-        att.clear();
         if (files) router.refresh();
         toast.success("Note saved.");
         return;
@@ -384,6 +398,8 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
         channel === "email"
           ? await sendLeadEmailAction(lead.id, { subject: emailSubject, text: t, draftMessageId: draftId ?? undefined, ...(files ? { attachments: files } : {}) })
           : await sendLeadWhatsAppAction(lead.id, t, draftId ?? undefined, files);
+      // Files that went come off the tray; refused ones stay, expired ones are marked.
+      att.afterSend(sentItems, res);
       if (!res.ok) return void toast.error(res.error);
       setMessages((prev) => [
         ...prev.filter((m) => m.id !== draftId),
@@ -392,13 +408,12 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
       if (lead.status === "new") setLead({ ...lead, status: "contacted" });
       setText("");
       setDraftId(null);
-      att.clear();
       // On WhatsApp each file is its own message; reload to show them as stored.
       if (files) router.refresh();
       const note = failedFilesNote((res as { failed?: string[] }).failed);
       if (note) toast.error(note);
       else toast.success(channel === "email" ? `Email sent to ${lead.email}.` : "Sent on WhatsApp.");
-    });
+    }
   }
 
   const feed = useMemo(() => {
@@ -793,6 +808,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
                 ref={boxRef}
                 rows={3}
                 value={text}
+                disabled={pending}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -812,7 +828,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
                     </Button>
                   )}
                 </span>
-                <Button size="sm" onClick={sendFromBox} loading={pending} disabled={!att.readyWith(text)}>
+                <Button size="sm" onClick={sendFromBox} loading={pending} disabled={pending || !att.readyWith(text)}>
                   {channel === "note" ? "Save note" : "Send"} <Send size={13} />
                 </Button>
               </div>

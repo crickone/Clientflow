@@ -26,6 +26,8 @@ export interface SendWhatsAppResult {
   providerMessageId: string;
   /** One line per file that did not go: "<file name>: <reason>". Empty when everything went. */
   failed: string[];
+  /** The stored file name (MessageMedia.file) of each file that did not go, in the same order as `failed`. */
+  failedFiles: string[];
 }
 
 /**
@@ -110,6 +112,7 @@ export async function sendWhatsApp(input: SendWhatsAppInput): Promise<SendWhatsA
   // A file that fails before anything has gone waits here, so a send where
   // nothing went stores nothing; once something goes they are written in order.
   const failed: string[] = [];
+  const failedFiles: string[] = [];
   let waiting: Array<{ media: MessageMedia; error: string }> = [];
   for (const f of files) {
     try {
@@ -126,6 +129,7 @@ export async function sendWhatsApp(input: SendWhatsAppInput): Promise<SendWhatsA
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       failed.push(`${attachmentLabel(f.media)}: ${reason}`);
+      failedFiles.push(f.media.file);
       if (first) store({ content: mediaPlaceholder(f.media.kind), providerMessageId: null, status: "failed", media: [f.media], error: reason });
       else waiting.push({ media: f.media, error: reason });
     }
@@ -138,5 +142,5 @@ export async function sendWhatsApp(input: SendWhatsAppInput): Promise<SendWhatsA
     providerMessageId: first.providerMessageId,
   });
 
-  return { ...first, failed };
+  return { ...first, failed, failedFiles };
 }

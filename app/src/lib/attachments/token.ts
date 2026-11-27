@@ -3,6 +3,7 @@ import "server-only";
 import crypto from "node:crypto";
 
 import { isSafeMediaFile, type MediaKind, type MessageMedia } from "@/lib/inbox/mediaModel";
+import { ATTACHMENT_TICKET_TTL_MS } from "./outgoingModel";
 
 /**
  * A signed, expiring ticket for one uploaded attachment.
@@ -15,7 +16,7 @@ import { isSafeMediaFile, type MediaKind, type MessageMedia } from "@/lib/inbox/
  * Payload: { t: tenant id, m: the stored media record, x: expiry ms }.
  */
 
-const DEFAULT_TTL_MS = 2 * 60 * 60 * 1000;
+const DEFAULT_TTL_MS = ATTACHMENT_TICKET_TTL_MS;
 const KINDS: ReadonlySet<MediaKind> = new Set(["image", "video", "audio", "file"]);
 
 function secret(): string | null {

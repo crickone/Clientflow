@@ -4,7 +4,9 @@
 // business's private inbox-media folder and answered with a ticket that
 // loadAttachments turns back into the same bytes; an SVG, bytes that do not
 // match the declared type, a file over 16 MB and a missing file are refused;
-// signed out is a 401. The session guard and the current-tenant lookup are
+// signed out is a 401; past 60 uploads in 10 minutes one person gets a 429
+// while another still uploads. The session guard, the session user and the
+// current-tenant lookup are
 // stubbed (no Next request context in this runner), as in
 // src/app/api/inbox/media/[file]/route.test.ts; the storage is real.
 import assert from "node:assert/strict";
@@ -17,6 +19,7 @@ const SLUG = "attachments-route-test";
 const TENANT_ID = 990_101;
 let signedIn = true;
 let tenant = { id: TENANT_ID, slug: SLUG };
+let userId = 501;
 
 type Loader = (request: string, ...rest: unknown[]) => unknown;
 const mod = Module as unknown as { _load: Loader };
@@ -24,6 +27,9 @@ const realLoad = mod._load;
 mod._load = function (this: unknown, request: string, ...rest: unknown[]) {
   if (request === "@/lib/api/guard") {
     return { guard: async () => (signedIn ? null : new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), { status: 401 })) };
+  }
+  if (request === "@/lib/auth") {
+    return { getSessionUser: async () => (signedIn ? { id: userId } : null) };
   }
   if (request === "@/lib/db/tenant") {
     return {
@@ -130,6 +136,22 @@ function check(name: string, cond: boolean) {
     check("signed out: 401", r6.status === 401);
     check("signed out stored nothing", files().length === before);
     signedIn = true;
+
+    // 7. Per-person rate limit: 60 uploads in 10 minutes, then a 429 with a plain reason.
+    const { UPLOAD_RATE_LIMIT, UPLOAD_RATE_ERROR } = requireLocal("../../../../lib/attachments/uploadRate") as typeof import("@/lib/attachments/uploadRate");
+    userId = 777;
+    const junk = () => POST(new Request("http://localhost/api/messages/attachments", { method: "POST", body: "{}", headers: { "content-type": "application/json" } }));
+    for (let i = 0; i < UPLOAD_RATE_LIMIT; i++) {
+      if ((await junk()).status === 429) throw new Error(`rate limited too early at ${i + 1}`);
+    }
+    const limited = await upload(new File([pdfBytes], "one-more.pdf", { type: "application/pdf" }));
+    const lb = (await limited.json()) as { ok: boolean; error: string };
+    check("61st upload: 429", limited.status === 429 && lb.ok === false && lb.error === UPLOAD_RATE_ERROR);
+    check("429 says when to retry", Number(limited.headers.get("retry-after")) > 0);
+    check("rate limited stored nothing", files().length === before);
+    userId = 778;
+    check("another person still uploads", (await upload(new File([pdfBytes], "theirs.pdf", { type: "application/pdf" }))).status === 200);
+    userId = 501;
   } finally {
     fs.rmSync(path.join(root, SLUG), { recursive: true, force: true });
     if (originalSocial === undefined) delete process.env.SOCIAL_TOKEN_SECRET;

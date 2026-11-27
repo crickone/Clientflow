@@ -4,7 +4,7 @@
 // Gmail (upload endpoint, multipart/mixed message), the Mailgun route (one
 // `attachment` form field per file), SMTP (nodemailer attachments) and Resend
 // (attachments array). A text-only send goes exactly as before. A set over
-// 20 MB is refused before anything is sent. The sent files are noted on the
+// 18 MB is refused before anything is sent. The sent files are noted on the
 // stored rows: client_emails, lead_messages and the inbox's email_messages.
 // Every provider is a stand-in: nothing leaves the machine.
 import Module from "node:module";
@@ -143,7 +143,7 @@ function file(kind: MessageMedia["kind"], mime: string, name: string | undefined
   const pdf = file("file", "application/pdf", "Clár.pdf", 3000);
   const jpg = file("image", "image/jpeg", undefined, 1200);
   const two = emailAttachmentsFrom([pdf, jpg]);
-  const big = emailAttachmentsFrom([file("video", "video/mp4", "a.mp4", 10 * 1024 * 1024), file("video", "video/mp4", "b.mp4", 10 * 1024 * 1024 + 1)]);
+  const big = emailAttachmentsFrom([file("video", "video/mp4", "a.mp4", 9 * 1024 * 1024), file("video", "video/mp4", "b.mp4", 9 * 1024 * 1024 + 1)]);
   const base = { to: "buyer@example.com", subject: "Your plan", html: "<p>Attached.</p>" };
 
   const prevMgKey = process.env.MAILGUN_API_KEY;
@@ -172,7 +172,10 @@ function file(kind: MessageMedia["kind"], mime: string, name: string | undefined
       ok(calls[0].url === "https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=multipart", "files go through the upload endpoint");
       const ct = new Headers(calls[0].init?.headers).get("content-type") ?? "";
       ok(/^multipart\/related; boundary=/.test(ct), "upload is multipart/related");
+      const upBoundary = /^multipart\/related; boundary="([^"]+)"$/.exec(ct)?.[1] ?? "";
+      ok(upBoundary.startsWith("=_aa_"), "upload boundary is quoted (it holds '=')");
       const upBody = String(calls[0].init?.body);
+      ok(upBody.startsWith(`--${upBoundary}\r\n`), "upload body opens on the quoted boundary's value");
       ok(upBody.includes('{"threadId":"thread-9"}'), "thread carried in the metadata part");
       ok(upBody.includes("Content-Type: message/rfc822") && upBody.includes("multipart/mixed"), "raw multipart/mixed message inside");
       ok(upBody.includes("filename*=UTF-8''Cl%C3%A1r.pdf") && upBody.includes('filename="Photo.jpg"'), "both files named in the message");
@@ -187,7 +190,7 @@ function file(kind: MessageMedia["kind"], mime: string, name: string | undefined
 
       calls = [];
       res = await sendEmailForTenant(tid, { ...base, attachments: big });
-      ok(!res.ok && res.error === OUTGOING_EMAIL_TOTAL_ERROR, "gmail: over 20 MB refused with the plain reason");
+      ok(!res.ok && res.error === OUTGOING_EMAIL_TOTAL_ERROR, "gmail: over 18 MB refused with the plain reason");
       ok(calls.length === 0, "gmail: nothing sent");
       deleteGmailConnection(tid);
 
@@ -219,7 +222,7 @@ function file(kind: MessageMedia["kind"], mime: string, name: string | undefined
 
       calls = [];
       res = await sendEmailForTenant(tid, { ...base, attachments: big });
-      ok(!res.ok && res.error === OUTGOING_EMAIL_TOTAL_ERROR && calls.length === 0, "mailgun: over 20 MB refused, nothing sent");
+      ok(!res.ok && res.error === OUTGOING_EMAIL_TOTAL_ERROR && calls.length === 0, "mailgun: over 18 MB refused, nothing sent");
 
       // ── SMTP. ──
       setMailgunRoute(false);
@@ -232,7 +235,7 @@ function file(kind: MessageMedia["kind"], mime: string, name: string | undefined
       res = await sendEmailForTenant(tid, base);
       ok(res.ok && smtpSent.length === 2 && !("attachments" in smtpSent[1]), "smtp text only: no attachments key");
       res = await sendEmailForTenant(tid, { ...base, attachments: big });
-      ok(!res.ok && res.error === OUTGOING_EMAIL_TOTAL_ERROR && smtpSent.length === 2, "smtp: over 20 MB refused, nothing sent");
+      ok(!res.ok && res.error === OUTGOING_EMAIL_TOTAL_ERROR && smtpSent.length === 2, "smtp: over 18 MB refused, nothing sent");
       deleteImapConnection(tid);
 
       // ── Resend. ──
@@ -245,7 +248,7 @@ function file(kind: MessageMedia["kind"], mime: string, name: string | undefined
       res = await sendEmailForTenant(tid, base);
       ok(res.ok && resendSent.length === 2 && !("attachments" in resendSent[1]), "resend text only: no attachments key");
       res = await sendEmailForTenant(tid, { ...base, attachments: big });
-      ok(!res.ok && res.error === OUTGOING_EMAIL_TOTAL_ERROR && resendSent.length === 2, "resend: over 20 MB refused, nothing sent");
+      ok(!res.ok && res.error === OUTGOING_EMAIL_TOTAL_ERROR && resendSent.length === 2, "resend: over 18 MB refused, nothing sent");
 
       // ── Client email (lib/clientEmail), through Resend. ──
       const clientId = tdb.insert(schema.clients).values({ firstName: "Aoife", lastName: "Test", email: "aoife@example.com", phone: "0870000001" }).returning({ id: schema.clients.id }).get().id;
@@ -258,8 +261,8 @@ function file(kind: MessageMedia["kind"], mime: string, name: string | undefined
       ok(c2.ok, "files alone are an email");
       const c3 = await sendClientEmail(clientId, { subject: "Words", body: "Hello" });
       ok(c3.ok && !("attachments" in resendSent[4]), "text only unchanged");
-      const c4 = await sendClientEmail(clientId, { subject: "Too big", body: "x", attachments: [file("video", "video/mp4", "a.mp4", 11 * 1024 * 1024), file("video", "video/mp4", "b.mp4", 10 * 1024 * 1024)] });
-      ok(!c4.ok && c4.error === OUTGOING_EMAIL_TOTAL_ERROR && resendSent.length === 5, "over 20 MB refused, nothing sent");
+      const c4 = await sendClientEmail(clientId, { subject: "Too big", body: "x", attachments: [file("video", "video/mp4", "a.mp4", 10 * 1024 * 1024), file("video", "video/mp4", "b.mp4", 9 * 1024 * 1024)] });
+      ok(!c4.ok && c4.error === OUTGOING_EMAIL_TOTAL_ERROR && resendSent.length === 5, "over 18 MB refused, nothing sent");
       const c5 = await sendClientEmail(clientId, { subject: "Nothing", body: "" });
       ok(!c5.ok && c5.error === "Message is required.", "no words and no files still refused");
       rows = tdb.select().from(schema.clientEmails).where(eq(schema.clientEmails.clientId, clientId)).all();
