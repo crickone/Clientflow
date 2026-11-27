@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { clientMessages, leadMessages } from "@/lib/db/schema";
 import { sendWhatsApp } from "@/lib/whatsapp/send";
 import { sendDm } from "@/lib/social/dm";
+import type { OutgoingFile } from "@/lib/attachments/outgoingModel";
 
 /**
  * Reply to a lead or client on the channel they last wrote on: Messenger or
@@ -38,14 +39,17 @@ export function lastInboundChannel(subjectType: "lead" | "client", subjectId: nu
 export async function sendReply(input: {
   subjectType: "lead" | "client";
   subjectId: number;
-  text: string;
+  /** May be empty when files are attached. */
+  text?: string;
   aiGenerated?: boolean;
-}): Promise<{ messageId: number; channel: ReplyChannel }> {
+  /** Files to send after the text, on the same channel. */
+  attachments?: OutgoingFile[];
+}): Promise<{ messageId: number; channel: ReplyChannel; failed: string[] }> {
   const channel = lastInboundChannel(input.subjectType, input.subjectId);
   if (channel === "messenger" || channel === "instagram") {
     const sent = await sendDm(input);
-    return { messageId: sent.messageId, channel: sent.channel };
+    return { messageId: sent.messageId, channel: sent.channel, failed: sent.failed };
   }
   const sent = await sendWhatsApp(input);
-  return { messageId: sent.messageId, channel: "whatsapp" };
+  return { messageId: sent.messageId, channel: "whatsapp", failed: sent.failed };
 }

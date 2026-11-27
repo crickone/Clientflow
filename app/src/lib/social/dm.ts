@@ -6,7 +6,8 @@ import { db } from "@/lib/db";
 import { socialContacts } from "@/lib/db/schema";
 import { boundTenantId, getCurrentTenant } from "@/lib/db/tenant";
 import { ingestMessageMediaLater } from "@/lib/inbox/media";
-import { nameFromUrl } from "@/lib/inbox/mediaModel";
+import { mediaPlaceholder, nameFromUrl, type MessageMedia } from "@/lib/inbox/mediaModel";
+import { attachmentLabel, checkOutgoingSet, type OutgoingFile } from "@/lib/attachments/outgoingModel";
 import { GRAPH_BASE, metaApiError } from "@/lib/facebook/graph";
 import { notePageRefusal } from "@/lib/facebook/health";
 import { getPageTokenForTenant } from "@/lib/facebook/pages";
@@ -107,10 +108,24 @@ function findContact(channel: DmChannel, externalId: string, pageId: string) {
     .get();
 }
 
-function storeMessage(owner: Owner, input: { direction: "inbound" | "outbound"; channel: DmChannel; content: string; providerMessageId: string; sentAt: Date; aiGenerated?: boolean }) {
-  return owner.ownerType === "lead"
-    ? addMessage({ leadId: owner.ownerId, ...input, status: input.direction === "outbound" ? "sent" : undefined })
-    : addClientMessage({ clientId: owner.ownerId, ...input, status: input.direction === "outbound" ? "sent" : undefined });
+function storeMessage(
+  owner: Owner,
+  input: {
+    direction: "inbound" | "outbound";
+    channel: DmChannel;
+    content: string;
+    providerMessageId: string | null;
+    sentAt: Date;
+    aiGenerated?: boolean;
+    media?: MessageMedia[];
+    /** Defaults to "sent" on an outbound row. */
+    status?: "sent" | "failed";
+    error?: string;
+  },
+) {
+  const { status, ...rest } = input;
+  const row = { ...rest, status: status ?? (input.direction === "outbound" ? ("sent" as const) : undefined) };
+  return owner.ownerType === "lead" ? addMessage({ leadId: owner.ownerId, ...row }) : addClientMessage({ clientId: owner.ownerId, ...row });
 }
 
 export interface RecordedInbound extends Owner {
@@ -244,59 +259,140 @@ export function getDmTarget(ownerType: "lead" | "client", ownerId: number, now =
 export interface SendDmInput {
   subjectType: "lead" | "client";
   subjectId: number;
-  text: string;
+  /** The words. May be empty when files are attached. */
+  text?: string;
   /** An AI wrote it with no person in between (auto-reply). Never gets the 7-day human tag. */
   aiGenerated?: boolean;
+  /** Files to send after the text, one message each. */
+  attachments?: OutgoingFile[];
+}
+
+/**
+ * Why Meta would refuse a reply in this window, or null when it may go. The
+ * same rules for text and files. Pure.
+ */
+export function dmSendRefusal(window: ReplyWindow, opts: { label: string; aiGenerated?: boolean; humanAgentApproved: boolean }): string | null {
+  if (window === "closed") {
+    return `${opts.label} only allows replies within 7 days of the customer's last message. Wait for them to write again.`;
+  }
+  if (window === "human_only" && opts.aiGenerated) {
+    return `It is more than 24 hours since the customer's last ${opts.label} message, so only a reply written by a person can be sent.`;
+  }
+  if (window === "human_only" && !opts.humanAgentApproved) return lateReplyMessage(opts.label);
+  return null;
+}
+
+/** RESPONSE inside 24 hours; the HUMAN_AGENT tag up to 7 days. */
+function messagingFields(window: ReplyWindow): { messaging_type: string; tag?: string } {
+  return window === "open" ? { messaging_type: "RESPONSE" } : { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" };
+}
+
+const META_ATTACHMENT_TYPE: Record<MessageMedia["kind"], "image" | "video" | "audio" | "file"> = {
+  image: "image",
+  video: "video",
+  audio: "audio",
+  file: "file",
+};
+
+/**
+ * The multipart body that uploads one file with a reply: `recipient` and
+ * `message` as JSON strings, the messaging type (and tag) for the window,
+ * and the file as `filedata`. Pure.
+ */
+export function dmAttachmentForm(input: {
+  recipientId: string;
+  window: ReplyWindow;
+  file: { kind: MessageMedia["kind"]; mime: string; name?: string; bytes: Buffer };
+}): FormData {
+  const form = new FormData();
+  form.set("recipient", JSON.stringify({ id: input.recipientId }));
+  const type = META_ATTACHMENT_TYPE[input.file.kind] ?? "file";
+  form.set("message", JSON.stringify({ attachment: { type, payload: { is_reusable: false } } }));
+  const m = messagingFields(input.window);
+  form.set("messaging_type", m.messaging_type);
+  if (m.tag) form.set("tag", m.tag);
+  const name = input.file.name?.trim() || `${type}`;
+  form.set("filedata", new Blob([new Uint8Array(input.file.bytes)], { type: input.file.mime }), name);
+  return form;
 }
 
 /**
  * Reply on the contact's Messenger / Instagram conversation and record it.
- * Throws with a plain reason when Meta would refuse (window closed, Page
- * disconnected), so the caller keeps the draft.
+ * Text goes first, then each file as its own message and row. Throws with a
+ * plain reason when Meta would refuse (window closed, Page disconnected), or
+ * when nothing at all was sent, so the caller keeps the draft. A file Meta
+ * refuses after something went is stored as a failed row with its reason.
  */
-export async function sendDm(input: SendDmInput): Promise<{ messageId: number; providerMessageId: string; channel: DmChannel }> {
-  const text = input.text.trim();
-  if (!text) throw new Error("Message is empty.");
+export async function sendDm(input: SendDmInput): Promise<{ messageId: number; providerMessageId: string; channel: DmChannel; failed: string[] }> {
+  const text = (input.text ?? "").trim();
+  const files = input.attachments ?? [];
+  if (!text && files.length === 0) throw new Error("Message is empty.");
   const target = getDmTarget(input.subjectType, input.subjectId);
   if (!target) throw new Error("This contact has no Messenger or Instagram conversation.");
   const label = CHANNEL_LABEL[target.channel];
-  if (target.window === "closed") {
-    throw new Error(`${label} only allows replies within 7 days of the customer's last message. Wait for them to write again.`);
+  if (files.length) {
+    const set = checkOutgoingSet(files.map((f) => ({ size: f.bytes.length })), target.channel);
+    if (!set.ok) throw new Error(set.error);
   }
-  if (target.window === "human_only" && input.aiGenerated) {
-    throw new Error(`It is more than 24 hours since the customer's last ${label} message, so only a reply written by a person can be sent.`);
-  }
-  if (target.window === "human_only" && !humanAgentApproved()) throw new Error(lateReplyMessage(label));
-  const token = getPageTokenForTenant(getCurrentTenant().id, target.pageId);
+  const refusal = dmSendRefusal(target.window, { label, aiGenerated: input.aiGenerated, humanAgentApproved: humanAgentApproved() });
+  if (refusal) throw new Error(refusal);
+  const token = getPageTokenForTenant(boundTenantId() ?? getCurrentTenant().id, target.pageId);
   if (!token) throw new Error("The Facebook Page for this conversation is no longer connected.");
 
-  const body: Record<string, unknown> = {
-    recipient: { id: target.externalId },
-    message: { text },
-    ...(target.window === "open" ? { messaging_type: "RESPONSE" } : { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" }),
-  };
-  const res = await fetch(`${GRAPH_BASE}/${encodeURIComponent(target.pageId)}/messages?` + new URLSearchParams({ access_token: token }), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const json = (await res.json().catch(() => ({}))) as { message_id?: string; error?: { message?: string } };
-  if (!res.ok || !json.message_id) {
-    const err = metaApiError(json, res.status, `${label} send failed (${res.status}).`);
-    if (/HUMAN_AGENT/.test(err.message)) throw new Error(lateReplyMessage(label));
-    // A refused token marks the Page for reconnect and tells the admins.
-    if (await notePageRefusal(target.pageId, err).catch(() => false)) {
-      throw new Error(`Facebook stopped accepting this Page's connection. Reconnect Facebook in Settings, then send again. (${err.message})`);
+  const url = `${GRAPH_BASE}/${encodeURIComponent(target.pageId)}/messages?` + new URLSearchParams({ access_token: token });
+  const post = async (init: RequestInit): Promise<string> => {
+    const res = await fetch(url, { method: "POST", ...init });
+    const json = (await res.json().catch(() => ({}))) as { message_id?: string; error?: { message?: string } };
+    if (!res.ok || !json.message_id) {
+      const err = metaApiError(json, res.status, `${label} send failed (${res.status}).`);
+      if (/HUMAN_AGENT/.test(err.message)) throw new Error(lateReplyMessage(label));
+      // A refused token marks the Page for reconnect and tells the admins.
+      if (await notePageRefusal(target.pageId, err).catch(() => false)) {
+        throw new Error(`Facebook stopped accepting this Page's connection. Reconnect Facebook in Settings, then send again. (${err.message})`);
+      }
+      throw err;
     }
-    throw err;
+    return json.message_id;
+  };
+  const owner: Owner = { ownerType: input.subjectType, ownerId: input.subjectId };
+  const store = (row: { content: string; providerMessageId: string | null; media?: MessageMedia[]; status?: "sent" | "failed"; error?: string }) =>
+    storeMessage(owner, { direction: "outbound", channel: target.channel, sentAt: new Date(), aiGenerated: input.aiGenerated, ...row });
+
+  let first: { messageId: number; providerMessageId: string } | null = null;
+  if (text) {
+    const body: Record<string, unknown> = {
+      recipient: { id: target.externalId },
+      message: { text },
+      ...messagingFields(target.window),
+    };
+    const providerMessageId = await post({ headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const stored = store({ content: text, providerMessageId });
+    first = { messageId: stored.id, providerMessageId };
   }
 
-  const stored = storeMessage(
-    { ownerType: input.subjectType, ownerId: input.subjectId },
-    { direction: "outbound", channel: target.channel, content: text, providerMessageId: json.message_id, sentAt: new Date(), aiGenerated: input.aiGenerated },
-  );
+  // As in sendWhatsApp: failures before anything went wait, so a send where nothing went stores nothing.
+  const failed: string[] = [];
+  let waiting: Array<{ media: MessageMedia; error: string }> = [];
+  for (const f of files) {
+    try {
+      const providerMessageId = await post({
+        body: dmAttachmentForm({ recipientId: target.externalId, window: target.window, file: { kind: f.media.kind, mime: f.media.mime, name: f.media.name, bytes: f.bytes } }),
+      });
+      for (const w of waiting) store({ content: mediaPlaceholder(w.media.kind), providerMessageId: null, media: [w.media], status: "failed", error: w.error });
+      waiting = [];
+      const stored = store({ content: mediaPlaceholder(f.media.kind), providerMessageId, media: [f.media] });
+      if (!first) first = { messageId: stored.id, providerMessageId };
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      failed.push(`${attachmentLabel(f.media)}: ${reason}`);
+      if (first) store({ content: mediaPlaceholder(f.media.kind), providerMessageId: null, media: [f.media], status: "failed", error: reason });
+      else waiting.push({ media: f.media, error: reason });
+    }
+  }
+  if (!first) throw new Error(failed.length === 1 ? failed[0] : `Nothing was sent. ${failed.join(" ")}`);
+
   await logActivity(`${target.channel}.sent`, `${label} reply sent`, input.subjectType === "lead" ? { leadId: input.subjectId } : { clientId: input.subjectId });
-  return { messageId: stored.id, providerMessageId: json.message_id, channel: target.channel };
+  return { ...first, channel: target.channel, failed };
 }
 
 const NAME_FILL_EVERY_MS = 6 * 60 * 60 * 1000;

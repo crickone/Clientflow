@@ -9,6 +9,7 @@ import type {
   InboundMedia,
   InboundMessage,
   MessageStatus,
+  OutgoingMediaFile,
   QrResult,
   StatusUpdate,
   WhatsAppBridge,
@@ -55,18 +56,23 @@ export class WhapiBridge implements WhatsAppBridge {
       headers: this.headers(),
       body: JSON.stringify({ to, body: text }),
     });
-    if (!res.ok) {
-      const detail = await safeText(res);
-      throw new Error(`WhatsApp send failed (${res.status}): ${detail}`);
-    }
-    const data = (await res.json().catch(() => ({}))) as {
-      message?: { id?: string };
-      id?: string;
-      sent?: boolean;
-    };
-    const id = data.message?.id ?? data.id;
-    if (!id) throw new Error("WhatsApp send: provider returned no message id.");
-    return { providerMessageId: id };
+    return parseSendResponse(res);
+  }
+
+  /** Send one photo, video, audio file or document, inline as a data URL. */
+  async sendMedia(
+    toPhone: string,
+    file: OutgoingMediaFile,
+  ): Promise<{ providerMessageId: string }> {
+    const to = normalizePhone(toPhone);
+    if (!to) throw new Error("Recipient phone is empty after normalization.");
+    const { path, body } = whapiMediaPayload(to, file);
+    const res = await fetch(`${this.base}/messages/${path}`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(body),
+    });
+    return parseSendResponse(res);
   }
 
   /**
@@ -226,6 +232,60 @@ export class WhapiBridge implements WhatsAppBridge {
     if (a.length !== b.length) return false;
     return timingSafeEqual(a, b);
   }
+}
+
+/**
+ * A send's reply, the same for text and files: the provider's message id, or
+ * an error with the status and the start of the body.
+ */
+async function parseSendResponse(res: Response): Promise<{ providerMessageId: string }> {
+  if (!res.ok) {
+    const detail = await safeText(res);
+    throw new Error(`WhatsApp send failed (${res.status}): ${detail}`);
+  }
+  const data = (await res.json().catch(() => ({}))) as {
+    message?: { id?: string };
+    id?: string;
+    sent?: boolean;
+  };
+  const id = data.message?.id ?? data.id;
+  if (!id) throw new Error("WhatsApp send: provider returned no message id.");
+  return { providerMessageId: id };
+}
+
+const WHAPI_SEND_PATH: Record<OutgoingMediaFile["kind"], "image" | "video" | "audio" | "document"> = {
+  image: "image",
+  video: "video",
+  audio: "audio",
+  file: "document",
+};
+
+export interface WhapiMediaBody {
+  to: string;
+  media: string;
+  caption?: string;
+  filename?: string;
+}
+
+/**
+ * The Whapi request for one file: the endpoint (`/messages/<path>`) and its
+ * JSON. The file goes inline as `data:<mime>;name=<encoded name>;base64,...`;
+ * a document also carries its file name so the customer sees it. Pure.
+ */
+export function whapiMediaPayload(to: string, file: OutgoingMediaFile): { path: "image" | "video" | "audio" | "document"; body: WhapiMediaBody } {
+  const path = WHAPI_SEND_PATH[file.kind] ?? "document";
+  const name = file.name?.trim();
+  const media = `data:${file.mime}${name ? `;name=${encodeURIComponent(name)}` : ""};base64,${file.bytes.toString("base64")}`;
+  const caption = file.caption?.trim();
+  return {
+    path,
+    body: {
+      to,
+      media,
+      ...(caption ? { caption } : {}),
+      ...(path === "document" && name ? { filename: name } : {}),
+    },
+  };
 }
 
 function mapStatus(raw: string): MessageStatus | null {

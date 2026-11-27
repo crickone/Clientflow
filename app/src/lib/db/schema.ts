@@ -556,6 +556,9 @@ export const leadMessages = sqliteTable(
     // "phone": sent from the business's own WhatsApp (the phone, or an earlier
     // tool such as GoHighLevel), not through Adonis. Null otherwise.
     origin: text("origin"),
+    // Why an outbound message did not go (status "failed"), e.g. one file of
+    // several the channel refused. Null otherwise.
+    error: text("error"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -668,6 +671,8 @@ export const clientMessages = sqliteTable(
     media: text("media"),
     // Same as lead_messages.origin.
     origin: text("origin"),
+    // Same as lead_messages.error.
+    error: text("error"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

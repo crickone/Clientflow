@@ -181,3 +181,10 @@ export function checkOutgoingSet(
   }
   return { ok: true };
 }
+
+/** How a file is named in a failure line: its own name, else "Photo", "File" and so on. */
+export function attachmentLabel(media: { kind: MediaKind; name?: string }): string {
+  const name = media.name?.trim();
+  if (name) return name;
+  return media.kind === "image" ? "Photo" : media.kind === "video" ? "Video" : media.kind === "audio" ? "Audio" : "File";
+}

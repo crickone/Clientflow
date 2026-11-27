@@ -2,6 +2,7 @@ import "server-only";
 import { and, desc, eq, inArray, isNotNull, like, or, sql, type SQL } from "drizzle-orm";
 import { db } from "./db";
 import { automationQueue, leadMessages, leads, pipelineStages, type Lead, type LeadMessage } from "./db/schema";
+import type { MessageMedia } from "./inbox/mediaModel";
 import { normalizePhone } from "./whatsapp/phone";
 import { splitFullName } from "./humanName";
 import { resolveEntryStageId } from "./pipeline/stageRepo";
@@ -288,6 +289,10 @@ export function addMessage(input: {
   providerMessageId?: string | null;
   status?: "queued" | "sent" | "delivered" | "read" | "failed" | null;
   sentAt?: Date | null;
+  /** Files sent or received with it, stored as the media JSON. */
+  media?: MessageMedia[] | null;
+  /** Why it did not go, on a failed outbound row. */
+  error?: string | null;
 }) {
   return db
     .insert(leadMessages)
@@ -300,6 +305,8 @@ export function addMessage(input: {
       providerMessageId: input.providerMessageId ?? null,
       status: input.status ?? null,
       sentAt: input.sentAt ?? null,
+      media: input.media?.length ? JSON.stringify(input.media) : null,
+      error: input.error ?? null,
     })
     .returning()
     .all()[0];

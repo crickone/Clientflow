@@ -55,12 +55,28 @@ export interface QrResult {
   connected: boolean;
 }
 
+/** A file to send on WhatsApp: a photo, video, audio file or document. */
+export interface OutgoingMediaFile {
+  kind: "image" | "video" | "audio" | "file";
+  mime: string;
+  /** The file name the customer sees (documents). */
+  name?: string;
+  bytes: Buffer;
+  caption?: string;
+}
+
 export interface WhatsAppBridge {
   /** Send a plain-text message. Throws on provider/transport failure. */
   sendText(
     toPhone: string,
     text: string,
   ): Promise<{ providerMessageId: string }>;
+
+  /**
+   * Send one file. Throws on provider/transport failure. Optional: a provider
+   * that can't send files leaves it out, and sending a file is then refused.
+   */
+  sendMedia?(toPhone: string, file: OutgoingMediaFile): Promise<{ providerMessageId: string }>;
 
   /** Whether the linked session is live, and which number. */
   connectionStatus(): Promise<ConnectionStatus>;

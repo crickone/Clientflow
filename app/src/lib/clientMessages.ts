@@ -2,6 +2,7 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
 import { clientMessages, clients, type ClientMessage } from "./db/schema";
+import type { MessageMedia } from "./inbox/mediaModel";
 import { normalizePhone } from "./whatsapp/phone";
 
 export function getClientMessages(clientId: number): ClientMessage[] {
@@ -22,6 +23,10 @@ export function addClientMessage(input: {
   providerMessageId?: string | null;
   status?: "queued" | "sent" | "delivered" | "read" | "failed" | null;
   sentAt?: Date | null;
+  /** Files sent or received with it, stored as the media JSON. */
+  media?: MessageMedia[] | null;
+  /** Why it did not go, on a failed outbound row. */
+  error?: string | null;
 }): ClientMessage {
   return db
     .insert(clientMessages)
@@ -34,6 +39,8 @@ export function addClientMessage(input: {
       providerMessageId: input.providerMessageId ?? null,
       status: input.status ?? null,
       sentAt: input.sentAt ?? null,
+      media: input.media?.length ? JSON.stringify(input.media) : null,
+      error: input.error ?? null,
     })
     .returning()
     .all()[0];
