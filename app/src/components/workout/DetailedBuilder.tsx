@@ -49,15 +49,23 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
   // Lines "Build from this file" could not place in the program. Kept with
   // the draft until dismissed; never saved with the program.
   const [unplaced, setUnplaced] = useState<string[]>([]);
+  // The file name when this draft came from "Build from this file", until dismissed.
+  const [imported, setImported] = useState<string | null>(null);
 
   const applyDraft = useCallback((d: BuilderDraft) => {
     setProgram(d.program);
     setTagsText(d.tagsText);
     setUnplaced(Array.isArray(d.unplaced) ? d.unplaced.filter((u) => typeof u === "string") : []);
+    setImported(typeof d.imported === "string" && d.imported ? d.imported : null);
   }, []);
-  // `unplaced` joins the draft only while it has lines, so an ordinary draft
-  // keeps exactly its old shape.
-  const draftValue: BuilderDraft = unplaced.length ? { program, tagsText, unplaced } : { program, tagsText };
+  // `unplaced` and `imported` join the draft only while set, so an ordinary
+  // draft keeps exactly its old shape.
+  const draftValue: BuilderDraft = {
+    program,
+    tagsText,
+    ...(unplaced.length ? { unplaced } : {}),
+    ...(imported ? { imported } : {}),
+  };
   const draft = useDraft<BuilderDraft>(draftKey ?? null, draftValue, applyDraft, normaliseDraft);
 
   const days = program.days;
@@ -166,8 +174,21 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <DraftNotice restoredAt={draft.restoredAt} onDiscard={draft.discard} />
-      {unplaced.length > 0 && <UnplacedNotice lines={unplaced} onDismiss={() => setUnplaced([])} />}
+      {imported ? (
+        <ImportNotice
+          file={imported}
+          lines={unplaced}
+          onDismiss={() => {
+            setImported(null);
+            setUnplaced([]);
+          }}
+        />
+      ) : (
+        <>
+          <DraftNotice restoredAt={draft.restoredAt} onDiscard={draft.discard} />
+          {unplaced.length > 0 && <ImportNotice file={null} lines={unplaced} onDismiss={() => setUnplaced([])} />}
+        </>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <Button variant="ghost" size="icon" onClick={() => router.push("/workout")} aria-label="Back">
           <ArrowLeft size={16} />
@@ -590,17 +611,19 @@ function tabStyle(active: boolean): React.CSSProperties {
 }
 
 /** What the builder keeps as a draft. `unplaced` comes from "Build from this file". */
-type BuilderDraft = { program: ProgramInput; tagsText: string; unplaced?: string[] };
+type BuilderDraft = { program: ProgramInput; tagsText: string; unplaced?: string[]; imported?: string };
 
 /** A stored draft from before weeks existed: every day lands in week 1. An empty `unplaced` is dropped. */
 function normaliseDraft(d: BuilderDraft): BuilderDraft {
-  const { unplaced, ...rest } = d;
+  const { unplaced, imported, ...rest } = d;
   const next: BuilderDraft = { ...rest, program: { ...d.program, days: normaliseWeeks(d.program.days) } };
-  return Array.isArray(unplaced) && unplaced.length ? { ...next, unplaced } : next;
+  if (Array.isArray(unplaced) && unplaced.length) next.unplaced = unplaced;
+  if (typeof imported === "string" && imported) next.imported = imported;
+  return next;
 }
 
-/** What the sheet had that the import could not place, until the coach dismisses it. */
-function UnplacedNotice({ lines, onDismiss }: { lines: string[]; onDismiss: () => void }) {
+/** A program built from a file: where it came from and what the import could not place, until dismissed. */
+function ImportNotice({ file, lines, onDismiss }: { file: string | null; lines: string[]; onDismiss: () => void }) {
   return (
     <div
       role="status"
@@ -618,12 +641,13 @@ function UnplacedNotice({ lines, onDismiss }: { lines: string[]; onDismiss: () =
     >
       <ListChecks size={16} style={{ color: "var(--accent-ink)", flexShrink: 0, marginTop: 2 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: "var(--text-primary)" }}>Check these before you save:</div>
-        <ul style={{ margin: "6px 0 0", paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4, overflowWrap: "anywhere" }}>
+        {file && <div style={{ color: "var(--text-primary)" }}>Built from {file}. Check it, then press Save.</div>}
+        {lines.length > 0 && <div style={{ color: "var(--text-primary)", marginTop: file ? 6 : 0 }}>Check these before you save:</div>}
+        {lines.length > 0 && <ul style={{ margin: "6px 0 0", paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4, overflowWrap: "anywhere" }}>
           {lines.map((line, i) => (
             <li key={i}>{line}</li>
           ))}
-        </ul>
+        </ul>}
       </div>
       <Button variant="ghost" size="sm" onClick={onDismiss}>
         Dismiss

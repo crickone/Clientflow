@@ -24,7 +24,7 @@ export default async function NewProgramPage(props: { searchParams: Promise<{ ty
   if (type === "upload") {
     return (
       <div className="app-page" style={{ maxWidth: 900 }}>
-        <UploadProgramForm initial={initial} />
+        <UploadProgramForm initial={initial} newProgramDraftKey={`draft:${tenantId()}:program:new`} />
       </div>
     );
   }

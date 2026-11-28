@@ -30,24 +30,34 @@ export function UploadProgramForm({ initial, newProgramDraftKey }: { initial: Pr
   const [building, startBuild] = useTransition();
   const [buildError, setBuildError] = useState<string | null>(null);
 
-  // Only the saved file: the action reads the program's stored upload, so a
-  // replaced-but-unsaved file would build the old one.
-  const canBuild =
-    !!newProgramDraftKey && !!initial.id && !!filename && filename === initial.uploadFilename && BUILDABLE.test(filename);
+  const canBuild = !!newProgramDraftKey && !!filename && BUILDABLE.test(filename);
 
   const build = () => {
-    if (!canBuild || !initial.id || !newProgramDraftKey) return;
-    const id = initial.id;
+    if (!canBuild || !filename || !newProgramDraftKey) return;
     setBuildError(null);
     startBuild(async () => {
       let res: Awaited<ReturnType<typeof buildProgramFromUploadAction>>;
       try {
+        // The action reads the program's stored file, so a new program or a
+        // replaced file is saved first.
+        let id = initial.id;
+        if (!id || filename !== initial.uploadFilename) {
+          const saved = await saveProgramAction({
+            ...initial,
+            title: title.trim() || (originalName ?? "").replace(/\.[^.]+$/, "") || "New Program",
+            tags: tagsText.split(",").map((t) => t.trim()).filter(Boolean),
+            uploadFilename: filename,
+            uploadOriginalName: originalName,
+          });
+          if (!saved.ok) return setBuildError(saved.error);
+          id = saved.id;
+        }
         res = await buildProgramFromUploadAction(id);
       } catch {
         return setBuildError("I couldn't build the program just now. Try again in a moment.");
       }
       if (!res.ok) return setBuildError(res.error);
-      if (!writeDraft(newProgramDraftKey, { program: res.program, tagsText: "", unplaced: res.unplaced })) {
+      if (!writeDraft(newProgramDraftKey, { program: res.program, tagsText: "", unplaced: res.unplaced, imported: originalName ?? "the file" })) {
         return setBuildError("This browser would not keep the program for the builder. Allow site data and try again.");
       }
       router.push("/workout/new?type=detailed");
