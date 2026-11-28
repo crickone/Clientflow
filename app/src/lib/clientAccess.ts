@@ -37,6 +37,27 @@ export function getClientLogin(clientId: number): ClientLoginInfo | null {
 
 export type LoginResult = { ok: true } | { ok: false; error: string };
 
+/** The stored password hash of this business's client login, or null. */
+export function getClientPasswordHash(clientId: number): string | null {
+  const tenantId = getCurrentTenant().id;
+  const c = authDb
+    .select({ hash: clientCredentials.passwordHash })
+    .from(clientCredentials)
+    .where(and(eq(clientCredentials.tenantId, tenantId), eq(clientCredentials.clientId, clientId)))
+    .get();
+  return c?.hash ?? null;
+}
+
+/** Put a previously stored hash back (used when emailing a new password fails). */
+export function restoreClientPasswordHash(clientId: number, hash: string): void {
+  const tenantId = getCurrentTenant().id;
+  authDb
+    .update(clientCredentials)
+    .set({ passwordHash: hash })
+    .where(and(eq(clientCredentials.tenantId, tenantId), eq(clientCredentials.clientId, clientId)))
+    .run();
+}
+
 export function enableClientLogin(clientId: number, email: string, password: string): LoginResult {
   const tenantId = getCurrentTenant().id;
   const normEmail = email.trim().toLowerCase();

@@ -33,9 +33,37 @@ interface Item {
   type: string;
 }
 
+/** A password that is easy to read out and type: lowercase, no look-alikes (0/o, 1/l/i). */
 function genPassword() {
-  return Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6).toUpperCase();
+  const chars = "abcdefghjkmnpqrstuvwxyz23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  return Array.from(bytes, (b) => chars[b % chars.length]).join("");
 }
+
+/** Typed passwords are kept exactly: no capitalising, correcting or spell checking. */
+/** The exact login just saved, so staff can pass it on without retyping it. */
+function SavedPassword({ email, password, onDismiss }: { email: string; password: string; onDismiss: () => void }) {
+  const copy = () => {
+    navigator.clipboard?.writeText(password).then(
+      () => toast.success("Password copied."),
+      () => toast.error("Couldn't copy. Select the password and copy it."),
+    );
+  };
+  return (
+    <div role="status" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 12px", border: "1px solid var(--hairline)", borderRadius: "var(--radius)", background: "var(--surface-2)" }}>
+      <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+        They sign in with <strong style={{ color: "var(--text-primary)" }}>{email}</strong> and password{" "}
+        <strong style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono), monospace", userSelect: "all" }}>{password}</strong>
+      </div>
+      <Button size="sm" variant="outline" onClick={copy} type="button">Copy password</Button>
+      <Button size="sm" variant="ghost" onClick={onDismiss} type="button" aria-label="Hide password">
+        <X size={13} />
+      </Button>
+    </div>
+  );
+}
+
+const passwordFieldProps = { autoCapitalize: "none", autoCorrect: "off", spellCheck: false, autoComplete: "off" } as const;
 
 export function ClientAppAccess({
   clientId,
@@ -91,20 +119,26 @@ function LoginCard({ clientId, clientEmail, login }: { clientId: number; clientE
   const [password, setPassword] = useState(genPassword());
   const [resetting, setResetting] = useState(false);
   const [newPass, setNewPass] = useState("");
+  // The password just saved, shown until dismissed so it can be passed on exactly.
+  const [savedPass, setSavedPass] = useState<string | null>(null);
 
   const enable = () =>
     start(async () => {
       const res = await enableClientLoginAction(clientId, email, password);
       if (res.ok) {
         toast.success("App login enabled.");
+        setSavedPass(password);
         router.refresh();
       } else toast.error(res.error);
     });
   const reset = () =>
     start(async () => {
-      const res = await resetClientPasswordAction(clientId, newPass || genPassword());
+      const pass = newPass;
+      if (pass.length < 6) return void toast.error("Password must be at least 6 characters.");
+      const res = await resetClientPasswordAction(clientId, pass);
       if (res.ok) {
         toast.success("Password reset.");
+        setSavedPass(pass);
         setResetting(false);
         setNewPass("");
       } else toast.error(res.error);
@@ -123,9 +157,16 @@ function LoginCard({ clientId, clientEmail, login }: { clientId: number; clientE
     });
   const sendLogin = () =>
     start(async () => {
+      const sure = await confirm({
+        title: "Email a new password?",
+        body: `This sets a new password and emails it to ${login!.email}. Any password set before stops working.`,
+        confirmLabel: "Set and email",
+      });
+      if (!sure) return;
       const res = await sendClientLoginEmailAction(clientId);
       if (res.ok) {
-        toast.success(`App login emailed to ${login!.email}`);
+        toast.success(`New password emailed to ${login!.email}`);
+        setSavedPass(null);
         router.refresh();
       } else toast.error(res.error);
     });
@@ -146,7 +187,7 @@ function LoginCard({ clientId, clientEmail, login }: { clientId: number; clientE
             <div>
               <Label htmlFor="cl-pass" srOnly>Temporary password</Label>
               <div style={{ display: "flex", gap: 6 }}>
-                <Input id="cl-pass" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Temporary password" />
+                <Input id="cl-pass" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Temporary password" {...passwordFieldProps} />
                 <Button variant="outline" size="sm" onClick={() => setPassword(genPassword())} type="button">New</Button>
               </div>
             </div>
@@ -159,6 +200,7 @@ function LoginCard({ clientId, clientEmail, login }: { clientId: number; clientE
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {savedPass && <SavedPassword email={login.email} password={savedPass} onDismiss={() => setSavedPass(null)} />}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div style={{ fontSize: 13.5, color: "var(--text-primary)", fontFamily: "var(--font-mono), monospace" }}>{login.email}</div>
             <Badge tone={login.isActive ? "green" : "neutral"}>
@@ -173,17 +215,18 @@ function LoginCard({ clientId, clientEmail, login }: { clientId: number; clientE
             <div style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
               <div style={{ flex: 1 }}>
                 <Label htmlFor="cl-newpass" srOnly>New password</Label>
-                <Input id="cl-newpass" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="New password" />
+                <Input id="cl-newpass" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="New password, at least 6 characters" autoFocus {...passwordFieldProps} />
               </div>
+              <Button size="sm" variant="outline" onClick={() => setNewPass(genPassword())} type="button">Suggest</Button>
               <Button size="sm" onClick={reset} disabled={pending}>Save</Button>
               <Button size="sm" variant="ghost" onClick={() => setResetting(false)}>Cancel</Button>
             </div>
           ) : (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Button size="sm" onClick={sendLogin} disabled={pending}>
-                <Send size={13} /> {pending ? "Sending…" : "Email app login"}
+                <Send size={13} /> {pending ? "Sending…" : "Email a new password"}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => { setNewPass(genPassword()); setResetting(true); }}>
+              <Button size="sm" variant="outline" onClick={() => { setNewPass(""); setResetting(true); }}>
                 <KeyRound size={13} /> Reset password
               </Button>
               <Button size="sm" variant="outline" onClick={toggle} disabled={pending}>

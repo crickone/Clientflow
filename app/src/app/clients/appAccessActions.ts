@@ -16,6 +16,8 @@ import {
   getClientLogin,
   removeClientLogin,
   resetClientPassword,
+  getClientPasswordHash,
+  restoreClientPasswordHash,
   setClientLoginActive,
   unassignNutrition,
   unassignWorkout,
@@ -51,6 +53,9 @@ export async function sendClientLoginEmailAction(clientId: number): Promise<Logi
   }
 
   const temp = "cf-" + crypto.randomBytes(4).toString("hex");
+  // Kept so a failed send can put the old password back: otherwise the member
+  // is locked out with a password nobody was told.
+  const previousHash = getClientPasswordHash(cid);
   const reset = resetClientPassword(cid, temp);
   if (!reset.ok) return reset;
 
@@ -78,7 +83,10 @@ export async function sendClientLoginEmailAction(clientId: number): Promise<Logi
   });
 
   const res = await sendEmail({ to: login.email, subject: `Your ${business} app login`, html });
-  if (!res.ok) return { ok: false, error: res.error };
+  if (!res.ok) {
+    if (previousHash) restoreClientPasswordHash(cid, previousHash);
+    return { ok: false, error: `${res.error} The password was not changed.` };
+  }
   revalidatePath(`/clients/${cid}`);
   return { ok: true };
 }
