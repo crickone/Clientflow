@@ -2888,7 +2888,8 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
   // Workout log: a member works through one programme day in the app. The
   // session snapshots the day's exercises (so a later programme edit never
   // rewrites history); exercise_key follows a lift across programmes. The day
-  // is kept by position: saveProgram re-creates day rows on every save.
+  // is kept by position: saveProgram re-creates day rows on every save (kept
+  // days keep their ids) and moves these positions with their days.
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS workout_sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

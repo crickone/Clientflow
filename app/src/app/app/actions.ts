@@ -38,6 +38,7 @@ import { programsOn } from "@/lib/programs/access";
 import { listExercises } from "@/lib/exerciseLibrary";
 import { searchExercises } from "@/lib/workoutGroupsModel";
 import { setTrainingPlan } from "@/lib/trainingOverview";
+import { PROGRAM_LIMITS } from "@/lib/workoutModel";
 import { addMealItems, deleteMeal, getMeal, getMealName, logMeal, removeMealItem, setMealServings, splitMealItem, updateMeal, updateMealItem } from "@/lib/meals";
 import { cleanItemEdit, loggedAtFor } from "@/lib/mealsModel";
 import { dateKey } from "@/lib/trainingProgress";
@@ -224,12 +225,13 @@ const setSchema = z.object({
   done: z.boolean(),
   rpe: z.number().min(1).max(10).nullable().optional(),
 });
-const exercisesSchema = z.array(z.object({ id: z.number().int().positive(), sets: z.array(setSchema).max(20) })).max(60);
+// A program day can hold PROGRAM_LIMITS.maxExercisesPerDay exercises, so a log of it can too.
+const exercisesSchema = z.array(z.object({ id: z.number().int().positive(), sets: z.array(setSchema).max(20) })).max(PROGRAM_LIMITS.maxExercisesPerDay);
 
 export async function startWorkoutAction(programId: number, dayPosition: number): Promise<StartResult> {
   const { clientId } = requireClient();
   const p = idSchema.safeParse(programId);
-  const d = z.number().int().min(0).max(100).safeParse(dayPosition);
+  const d = z.number().int().min(0).max(PROGRAM_LIMITS.maxDays - 1).safeParse(dayPosition);
   if (!p.success || !d.success) return { ok: false, error: "That day isn't in your program." };
   const program = assignedWorkoutProgramDetail(clientId, p.data);
   if (!program) return { ok: false, error: "That program isn't assigned to you." };

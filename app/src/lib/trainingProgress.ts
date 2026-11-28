@@ -186,9 +186,9 @@ export function planWeek(input: {
   return out;
 }
 
-/** The programme day after the last one logged, or the first. */
+/** The programme day after the last one logged, or the first (also when the last one's day was removed: a negative position). */
 export function nextDayAfter(lastPosition: number | null, dayCount: number): number {
   if (dayCount <= 0) return 0;
-  if (lastPosition === null) return 0;
+  if (lastPosition === null || lastPosition < 0) return 0;
   return (lastPosition + 1) % dayCount;
 }

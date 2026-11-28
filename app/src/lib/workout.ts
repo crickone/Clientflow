@@ -1,9 +1,9 @@
 import "server-only";
 
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { workoutDays, workoutExercises, workoutPrograms } from "@/lib/db/schema";
+import { workoutDays, workoutExercises, workoutPrograms, workoutSessions } from "@/lib/db/schema";
 import { checkProgramLimits, cleanLoad, normaliseWeeks, type ProgramInput, type ProgramStatus, type ProgramType, type Section } from "@/lib/workoutModel";
 
 function parseTags(csv: string | null): string[] {
@@ -121,9 +121,24 @@ export function getProgram(id: number): ProgramInput | null {
 }
 
 /**
+ * The day_position of a member's session whose day was removed from its
+ * program. No day has it, so Next up starts again at day 1 (nextDayAfter)
+ * and the session is never resumed as another day. The same value the
+ * program enrolments use (programs/enrolments.ts DETACHED_POSITION).
+ */
+export const DETACHED_DAY_POSITION = -1;
+
+/**
  * Create or replace a program. Days are normalised to weeks 1..K (see
  * normaliseWeeks) and checked against PROGRAM_LIMITS (throws a plain Error
  * when over). `position` is the running index across the whole program.
+ *
+ * On an update, a day whose incoming `id` is one of this program's days
+ * keeps that id (first occurrence wins), and members' sessions of this
+ * program follow their day to its new position, in the same transaction.
+ * A session whose day was removed is detached (DETACHED_DAY_POSITION).
+ * When no incoming day carries one of the program's ids, positions are left
+ * as they were.
  */
 export function saveProgram(input: ProgramInput): number {
   const days = normaliseWeeks(input.days);
@@ -142,7 +157,12 @@ export function saveProgram(input: ProgramInput): number {
       updatedAt: new Date(),
     };
     let programId = input.id ?? 0;
+    // Old position of each of this program's days, by id (update only).
+    const oldPosition = new Map<number, number>();
     if (programId) {
+      for (const d of tx.select({ id: workoutDays.id, position: workoutDays.position }).from(workoutDays).where(eq(workoutDays.programId, programId)).all()) {
+        oldPosition.set(d.id, d.position);
+      }
       tx.update(workoutPrograms).set(base).where(eq(workoutPrograms.id, programId)).run();
       tx.delete(workoutDays).where(eq(workoutDays.programId, programId)).run();
     } else {
@@ -150,12 +170,22 @@ export function saveProgram(input: ProgramInput): number {
       programId = row.id;
     }
     const inWeek = new Map<number, number>();
+    const kept = new Set<number>();
+    // Old position -> new position, for every kept day.
+    const moved = new Map<number, number>();
     days.forEach((day, di) => {
       const n = (inWeek.get(day.week) ?? 0) + 1;
       inWeek.set(day.week, n);
+      const keepId = day.id != null && oldPosition.has(day.id) && !kept.has(day.id) ? day.id : null;
+      if (keepId !== null) {
+        kept.add(keepId);
+        const from = oldPosition.get(keepId)!;
+        if (!moved.has(from)) moved.set(from, di);
+      }
       const [dayRow] = tx
         .insert(workoutDays)
         .values({
+          ...(keepId !== null ? { id: keepId } : {}),
           programId,
           week: day.week,
           // Fallback counts within the week; for a one-week program that is di + 1, as before.
@@ -185,8 +215,28 @@ export function saveProgram(input: ProgramInput): number {
           .run();
       });
     });
+    if (oldPosition.size > 0 && kept.size > 0) remapSessionDays(tx, programId, moved);
     return programId;
   });
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Members' sessions of this program follow their day: old position -> new
+ * one, and DETACHED_DAY_POSITION when the day is gone. One CASE update, so
+ * every row is read at its old position and moves can never collide.
+ * Enrolment sessions (the program library) are left alone.
+ */
+function remapSessionDays(tx: Tx, programId: number, moved: Map<number, number>) {
+  const cases = [...moved].map(([from, to]) => sql`WHEN ${from} THEN ${to}`);
+  const target = cases.length
+    ? sql`CASE ${workoutSessions.dayPosition} ${sql.join(cases, sql` `)} ELSE ${DETACHED_DAY_POSITION} END`
+    : sql`${DETACHED_DAY_POSITION}`;
+  tx.update(workoutSessions)
+    .set({ dayPosition: target })
+    .where(and(eq(workoutSessions.programId, programId), isNull(workoutSessions.enrolmentId), gte(workoutSessions.dayPosition, 0)))
+    .run();
 }
 
 export function deleteProgram(id: number) {

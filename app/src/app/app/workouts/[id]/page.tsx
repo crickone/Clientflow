@@ -32,7 +32,8 @@ export default async function ClientWorkoutProgramPage(
 
   const open = openSession(clientId);
   const day = Number(searchParams.day);
-  const initialDay = Number.isInteger(day) && day >= 0 ? day : open?.programId === id ? open.dayPosition : 0;
+  // An open session detached from a removed day (position -1) opens at the first day.
+  const initialDay = Number.isInteger(day) && day >= 0 ? day : open?.programId === id && open.dayPosition >= 0 ? open.dayPosition : 0;
 
   return (
     <WorkoutProgramDetail

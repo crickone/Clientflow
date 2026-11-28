@@ -38,7 +38,7 @@ import { exerciseHasVideo } from "@/lib/youtube";
 export function DetailedBuilder({ initial, exercises, draftKey }: { initial: ProgramInput; exercises: ExerciseLibRow[]; draftKey?: string }) {
   const router = useRouter();
   const confirm = useConfirm();
-  const [program, setProgram] = useState<ProgramInput>(() => ({ ...initial, days: normaliseWeeks(initial.days) }));
+  const [program, setProgram] = useState<ProgramInput>(() => withDays({ ...initial, days: normaliseWeeks(initial.days) }));
   // dayIdx indexes the flat program.days; the selected week is that day's week.
   const [dayIdx, setDayIdx] = useState(0);
   const [tagsText, setTagsText] = useState(initial.tags.join(", "));
@@ -53,7 +53,7 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
   const [imported, setImported] = useState<string | null>(null);
 
   const applyDraft = useCallback((d: BuilderDraft) => {
-    setProgram(d.program);
+    setProgram(withDays(d.program));
     setTagsText(d.tagsText);
     setUnplaced(Array.isArray(d.unplaced) ? d.unplaced.filter((u) => typeof u === "string") : []);
     setImported(typeof d.imported === "string" && d.imported ? d.imported : null);
@@ -69,8 +69,9 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
   const draft = useDraft<BuilderDraft>(draftKey ?? null, draftValue, applyDraft, normaliseDraft);
 
   const days = program.days;
-  const idx = Math.min(dayIdx, days.length - 1);
-  const day = days[idx];
+  // The program always has a day (withDays), so `day` is always set.
+  const idx = Math.max(0, Math.min(dayIdx, days.length - 1));
+  const day = days[idx] ?? FALLBACK_DAY;
   const volume = dayVolume(day);
 
   // Weeks. `days` stays flat and ordered by week, so a week is a run of it.
@@ -613,10 +614,20 @@ function tabStyle(active: boolean): React.CSSProperties {
 /** What the builder keeps as a draft. `unplaced` comes from "Build from this file". */
 type BuilderDraft = { program: ProgramInput; tagsText: string; unplaced?: string[]; imported?: string };
 
-/** A stored draft from before weeks existed: every day lands in week 1. An empty `unplaced` is dropped. */
+/** The builder needs at least one day to show; a program with none gets one blank day. */
+function withDays(p: ProgramInput): ProgramInput {
+  return Array.isArray(p.days) && p.days.length > 0 ? p : { ...p, days: [blankDay()] };
+}
+const FALLBACK_DAY = blankDay();
+
+/**
+ * A stored draft from before weeks existed: every day lands in week 1. A
+ * draft with no days gets one blank day back. An empty `unplaced` is dropped.
+ */
 function normaliseDraft(d: BuilderDraft): BuilderDraft {
   const { unplaced, imported, ...rest } = d;
-  const next: BuilderDraft = { ...rest, program: { ...d.program, days: normaliseWeeks(d.program.days) } };
+  const days = Array.isArray(d.program?.days) ? normaliseWeeks(d.program.days) : [];
+  const next: BuilderDraft = { ...rest, program: { ...d.program, days: days.length ? days : [blankDay()] } };
   if (Array.isArray(unplaced) && unplaced.length) next.unplaced = unplaced;
   if (typeof imported === "string" && imported) next.imported = imported;
   return next;

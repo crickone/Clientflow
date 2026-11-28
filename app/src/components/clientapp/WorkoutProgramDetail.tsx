@@ -37,7 +37,7 @@ export function WorkoutProgramDetail({
   initialDay?: number;
 }) {
   const router = useRouter();
-  const [dayIdx, setDayIdx] = useState(Math.min(initialDay, Math.max(0, program.days.length - 1)));
+  const [dayIdx, setDayIdx] = useState(Math.max(0, Math.min(initialDay, program.days.length - 1)));
   const [pending, start] = useTransition();
   const [blocked, setBlocked] = useState<{ error: string; id?: number } | null>(null);
   const day = program.days[dayIdx];

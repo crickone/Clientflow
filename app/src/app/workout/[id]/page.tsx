@@ -33,7 +33,13 @@ export default async function EditProgramPage(props: { params: Promise<{ id: str
   }
   return (
     <div className="app-page">
-      <DetailedBuilder initial={program} exercises={listExercises()} draftKey={`draft:${tenantId()}:program:${id}`} />
+      {/* Keyed by the day ids: after a save that added days the builder remounts with their new ids, so a later save keeps them (saveProgram matches days by id). */}
+      <DetailedBuilder
+        key={program.days.map((d) => d.id).join(",")}
+        initial={program}
+        exercises={listExercises()}
+        draftKey={`draft:${tenantId()}:program:${id}`}
+      />
     </div>
   );
 }
