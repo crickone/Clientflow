@@ -254,7 +254,7 @@ function ex(name: string, extra: Partial<ProgramInput["days"][number]["exercises
     ok("turn: with the weeks", (turn.pendingWrites[0].input.days as { week: number }[]).map((d) => d.week).join(",") === "1,1,2,2");
     ok("turn: with the card line", turn.pendingWrites[0].summary === "Create workout program “Strength block”");
     ok("turn: stopped for approval", modelCalls === 1);
-    ok("turn: reply has the model's words then the tool's text", turn.text.startsWith("I'll copy the program from the sheet.\n\n<untrusted_external_content>\nStrength block: 2 weeks") && /Things to check:/.test(turn.text) && turn.text.endsWith("Approve the card to save it."));
+    ok("turn: reply has the model's words then the tool's text", turn.text.startsWith("I'll copy the program from the sheet.\n\nStrength block: 2 weeks") && !turn.text.includes("untrusted_external_content") && /Things to check:/.test(turn.text) && turn.text.endsWith("Approve the card to save it."));
     ok("turn: the tool's text streamed too", streamed.join("") === turn.text);
 
     // An error adds no card and no extra text: the model reads the error next turn.

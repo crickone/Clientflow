@@ -55,6 +55,9 @@ export type ToolResult = {
   // result's text to the reply so the operator sees it. Normal tools leave it
   // undefined.
   pendingWrites?: PendingWrite[];
+  // What the operator reads in the reply when `pendingWrites` is set, if it
+  // should differ from `text` (the model's copy, which may carry fences).
+  displayText?: string;
   // The artifact-side mirror of `pendingWrites`, one field over: a list (not
   // the single `artifact` above) that runAgentTurn folds into the outer turn's
   // own `artifacts`. Same status — no in-tree tool currently sets it (it was

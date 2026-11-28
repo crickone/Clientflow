@@ -182,8 +182,9 @@ export async function runAgentTurn(
             // text (what the card is, anything to check) is shown to the
             // operator as part of the reply instead of being lost.
             // draft_program_from_file is the tool that does this.
-            if (tr.text.trim()) {
-              const note = `${fullText.trim() ? "\n\n" : ""}${tr.text.trim()}`;
+            const shown = (tr.displayText ?? tr.text).trim();
+            if (shown) {
+              const note = `${fullText.trim() ? "\n\n" : ""}${shown}`;
               fullText += note;
               onText?.(note);
             }

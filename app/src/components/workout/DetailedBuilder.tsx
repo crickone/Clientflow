@@ -531,7 +531,7 @@ function ExerciseRow({
         <Input
           value={ex.load ?? ""}
           onChange={(e) => onPatch({ load: e.target.value })}
-          placeholder="Load, e.g. 70% or RPE 8"
+          placeholder="70% or RPE 8"
           aria-label="Load"
           maxLength={MAX_LOAD_LENGTH}
           style={{ height: 34 }}
