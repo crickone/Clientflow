@@ -1,18 +1,28 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FileText, Loader2, UploadCloud, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
-import { buildProgramFromUploadAction, saveProgramAction } from "@/app/workout/actions";
-import { writeDraft } from "@/components/workout/useDraft";
-import type { ProgramInput } from "@/lib/workoutModel";
+import { pollBuildFromUploadAction, saveProgramAction, startBuildFromUploadAction, type BuildPollResult } from "@/app/workout/actions";
+import { readDraft, writeDraft } from "@/components/workout/useDraft";
+import { blankProgram, type ProgramInput } from "@/lib/workoutModel";
 
 /** Spreadsheets Adonis can copy into the builder. */
 const BUILDABLE = /\.(xlsx|csv)$/i;
+const BUILD_FAILED = "I couldn't build the program just now. Try again in a moment.";
+const POLL_MS = 3000;
+const POLL_LIMIT_MS = 10 * 60_000;
+
+/** True when the new-program builder holds unsaved work (anything other than a blank program). */
+function hasNewProgramDraft(key: string): boolean {
+  const draft = readDraft<{ program?: unknown; tagsText?: unknown }>(key);
+  if (!draft) return false;
+  return JSON.stringify({ program: draft.program, tagsText: draft.tagsText ?? "" }) !== JSON.stringify({ program: blankProgram("detailed"), tagsText: "" });
+}
 
 /**
  * `newProgramDraftKey` is the new Detailed program builder's draft key; with
@@ -29,21 +39,35 @@ export function UploadProgramForm({ initial, newProgramDraftKey }: { initial: Pr
   const [saving, start] = useTransition();
   const [building, startBuild] = useTransition();
   const [buildError, setBuildError] = useState<string | null>(null);
+  // The program as last saved from this form: a build saves a new program
+  // first, and every later build and Save & Close must update that one, not
+  // make another.
+  const [savedId, setSavedId] = useState<number | undefined>(initial.id);
+  const [savedFile, setSavedFile] = useState<string | null>(initial.uploadFilename);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const canBuild = !!newProgramDraftKey && !!filename && BUILDABLE.test(filename);
 
   const build = () => {
     if (!canBuild || !filename || !newProgramDraftKey) return;
+    if (hasNewProgramDraft(newProgramDraftKey) && !window.confirm("Replace the unsaved new program in the builder?")) return;
     setBuildError(null);
     startBuild(async () => {
-      let res: Awaited<ReturnType<typeof buildProgramFromUploadAction>>;
+      let res: BuildPollResult;
       try {
-        // The action reads the program's stored file, so a new program or a
+        // The build reads the program's stored file, so a new program or a
         // replaced file is saved first.
-        let id = initial.id;
-        if (!id || filename !== initial.uploadFilename) {
+        let id = savedId;
+        if (!id || filename !== savedFile) {
           const saved = await saveProgramAction({
             ...initial,
+            id,
             title: title.trim() || (originalName ?? "").replace(/\.[^.]+$/, "") || "New Program",
             tags: tagsText.split(",").map((t) => t.trim()).filter(Boolean),
             uploadFilename: filename,
@@ -51,11 +75,31 @@ export function UploadProgramForm({ initial, newProgramDraftKey }: { initial: Pr
           });
           if (!saved.ok) return setBuildError(saved.error);
           id = saved.id;
+          setSavedId(saved.id);
+          setSavedFile(filename);
         }
-        res = await buildProgramFromUploadAction(id);
+        const started = await startBuildFromUploadAction(id);
+        if (!started.ok) return setBuildError(started.error);
+        // The build runs on the server; ask every few seconds until it is done.
+        const deadline = Date.now() + POLL_LIMIT_MS;
+        let misses = 0;
+        res = { status: "running" };
+        while ("status" in res) {
+          if (!mounted.current) return;
+          if (Date.now() > deadline) return setBuildError("Building the program took too long. Try again in a moment.");
+          await new Promise((r) => setTimeout(r, POLL_MS));
+          try {
+            res = await pollBuildFromUploadAction(started.jobId);
+            misses = 0;
+          } catch {
+            // A dropped poll is retried; three in a row end the wait.
+            if (++misses >= 3) throw new Error("poll failed");
+          }
+        }
       } catch {
-        return setBuildError("I couldn't build the program just now. Try again in a moment.");
+        return setBuildError(BUILD_FAILED);
       }
+      if (!mounted.current) return;
       if (!res.ok) return setBuildError(res.error);
       if (!writeDraft(newProgramDraftKey, { program: res.program, tagsText: "", unplaced: res.unplaced, imported: originalName ?? "the file" })) {
         return setBuildError("This browser would not keep the program for the builder. Allow site data and try again.");
@@ -89,6 +133,7 @@ export function UploadProgramForm({ initial, newProgramDraftKey }: { initial: Pr
     start(async () => {
       const res = await saveProgramAction({
         ...initial,
+        id: savedId,
         title,
         tags: tagsText.split(",").map((t) => t.trim()).filter(Boolean),
         uploadFilename: filename,

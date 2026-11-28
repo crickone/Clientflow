@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/auth";
+import { getCurrentMembership, requireUser } from "@/lib/auth";
 import { deleteProgram, duplicateProgram, getProgram, saveProgram, setProgramStatus } from "@/lib/workout";
 import { importProgramFromUpload } from "@/lib/workoutImport/convert";
+import { readJob, startJob } from "@/lib/workoutImport/jobs";
 import { MAX_LOAD_LENGTH, PROGRAM_LIMITS, PROGRAM_TEXT_LIMITS as T, checkProgramLimits, type ProgramInput } from "@/lib/workoutModel";
 
 const exerciseSchema = z.object({
@@ -84,20 +85,52 @@ export async function setProgramStatusAction(id: number, status: "active" | "arc
 }
 
 export type BuildFromUploadResult = { ok: true; program: ProgramInput; unplaced: string[] } | { ok: false; error: string };
+export type BuildStartResult = { ok: true; jobId: string } | { ok: false; error: string };
+export type BuildPollResult = { status: "running" } | BuildFromUploadResult;
+
+const BUILD_FAILED = "I couldn't build the program just now. Try again in a moment.";
+
+/** The signed-in user and their business, for binding and reading a build job. */
+async function jobOwner(): Promise<{ tenantId: number; userId: number } | null> {
+  const user = await requireUser();
+  const tenantId = getCurrentMembership()?.tenant.id;
+  return tenantId ? { tenantId, userId: user.id } : null;
+}
 
 /**
- * "Build from this file": Adonis reads an Upload program's spreadsheet and
- * hands back a new Detailed program for the builder. Nothing is saved here;
- * the operator checks it in the builder and saves it there.
+ * "Build from this file", step 1: checks the program, then starts Adonis
+ * reading its spreadsheet detached on the server (a sheet can take several
+ * minutes, longer than one request may last behind a proxy) and returns the
+ * job id at once. Nothing is saved; the operator checks the program in the
+ * builder and saves it there.
  */
-export async function buildProgramFromUploadAction(programId: number): Promise<BuildFromUploadResult> {
-  await requireUser();
+export async function startBuildFromUploadAction(programId: number): Promise<BuildStartResult> {
+  const owner = await jobOwner();
+  if (!owner) return { ok: false, error: BUILD_FAILED };
   const p = idSchema.safeParse(programId);
   if (!p.success) return { ok: false, error: "I can't find that program." };
   const program = getProgram(p.data);
   if (!program) return { ok: false, error: "I can't find that program." };
   if (program.type !== "upload") return { ok: false, error: "Only an uploaded program can be built from its file." };
-  const result = await importProgramFromUpload(p.data);
-  if (!result.ok) return { ok: false, error: result.error };
-  return { ok: true, program: result.program, unplaced: result.unplaced };
+  const jobId = startJob<BuildFromUploadResult>(
+    owner,
+    async () => {
+      const result = await importProgramFromUpload(p.data);
+      return result.ok ? { ok: true, program: result.program, unplaced: result.unplaced } : { ok: false, error: result.error };
+    },
+    (err) => {
+      console.error("[workout-import] build job failed:", err);
+      return { ok: false, error: BUILD_FAILED };
+    },
+  );
+  return { ok: true, jobId };
+}
+
+/** Step 2, polled: still running, or the result. Only the business and user that started the job can read it. */
+export async function pollBuildFromUploadAction(jobId: string): Promise<BuildPollResult> {
+  const owner = await jobOwner();
+  if (!owner) return { ok: false, error: BUILD_FAILED };
+  const state = readJob<BuildFromUploadResult>(String(jobId ?? ""), owner);
+  if (!state) return { ok: false, error: "That build has stopped. Try again." };
+  return state.status === "running" ? { status: "running" } : state.result;
 }

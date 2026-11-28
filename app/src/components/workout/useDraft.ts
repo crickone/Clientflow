@@ -105,3 +105,15 @@ export function writeDraft<T>(key: string, value: T): boolean {
     return false;
   }
 }
+
+/** The value in a builder's draft slot, or null when there is none (or storage is blocked). */
+export function readDraft<T>(key: string): T | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as { value?: T } | null;
+    return draft && draft.value !== undefined ? draft.value : null;
+  } catch {
+    return null;
+  }
+}
