@@ -93,6 +93,56 @@ async function main() {
   await assert.rejects(() => readXlsx(buf, { maxUncompressedBytes: 100 }), (e) => e instanceof SheetReadError && /too large/.test(e.message));
   passed++;
   check("guards do not fire at the default limits", (await readXlsx(buf)).length === 2);
+  // Refs past Excel's bounds are refused before any row or cell is padded out.
+  const oneSheet = (sheetXml: string) =>
+    build({
+      "xl/workbook.xml": '<workbook xmlns:r="y"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>',
+      "xl/_rels/workbook.xml.rels": '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
+      "xl/worksheets/sheet1.xml": sheetXml,
+    });
+  const tooLarge = (e: unknown) => e instanceof SheetReadError && /too large/.test(e.message);
+  await assert.rejects(async () => readXlsx(await oneSheet('<worksheet><sheetData><row r="1"><c r="ZZZZZZZZ1" t="str"><v>x</v></c></row></sheetData></worksheet>')), tooLarge, "huge column refused");
+  passed++;
+  await assert.rejects(async () => readXlsx(await oneSheet('<worksheet><sheetData><row r="99999999999"><c t="str"><v>x</v></c></row></sheetData></worksheet>')), tooLarge, "huge row refused");
+  passed++;
+  await assert.rejects(async () => readXlsx(await oneSheet('<worksheet><sheetData><row r="1"><c r="XFE1" t="str"><v>x</v></c></row></sheetData></worksheet>')), tooLarge, "column XFE refused");
+  passed++;
+  const edge = await readXlsx(await oneSheet('<worksheet><sheetData><row r="1"><c r="XFD1" t="str"><v>x</v></c></row></sheetData></worksheet>'));
+  check("column XFD (the last one) still reads", edge[0].rows[0].length === 16_384 && edge[0].rows[0][16_383] === "x");
+  // Far-apart cells inside the bounds still cannot pad the grid without limit.
+  await assert.rejects(
+    async () => readXlsx(await oneSheet('<worksheet><sheetData><row r="1"><c r="XFD1" t="str"><v>x</v></c></row><row r="2"><c r="XFD2" t="str"><v>y</v></c></row></sheetData></worksheet>'), { maxGridSlots: 20_000 }),
+    tooLarge,
+    "grid slot budget",
+  );
+  passed++;
+
+  // A zip whose sizes lie: the declared size says 1 byte, the entry inflates
+  // to 2 MB. The running count stops it while it inflates.
+  {
+    const z = new JSZip();
+    z.file("xl/workbook.xml", '<workbook xmlns:r="y"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>');
+    z.file("xl/_rels/workbook.xml.rels", '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>');
+    z.file("xl/worksheets/sheet1.xml", "<worksheet>" + " ".repeat(2 * 1024 * 1024) + "</worksheet>");
+    const raw = await z.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+    const lying = Buffer.from(raw);
+    for (let i = 0; i + 46 <= lying.length; i++) {
+      const sig = lying.readUInt32LE(i);
+      // Only the big sheet's entry lies (local header and central directory).
+      if (sig === 0x04034b50 && lying.readUInt32LE(i + 22) > 100_000) lying.writeUInt32LE(1, i + 22);
+      else if (sig === 0x02014b50 && lying.readUInt32LE(i + 24) > 100_000) lying.writeUInt32LE(1, i + 24);
+    }
+    await assert.rejects(() => readXlsx(lying, { maxUncompressedBytes: 1024 * 1024 }), tooLarge, "lying sizes refused while inflating");
+    passed++;
+  }
+
+  // CSV has the same cell and grid guards.
+  await assert.rejects(async () => readCsv("a,b,c\nd,e,f\n", { maxCells: 5 }), tooLarge, "csv cell cap");
+  passed++;
+  await assert.rejects(async () => readCsv(",".repeat(5000), { maxGridSlots: 1000 }), tooLarge, "csv grid cap");
+  passed++;
+  check("csv under the caps reads", readCsv("a,b,c\nd,e,f\n", { maxCells: 6 })[0].rows.length === 2);
+
 
   // CSV.
   eq("csv basics", readCsv("a,b,c\n1,2,3\n")[0].rows, [["a", "b", "c"], ["1", "2", "3"]]);

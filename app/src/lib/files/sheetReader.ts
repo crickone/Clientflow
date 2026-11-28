@@ -16,8 +16,40 @@ export class SheetReadError extends Error {
 export const MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024;
 export const MAX_CELLS = 200_000;
 export const DEFAULT_MAX_CHARS = 60_000;
+/**
+ * Grid slots (cells, empty ones included, plus rows) a read may fill. Cells
+ * are stored densely, so a few far-apart refs ("XFD1048576") would otherwise
+ * make huge rows from a tiny file.
+ */
+export const MAX_GRID_SLOTS = 2_000_000;
+/** Excel's own bounds, zero-based: column XFD, row 1,048,576. */
+export const MAX_COL_INDEX = 16_383;
+export const MAX_ROW_INDEX = 1_048_575;
 
-export type ReadLimits = { maxUncompressedBytes?: number; maxCells?: number };
+export type ReadLimits = { maxUncompressedBytes?: number; maxCells?: number; maxGridSlots?: number };
+
+const TOO_LARGE = "That spreadsheet is too large to read. Split it into smaller files and attach them again.";
+const NOT_XLSX = "That file is not a valid .xlsx workbook. Save it as .xlsx from Excel and attach it again.";
+const tooLarge = () => new SheetReadError(TOO_LARGE);
+
+/** Counts cells and grid slots as a read fills them; throws the plain "too large" refusal past a limit. */
+type Guard = { cell: () => void; grow: (slots: number) => void };
+
+function makeGuard(limits: ReadLimits): Guard {
+  const maxCells = limits.maxCells ?? MAX_CELLS;
+  const maxSlots = limits.maxGridSlots ?? MAX_GRID_SLOTS;
+  let cells = 0;
+  let slots = 0;
+  return {
+    cell: () => {
+      if (++cells > maxCells) throw tooLarge();
+    },
+    grow: (n) => {
+      slots += n;
+      if (slots > maxSlots) throw tooLarge();
+    },
+  };
+}
 
 /** 0 -> "A", 25 -> "Z", 26 -> "AA". */
 export function colName(i: number): string {
@@ -88,7 +120,7 @@ function innerValue(inner: string): string | null {
   return m ? decodeXML(m[1] ?? "") : null;
 }
 
-function parseSheetXml(xml: string, shared: string[], onCell: () => void): string[][] {
+function parseSheetXml(xml: string, shared: string[], guard: Guard): string[][] {
   const rows: string[][] = [];
   const cellRe = /<c(?=[\s>\/])([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
   const rowRe = /<row(?=[\s>\/])([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g;
@@ -98,6 +130,7 @@ function parseSheetXml(xml: string, shared: string[], onCell: () => void): strin
     seqRow++;
     const rAttr = attr(rowMatch[1], "r");
     const rowIdx = rAttr && /^\d+$/.test(rAttr) ? Number(rAttr) - 1 : seqRow;
+    if (rowIdx > MAX_ROW_INDEX) throw tooLarge();
     seqRow = rowIdx;
     const inner = rowMatch[2];
     if (inner === undefined) continue;
@@ -111,6 +144,7 @@ function parseSheetXml(xml: string, shared: string[], onCell: () => void): strin
       const ref = attr(attrs, "r");
       const parsed = ref ? parseRef(ref) : null;
       const col = parsed ? parsed.col : seqCol;
+      if (col > MAX_COL_INDEX) throw tooLarge();
       seqCol = col;
       if (body === undefined) continue;
       const type = attr(attrs, "t") ?? "n";
@@ -127,10 +161,16 @@ function parseSheetXml(xml: string, shared: string[], onCell: () => void): strin
         }
       }
       if (value === "") continue;
-      onCell();
-      while (rows.length <= rowIdx) rows.push([]);
+      guard.cell();
+      if (rows.length <= rowIdx) {
+        guard.grow(rowIdx + 1 - rows.length);
+        while (rows.length <= rowIdx) rows.push([]);
+      }
       const row = rows[rowIdx];
-      while (row.length <= col) row.push("");
+      if (row.length <= col) {
+        guard.grow(col + 1 - row.length);
+        while (row.length <= col) row.push("");
+      }
       row[col] = value;
     }
   }
@@ -153,16 +193,60 @@ function resolveTarget(target: string): string {
   return out.join("/");
 }
 
+type EntryStream = {
+  on(event: "data", cb: (chunk: Uint8Array) => void): EntryStream;
+  on(event: "end", cb: () => void): EntryStream;
+  on(event: "error", cb: (err: Error) => void): EntryStream;
+  resume(): EntryStream;
+  pause(): EntryStream;
+};
+
+/**
+ * One zip entry inflated chunk by chunk. `count` sees each chunk's size
+ * before it is kept and throws to stop the inflate there, so a zip bomb is
+ * refused while it inflates, not after.
+ */
+function inflateEntry(file: JSZip.JSZipObject, count: (bytes: number) => void): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Uint8Array[] = [];
+    let settled = false;
+    // internalStream is jszip's public streaming API; its types leave it out.
+    const stream = (file as unknown as { internalStream(type: "uint8array"): EntryStream }).internalStream("uint8array");
+    stream.on("data", (chunk) => {
+      if (settled) return;
+      try {
+        count(chunk.length);
+      } catch (err) {
+        settled = true;
+        stream.pause();
+        reject(err);
+        return;
+      }
+      chunks.push(chunk);
+    });
+    stream.on("error", () => {
+      // A broken or inconsistent entry (bad deflate data, a size that does not match).
+      if (settled) return;
+      settled = true;
+      reject(new SheetReadError(NOT_XLSX));
+    });
+    stream.on("end", () => {
+      if (settled) return;
+      settled = true;
+      resolve(Buffer.concat(chunks).toString("utf8"));
+    });
+    stream.resume();
+  });
+}
+
 export async function readXlsx(buf: Buffer, limits: ReadLimits = {}): Promise<Sheet[]> {
   const maxBytes = limits.maxUncompressedBytes ?? MAX_UNCOMPRESSED_BYTES;
-  const maxCells = limits.maxCells ?? MAX_CELLS;
-  const tooBig = () => new SheetReadError("That spreadsheet is too large to read. Split it into smaller files and attach them again.");
 
   let zip: JSZip;
   try {
     zip = await JSZip.loadAsync(buf);
   } catch {
-    throw new SheetReadError("That file is not a valid .xlsx workbook. Save it as .xlsx from Excel and attach it again.");
+    throw new SheetReadError(NOT_XLSX);
   }
 
   // Declared sizes first, so a zip bomb is refused before anything inflates.
@@ -171,16 +255,18 @@ export async function readXlsx(buf: Buffer, limits: ReadLimits = {}): Promise<Sh
     const size = (file as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
     if (typeof size === "number" && Number.isFinite(size)) declared += size;
   });
-  if (declared > maxBytes) throw tooBig();
+  if (declared > maxBytes) throw tooLarge();
 
-  // Measured as we read, in case the declared sizes were missing or wrong.
+  // Measured while each entry inflates: the declared sizes come from the
+  // file itself and can lie.
   let measured = 0;
   const read = async (path: string): Promise<string | null> => {
     const f = zip.file(path);
     if (!f) return null;
-    const text = await f.async("string");
-    measured += Buffer.byteLength(text, "utf8");
-    if (measured > maxBytes) throw tooBig();
+    const text = await inflateEntry(f, (bytes) => {
+      measured += bytes;
+      if (measured > maxBytes) throw tooLarge();
+    });
     return stripTagPrefixes(text);
   };
 
@@ -199,11 +285,7 @@ export async function readXlsx(buf: Buffer, limits: ReadLimits = {}): Promise<Sh
   const shared = sharedXml ? parseSharedStrings(sharedXml) : [];
 
   const sheets: Sheet[] = [];
-  let cells = 0;
-  const onCell = () => {
-    cells++;
-    if (cells > maxCells) throw tooBig();
-  };
+  const guard = makeGuard(limits);
   let index = 0;
   for (const m of workbook.matchAll(/<sheet(?=[\s\/])([^>]*?)\/?>/g)) {
     index++;
@@ -212,14 +294,16 @@ export async function readXlsx(buf: Buffer, limits: ReadLimits = {}): Promise<Sh
     const target = rid ? rels.get(rid) : undefined;
     const path = target ? resolveTarget(target) : `xl/worksheets/sheet${index}.xml`;
     const xml = await read(path);
-    sheets.push({ name, rows: xml ? parseSheetXml(xml, shared, onCell) : [] });
+    sheets.push({ name, rows: xml ? parseSheetXml(xml, shared, guard) : [] });
   }
   return sheets;
 }
 
 // ---------------------------------------------------------------- csv
 
-export function readCsv(text: string): Sheet[] {
+/** Every field counts toward the grid slots and each filled one toward MAX_CELLS (the same plain refusal as xlsx). */
+export function readCsv(text: string, limits: ReadLimits = {}): Sheet[] {
+  const guard = makeGuard(limits);
   const src = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   const firstLine = src.split(/\r\n|\n|\r/, 1)[0] ?? "";
   const count = (ch: string) => firstLine.split(ch).length - 1;
@@ -231,11 +315,14 @@ export function readCsv(text: string): Sheet[] {
   let inQuotes = false;
   let i = 0;
   const endField = () => {
+    guard.grow(1);
+    if (field !== "") guard.cell();
     row.push(field);
     field = "";
   };
   const endRow = () => {
     endField();
+    guard.grow(1);
     rows.push(row);
     row = [];
   };
