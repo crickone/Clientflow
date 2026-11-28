@@ -260,15 +260,15 @@ async function main() {
     check("notAProgram: no week calls", calls.length === 1);
   }
 
-  // Limits: an outline over 16 weeks is refused before any week is read.
+  // Limits: weeks are unlimited, but an outline past the day ceiling is refused before any week is read.
   {
-    const rows = Array.from({ length: 40 }, (_, i) => [`Week ${i + 1}`, "Squat"]);
+    const rows = Array.from({ length: 150 }, (_, i) => [`Week ${i + 1}`, "Squat"]);
     const big: Sheet[] = [{ name: "S", rows }];
-    const weeks = rows.map((_, i) => ({ week: i + 1, sheet: "S", fromRow: i + 1, toRow: i + 1, days: 1 }));
+    const weeks = rows.map((_, i) => ({ week: i + 1, sheet: "S", fromRow: i + 1, toRow: i + 1, days: 7 }));
     const { complete, calls } = fake({ outline: [fenced({ weeks })], weeks: {} });
     const r = await programFromSheets(big, { complete });
-    check("over 16 weeks: plain limit error", !r.ok && r.error === "A program can have at most 16 weeks. This one has 40.");
-    check("over 16 weeks: no week calls", calls.length === 1);
+    check("past the day ceiling: plain limit error", !r.ok && r.error === "A program can have at most 1000 days. This one has 1050.");
+    check("past the day ceiling: no week calls", calls.length === 1);
   }
 
   // Limits: the weeks' replies over a limit (8 days in one week) -> plain error.

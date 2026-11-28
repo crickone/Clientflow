@@ -128,7 +128,9 @@ export function blankProgram(type: ProgramType): ProgramInput {
 // pointing into the same flat list. A program with only week 1 looks and
 // behaves exactly as it did before weeks existed.
 
-export const PROGRAM_LIMITS = { maxWeeks: 16, maxDaysPerWeek: 7, maxDays: 112, maxExercisesPerDay: 200 } as const;
+// No limit on weeks (user, 2026-11-28: "the amount of weeks should be unlimited").
+// maxDays is only a safety ceiling so one save can't grow without bound.
+export const PROGRAM_LIMITS = { maxDaysPerWeek: 7, maxDays: 1000, maxExercisesPerDay: 200 } as const;
 
 /**
  * The builder's save limits for each text and number field (the zod schema in
@@ -233,7 +235,6 @@ export function checkProgramLimits(days: WorkoutDayInput[]): string | null {
   if (days.length > L.maxDays) return `A program can have at most ${L.maxDays} days. This one has ${days.length}.`;
   const norm = normaliseWeeks(days);
   const weeks = weekCount(norm);
-  if (weeks > L.maxWeeks) return `A program can have at most ${L.maxWeeks} weeks. This one has ${weeks}.`;
   for (let w = 1; w <= weeks; w++) {
     const n = daysInWeek(norm, w).length;
     if (n > L.maxDaysPerWeek) return `Week ${w} has ${n} days. A week can have at most ${L.maxDaysPerWeek}.`;

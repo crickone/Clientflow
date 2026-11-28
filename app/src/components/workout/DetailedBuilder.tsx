@@ -87,9 +87,8 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
       : days.length >= L.maxDays
         ? `A program can have at most ${L.maxDays} days.`
         : null;
-  const weekBlock = weeks >= L.maxWeeks ? `A program can have at most ${L.maxWeeks} weeks.` : null;
-  const emptyWeekBlock = weekBlock ?? (days.length + 1 > L.maxDays ? `A program can have at most ${L.maxDays} days.` : null);
-  const copyWeekBlock = weekBlock ?? (days.length + weekIdxs.length > L.maxDays ? `Copying this week would pass ${L.maxDays} days.` : null);
+  const emptyWeekBlock = days.length + 1 > L.maxDays ? `A program can have at most ${L.maxDays} days.` : null;
+  const copyWeekBlock = days.length + weekIdxs.length > L.maxDays ? `Copying this week would pass ${L.maxDays} days.` : null;
 
   const mutateDay = (di: number, fn: (d: WorkoutDayInput) => WorkoutDayInput) =>
     setProgram((p) => ({ ...p, days: p.days.map((d, i) => (i === di ? fn(d) : d)) }));
@@ -237,7 +236,7 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
             ))}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" disabled={Boolean(weekBlock)} title={weekBlock ?? undefined}>
+              <Button variant="outline" size="sm">
                 <Plus size={14} /> Add week <ChevronDown size={14} />
               </Button>
             </DropdownMenuTrigger>

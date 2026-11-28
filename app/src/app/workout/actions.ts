@@ -24,7 +24,7 @@ const exerciseSchema = z.object({
 });
 const daySchema = z.object({
   id: z.number().int().positive().optional(),
-  week: z.number().int().min(1).max(PROGRAM_LIMITS.maxWeeks).default(1),
+  week: z.number().int().min(1).max(PROGRAM_LIMITS.maxDays).default(1),
   name: z.string().trim().max(T.dayName),
   instructions: z.string().trim().max(T.dayInstructions).nullable().default(null),
   exercises: z.array(exerciseSchema).max(PROGRAM_LIMITS.maxExercisesPerDay),

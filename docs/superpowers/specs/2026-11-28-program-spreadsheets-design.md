@@ -23,7 +23,7 @@ and no target load, so a typical multi-week coach sheet cannot be copied faithfu
   "index into getProgram().days", so logging, history, progress and resume need no
   data change. "Next" stays (last + 1) modulo the day count: after the final week it
   goes back to week 1.
-- Limits: weeks 1..16, at most 7 days in one week, at most 112 days, 200 exercises a
+- Limits (updated 2026-11-28, user: weeks unlimited): no week limit; at most 7 days in one week; a 1000-day safety ceiling; 200 exercises a
   day (unchanged).
 - Labels: when a program has more than one week, a day reads
   "Week 2 · Day 1 – Push" (week prefix + the day's own name). One-week programs keep

@@ -32,7 +32,7 @@ const day = (week: number, name: string, exercises = 0): WorkoutDayInput => ({
 });
 
 // ── limits ──
-check("limits verbatim", PROGRAM_LIMITS.maxWeeks === 16 && PROGRAM_LIMITS.maxDaysPerWeek === 7 && PROGRAM_LIMITS.maxDays === 112 && PROGRAM_LIMITS.maxExercisesPerDay === 200);
+check("limits verbatim", !("maxWeeks" in PROGRAM_LIMITS) && PROGRAM_LIMITS.maxDaysPerWeek === 7 && PROGRAM_LIMITS.maxDays === 1000 && PROGRAM_LIMITS.maxExercisesPerDay === 200);
 
 // ── labels: one week, exactly as before ──
 const oneWeek = [day(1, "Push"), day(1, ""), day(1, "Legs")];
@@ -79,10 +79,9 @@ check("shape: one day a week", shapeLabel([day(1, "a"), day(2, "a")]) === "2 wee
 
 // ── limits errors ──
 check("a normal program passes", checkProgramLimits(even) === null && checkProgramLimits([]) === null);
-check("too many weeks", checkProgramLimits(Array.from({ length: 17 }, (_, i) => day(i + 1, "x")))?.includes("at most 16 weeks") === true);
-check("16 weeks is fine", checkProgramLimits(Array.from({ length: 16 }, (_, i) => day(i + 1, "x"))) === null);
+check("weeks are unlimited: 200 weeks is fine", checkProgramLimits(Array.from({ length: 200 }, (_, i) => day(i + 1, "x"))) === null);
 check("too many days in a week", checkProgramLimits(Array.from({ length: 8 }, () => day(1, "x"))) === "Week 1 has 8 days. A week can have at most 7.");
-check("too many days", checkProgramLimits(Array.from({ length: 113 }, (_, i) => day(Math.floor(i / 7) + 1, "x")))?.includes("at most 112 days") === true);
+check("too many days", checkProgramLimits(Array.from({ length: 1001 }, (_, i) => day(Math.floor(i / 7) + 1, "x")))?.includes("at most 1000 days") === true);
 check("too many exercises", checkProgramLimits([day(1, "Push", 201)]) === "Push has 201 exercises. A day can have at most 200.");
 check("200 exercises is fine", checkProgramLimits([day(1, "Push", 200)]) === null);
 
