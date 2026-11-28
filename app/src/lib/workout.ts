@@ -4,7 +4,7 @@ import { asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { workoutDays, workoutExercises, workoutPrograms } from "@/lib/db/schema";
-import type { ProgramInput, ProgramStatus, ProgramType, Section } from "@/lib/workoutModel";
+import { checkProgramLimits, cleanLoad, normaliseWeeks, type ProgramInput, type ProgramStatus, type ProgramType, type Section } from "@/lib/workoutModel";
 
 function parseTags(csv: string | null): string[] {
   if (!csv) return [];
@@ -21,6 +21,8 @@ export interface ProgramListRow {
   status: ProgramStatus;
   tags: string[];
   dayCount: number;
+  /** Distinct weeks (0 for a program with no days). */
+  weekCount: number;
   exerciseCount: number;
   createdAt: number;
   updatedAt: number;
@@ -39,6 +41,12 @@ export function listPrograms(): ProgramListRow[] {
 
   const daysByProgram = new Map<number, number>();
   for (const d of days) daysByProgram.set(d.programId, (daysByProgram.get(d.programId) ?? 0) + 1);
+  const weeksByProgram = new Map<number, Set<number>>();
+  for (const d of days) {
+    const set = weeksByProgram.get(d.programId) ?? new Set<number>();
+    set.add(d.week);
+    weeksByProgram.set(d.programId, set);
+  }
   const exByDay = new Map<number, number>();
   for (const e of exercises) exByDay.set(e.dayId, (exByDay.get(e.dayId) ?? 0) + 1);
   const exByProgram = new Map<number, number>();
@@ -51,6 +59,7 @@ export function listPrograms(): ProgramListRow[] {
     status: p.status,
     tags: parseTags(p.tags),
     dayCount: daysByProgram.get(p.id) ?? 0,
+    weekCount: weeksByProgram.get(p.id)?.size ?? 0,
     exerciseCount: exByProgram.get(p.id) ?? 0,
     createdAt: p.createdAt.getTime(),
     updatedAt: p.updatedAt.getTime(),
@@ -89,6 +98,7 @@ export function getProgram(id: number): ProgramInput | null {
     uploadOriginalName: program.uploadOriginalName,
     days: days.map((d) => ({
       id: d.id,
+      week: d.week,
       name: d.name,
       instructions: d.instructions,
       exercises: exercises
@@ -104,12 +114,21 @@ export function getProgram(id: number): ProgramInput | null {
           notes: e.notes,
           muscleGroups: parseGroups(e.muscleGroups),
           joined: e.joined,
+          load: e.load,
         })),
     })),
   };
 }
 
+/**
+ * Create or replace a program. Days are normalised to weeks 1..K (see
+ * normaliseWeeks) and checked against PROGRAM_LIMITS (throws a plain Error
+ * when over). `position` is the running index across the whole program.
+ */
 export function saveProgram(input: ProgramInput): number {
+  const days = normaliseWeeks(input.days);
+  const limitError = checkProgramLimits(days);
+  if (limitError) throw new Error(limitError);
   return db.transaction((tx) => {
     const base = {
       title: input.title.trim() || "New Program",
@@ -130,12 +149,17 @@ export function saveProgram(input: ProgramInput): number {
       const [row] = tx.insert(workoutPrograms).values(base).returning({ id: workoutPrograms.id }).all();
       programId = row.id;
     }
-    input.days.forEach((day, di) => {
+    const inWeek = new Map<number, number>();
+    days.forEach((day, di) => {
+      const n = (inWeek.get(day.week) ?? 0) + 1;
+      inWeek.set(day.week, n);
       const [dayRow] = tx
         .insert(workoutDays)
         .values({
           programId,
-          name: day.name.trim() || `Day ${di + 1}`,
+          week: day.week,
+          // Fallback counts within the week; for a one-week program that is di + 1, as before.
+          name: day.name.trim() || `Day ${n}`,
           position: di,
           instructions: day.instructions,
         })
@@ -155,6 +179,7 @@ export function saveProgram(input: ProgramInput): number {
             restSeconds: ex.restSeconds,
             notes: ex.notes,
             joined: ex.joined === true,
+            load: cleanLoad(ex.load),
             muscleGroups: ex.muscleGroups.map((g) => g.trim()).filter(Boolean).join(",") || null,
           })
           .run();

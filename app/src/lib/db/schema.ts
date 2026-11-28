@@ -2626,6 +2626,8 @@ export const workoutDays = sqliteTable(
     programId: integer("program_id")
       .notNull()
       .references(() => workoutPrograms.id, { onDelete: "cascade" }),
+    /** 1-based week of the program. Existing days are week 1. lib/workoutModel.ts */
+    week: integer("week").notNull().default(1),
     name: text("name").notNull().default("Day 1"),
     position: integer("position").notNull().default(0),
     instructions: text("instructions"),
@@ -2661,6 +2663,8 @@ export const workoutExercises = sqliteTable(
     notes: text("notes"),
     /** Done back to back with the exercise above: a superset (2) or circuit (3+). lib/workoutGroupsModel.ts */
     joined: integer("joined", { mode: "boolean" }).notNull().default(false),
+    /** Target load as the coach wrote it ("70%", "RPE 8", "60 kg"). Free text, never parsed. */
+    load: text("load"),
     muscleGroups: text("muscle_groups"), // denormalized from the library exercise
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
@@ -3833,6 +3837,8 @@ export const workoutSessionExercises = sqliteTable("workout_session_exercises", 
   notes: text("notes"),
   /** Copied from the programme: done back to back with the exercise above. */
   joined: integer("joined", { mode: "boolean" }).notNull().default(false),
+  /** Copied from the programme: the target load as written. */
+  load: text("load"),
   /** A program session's planned sets for this exercise (PlannedExercise JSON). */
   rxJson: text("rx_json"),
 });

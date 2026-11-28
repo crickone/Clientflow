@@ -3,7 +3,7 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, ne } from "drizzle-
 
 import { db } from "@/lib/db";
 import { workoutSessionExercises, workoutSessions, workoutSetLogs, type WorkoutSession } from "@/lib/db/schema";
-import type { ProgramInput } from "@/lib/workoutModel";
+import { cleanLoad, dayLabel, type ProgramInput } from "@/lib/workoutModel";
 import { DEFAULT_REST_SECONDS, bestSet, exerciseKey, restFor, setsDone, volumeKg, type LoggedSet, type SessionExercise, type SessionView } from "@/lib/workoutLogModel";
 import { repsLabel } from "@/lib/programs/planner";
 import type { PlannedExercise } from "@/lib/programs/types";
@@ -37,7 +37,7 @@ export function startSession(clientId: number, program: ProgramInput, dayPositio
     const now = Date.now();
     const [row] = tx
       .insert(workoutSessions)
-      .values({ clientId, programId: program.id!, dayPosition, programTitle: program.title, dayName: day.name || `Day ${dayPosition + 1}`, startedAt: now, updatedAt: now })
+      .values({ clientId, programId: program.id!, dayPosition, programTitle: program.title, dayName: dayLabel(program.days, dayPosition), startedAt: now, updatedAt: now })
       .returning({ id: workoutSessions.id })
       .all();
     exercises.forEach((ex, i) => {
@@ -53,6 +53,7 @@ export function startSession(clientId: number, program: ProgramInput, dayPositio
           targetReps: ex.reps,
           restSeconds: restFor(ex.restSeconds),
           joined: ex.joined === true,
+          load: cleanLoad(ex.load),
           notes: ex.notes,
         })
         .returning({ id: workoutSessionExercises.id })
@@ -256,6 +257,7 @@ function assemble(rows: WorkoutSession[]): SessionView[] {
           restSeconds: restFor(e.restSeconds),
           notes: e.notes,
           joined: e.joined,
+          load: e.load,
           plan: parsePlan(e.rxJson),
           sets: setsBy.get(e.id) ?? [],
         }),

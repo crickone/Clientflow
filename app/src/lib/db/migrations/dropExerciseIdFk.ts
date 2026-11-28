@@ -37,8 +37,12 @@ import type { Database as BetterSqlite3 } from "better-sqlite3";
 interface TableRebuildSpec {
   /** Real (post-migration) table name. */
   table: string;
-  /** CREATE TABLE body for the NEW (no exercise_id FK) shape, using `newName` as the table name. */
-  createNewSql: (newName: string) => string;
+  /**
+   * CREATE TABLE body for the NEW (no exercise_id FK) shape, using `newName`
+   * as the table name. `extra` holds the column DDL of any `laterColumns` the
+   * OLD table already has, appended after the base columns.
+   */
+  createNewSql: (newName: string, extra: string[]) => string;
   /**
    * Explicit column list, in order, shared by the old and new shape —
    * exercise_id just loses its FK, nothing is added/removed/reordered.
@@ -49,6 +53,16 @@ interface TableRebuildSpec {
   columns: string[];
   /** Re-asserted on the renamed table after rebuild (CREATE INDEX IF NOT EXISTS ...). */
   indexSql: string[];
+  /**
+   * Columns added to this table AFTER this migration was written, by
+   * ensureTenantTables' additive ALTERs. ensureTenantTables runs BEFORE
+   * runMigrations (../tenant.ts openTenantDb), so a tenant that still needs
+   * this rebuild already has them by the time it runs; without this list the
+   * rebuild would silently drop them (and their data). Each is kept, with
+   * its data, only when the old table has it, so the rebuild never adds or
+   * removes a column.
+   */
+  laterColumns?: { name: string; ddl: string }[];
 }
 
 const REBUILDS: TableRebuildSpec[] = [
@@ -68,7 +82,11 @@ const REBUILDS: TableRebuildSpec[] = [
       "muscle_groups",
       "created_at",
     ],
-    createNewSql: (n) => `
+    laterColumns: [
+      { name: "joined", ddl: "joined INTEGER NOT NULL DEFAULT 0" },
+      { name: "load", ddl: "load TEXT" },
+    ],
+    createNewSql: (n, extra) => `
       CREATE TABLE ${n} (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         day_id INTEGER NOT NULL REFERENCES workout_days(id) ON DELETE CASCADE,
@@ -81,7 +99,7 @@ const REBUILDS: TableRebuildSpec[] = [
         rest_seconds INTEGER NOT NULL DEFAULT 0,
         notes TEXT,
         muscle_groups TEXT,
-        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)${extra.map((c) => `,\n        ${c}`).join("")}
       )`,
     indexSql: ["CREATE INDEX IF NOT EXISTS idx_workout_exercises_day ON workout_exercises(day_id)"],
   },
@@ -191,8 +209,12 @@ export function dropWorkoutExerciseIdForeignKeys(sqlite: BetterSqlite3): void {
     const rebuildAll = sqlite.transaction(() => {
       for (const spec of pending) {
         const newName = `${spec.table}_new`;
-        sqlite.exec(spec.createNewSql(newName));
-        const colList = spec.columns.join(", ");
+        const have = new Set(
+          (sqlite.prepare(`PRAGMA table_info(${spec.table})`).all() as Array<{ name: string }>).map((c) => c.name),
+        );
+        const later = (spec.laterColumns ?? []).filter((c) => have.has(c.name));
+        sqlite.exec(spec.createNewSql(newName, later.map((c) => c.ddl)));
+        const colList = [...spec.columns, ...later.map((c) => c.name)].join(", ");
         sqlite.exec(`INSERT INTO ${newName} (${colList}) SELECT ${colList} FROM ${spec.table}`);
         sqlite.exec(`DROP TABLE ${spec.table}`);
         sqlite.exec(`ALTER TABLE ${newName} RENAME TO ${spec.table}`);

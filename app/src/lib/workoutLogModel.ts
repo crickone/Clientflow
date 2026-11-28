@@ -23,6 +23,8 @@ export interface SessionExercise {
   notes: string | null;
   /** Done back to back with the exercise above (superset or circuit). */
   joined?: boolean;
+  /** Target load copied from the programme as written ("70%", "RPE 8"). */
+  load?: string | null;
   /** A program session: the planned sets this exercise was started with. */
   plan?: PlannedExercise | null;
   sets: LoggedSet[];

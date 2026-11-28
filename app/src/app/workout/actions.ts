@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { requireUser } from "@/lib/auth";
 import { deleteProgram, duplicateProgram, saveProgram, setProgramStatus } from "@/lib/workout";
-import type { ProgramInput } from "@/lib/workoutModel";
+import { PROGRAM_LIMITS, checkProgramLimits, type ProgramInput } from "@/lib/workoutModel";
 
 const exerciseSchema = z.object({
   id: z.number().int().positive().optional(),
@@ -18,12 +18,14 @@ const exerciseSchema = z.object({
   notes: z.string().trim().max(2000).nullable().default(null),
   muscleGroups: z.array(z.string().trim().max(60)).max(20).default([]),
   joined: z.boolean().default(false),
+  load: z.string().trim().max(60, "A load can be at most 60 characters.").nullable().optional(),
 });
 const daySchema = z.object({
   id: z.number().int().positive().optional(),
+  week: z.number().int().min(1).max(PROGRAM_LIMITS.maxWeeks).default(1),
   name: z.string().trim().max(120),
   instructions: z.string().trim().max(8000).nullable().default(null),
-  exercises: z.array(exerciseSchema).max(200),
+  exercises: z.array(exerciseSchema).max(PROGRAM_LIMITS.maxExercisesPerDay),
 });
 const programSchema = z.object({
   id: z.number().int().positive().optional(),
@@ -35,7 +37,7 @@ const programSchema = z.object({
   content: z.string().trim().max(100000).nullable().default(null),
   uploadFilename: z.string().trim().max(300).nullable().default(null),
   uploadOriginalName: z.string().trim().max(300).nullable().default(null),
-  days: z.array(daySchema).max(31),
+  days: z.array(daySchema).max(PROGRAM_LIMITS.maxDays, `A program can have at most ${PROGRAM_LIMITS.maxDays} days.`),
 });
 
 export type SaveResult = { ok: true; id: number } | { ok: false; error: string };
@@ -44,6 +46,8 @@ export async function saveProgramAction(raw: unknown): Promise<SaveResult> {
   await requireUser();
   const parsed = programSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid program." };
+  const limitError = checkProgramLimits(parsed.data.days);
+  if (limitError) return { ok: false, error: limitError };
   const id = saveProgram(parsed.data as ProgramInput);
   revalidatePath("/workout");
   revalidatePath(`/workout/${id}`);

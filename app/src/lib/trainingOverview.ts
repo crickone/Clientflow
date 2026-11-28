@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { trainingPlans } from "@/lib/db/schema";
 import { assignedWorkoutPrograms } from "@/lib/clientApp";
 import { getProgram } from "@/lib/workout";
+import { dayLabel } from "@/lib/workoutModel";
 import { listSessions, openSession } from "@/lib/workoutLog";
 import { bestSet, setsDone, volumeKg, type SessionView } from "@/lib/workoutLogModel";
 import {
@@ -105,7 +106,7 @@ export function trainingOverview(clientId: number, now = Date.now()): TrainingOv
     .filter((p) => p.type === "detailed")
     .map((p) => {
       const days = getProgram(p.id)?.days ?? [];
-      return { id: p.id, title: p.title, dayNames: days.some((d) => d.exercises.length > 0) ? days.map((d, i) => d.name || `Day ${i + 1}`) : [] };
+      return { id: p.id, title: p.title, dayNames: days.some((d) => d.exercises.length > 0) ? days.map((_, i) => dayLabel(days, i)) : [] };
     })
     .filter((p) => p.dayNames.length > 0);
 

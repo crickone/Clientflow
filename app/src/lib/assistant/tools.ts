@@ -37,8 +37,6 @@ import {
   nutritionPlans,
   payments,
   sessionBookings,
-  workoutDays,
-  workoutExercises,
   workoutPrograms,
 } from "@/lib/db/schema";
 import {
@@ -52,6 +50,8 @@ import { uploadFilesToDrive } from "@/lib/google/drive";
 import { saveDownload } from "@/lib/assistant/downloadStore";
 import { sendClientEmail } from "@/lib/clientEmail";
 import { saveExercise } from "@/lib/exerciseLibrary";
+import { saveProgram } from "@/lib/workout";
+import { checkProgramLimits, cleanLoad, type ProgramInput, type Section } from "@/lib/workoutModel";
 import { dailyTarget, mealsBetween, targetSource } from "@/lib/meals";
 import { summarisePeriod } from "@/lib/mealsModel";
 import { runWithTenant } from "@/lib/db/tenant";
@@ -595,6 +595,7 @@ export const TOOLS: Anthropic.Tool[] = [
             type: "object",
             properties: {
               name: { type: "string", description: "e.g. 'Day 1 – Push'." },
+              week: { type: "number", description: "1-based week number; omit for a one-week program" },
               instructions: { type: "string" },
               exercises: {
                 type: "array",
@@ -609,6 +610,7 @@ export const TOOLS: Anthropic.Tool[] = [
                     notes: { type: "string" },
                     muscleGroups: { type: "string" },
                     joined: { type: "boolean", description: "true = done back to back with the exercise before it (superset or circuit, same section). The group's rest goes on its last exercise." },
+                    load: { type: "string", description: "Target load as written: '70%', 'RPE 8', '60 kg'" },
                   },
                   required: ["name"],
                 },
@@ -1692,47 +1694,49 @@ function addExercise(ctx: ToolContext, input: Record<string, unknown>): string {
   return JSON.stringify({ result: `Added "${name}" to the exercise library.`, exerciseId: id });
 }
 
-type ExIn = { name?: unknown; section?: unknown; sets?: unknown; reps?: unknown; restSeconds?: unknown; notes?: unknown; muscleGroups?: unknown; joined?: unknown };
-type WDayIn = { name?: unknown; instructions?: unknown; exercises?: ExIn[] };
+type ExIn = { name?: unknown; section?: unknown; sets?: unknown; reps?: unknown; restSeconds?: unknown; notes?: unknown; muscleGroups?: unknown; joined?: unknown; load?: unknown };
+type WDayIn = { name?: unknown; week?: unknown; instructions?: unknown; exercises?: ExIn[] };
 
 function createWorkoutProgram(ctx: ToolContext, input: Record<string, unknown>): string {
-  const db = tdb(ctx);
   const title = String(input.title || "").trim() || "New Program";
   const days = Array.isArray(input.days) ? (input.days as WDayIn[]) : [];
   if (days.length === 0) return JSON.stringify({ error: "Provide at least one day with exercises." });
 
-  const prog = db
-    .insert(workoutPrograms)
-    .values({ title, type: "detailed", status: "active", tags: str(input.tags), summary: str(input.summary) })
-    .returning({ id: workoutPrograms.id })
-    .get();
-
-  let dPos = 0;
-  for (const d of days) {
-    const dayRow = db
-      .insert(workoutDays)
-      .values({ programId: prog.id, name: str(d.name) ?? `Day ${dPos + 1}`, position: dPos, instructions: str(d.instructions) })
-      .returning({ id: workoutDays.id })
-      .get();
-    let ePos = 0;
-    for (const e of Array.isArray(d.exercises) ? d.exercises : []) {
-      const section = ["warmup", "workout", "cooldown"].includes(String(e.section)) ? (String(e.section) as "warmup" | "workout" | "cooldown") : "workout";
-      db.insert(workoutExercises).values({
-        dayId: dayRow.id,
-        section,
+  const program: ProgramInput = {
+    title,
+    type: "detailed",
+    status: "active",
+    tags: (str(input.tags) ?? "").split(",").map((t) => t.trim()).filter(Boolean),
+    summary: str(input.summary),
+    content: null,
+    uploadFilename: null,
+    uploadOriginalName: null,
+    days: days.map((d) => ({
+      // An invalid or missing week becomes week 1 in saveProgram (normaliseWeeks).
+      week: Math.round(num(d.week, 1)),
+      name: str(d.name) ?? "",
+      instructions: str(d.instructions),
+      exercises: (Array.isArray(d.exercises) ? d.exercises : []).map((e) => ({
+        exerciseId: null,
+        section: ["warmup", "workout", "cooldown"].includes(String(e.section)) ? (String(e.section) as Section) : "workout",
         name: String(e.name ?? "Exercise"),
-        position: ePos++,
         sets: Math.round(num(e.sets, 0)),
         reps: e.reps != null ? String(e.reps) : null,
         restSeconds: Math.round(num(e.restSeconds, 0)),
         notes: str(e.notes),
-        muscleGroups: str(e.muscleGroups),
+        muscleGroups: (str(e.muscleGroups) ?? "").split(",").map((g) => g.trim()).filter(Boolean),
         joined: e.joined === true,
-      }).run();
-    }
-    dPos++;
-  }
-  return JSON.stringify({ result: `Created workout program "${title}" with ${days.length} day(s). Find it under Workout → Programs.`, programId: prog.id });
+        load: cleanLoad(e.load),
+      })),
+    })),
+  };
+  const limitError = checkProgramLimits(program.days);
+  if (limitError) return JSON.stringify({ error: limitError });
+
+  // One transaction, the same limits and week rules as the builder. saveProgram
+  // writes through the ambient tenant db, so bind it to this tool's tenant.
+  const programId = runWithTenant(ctx.tenantId, () => saveProgram(program));
+  return JSON.stringify({ result: `Created workout program "${title}" with ${days.length} day(s). Find it under Workout → Programs.`, programId });
 }
 
 // ── Assignment + leads ───────────────────────────────────────────────────────

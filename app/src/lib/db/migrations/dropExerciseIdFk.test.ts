@@ -490,6 +490,9 @@ function allRows(db: BetterSqlite3, table: string): unknown[] {
           notes: "kept from before the fix",
           muscle_groups: "legs",
           created_at: 777,
+          // Added by ensureTenantTables' ALTERs before 0003 runs; the rebuild keeps them.
+          joined: 0,
+          load: null,
         },
         "the pre-existing row's data survived the real upgrade path byte-identical",
       );

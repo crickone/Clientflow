@@ -3336,6 +3336,12 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     addColumn("workout_set_logs", "rpe", "rpe REAL");
     addColumn("program_enrolments", "assigned_by", "assigned_by INTEGER");
     addColumn("program_enrolments", "assigned_at", "assigned_at INTEGER");
+    // Weeks and target load in Workout programs (lib/workoutModel.ts). Every
+    // existing day is week 1. Additive. migrations/dropExerciseIdFk.ts keeps
+    // `load` (and `joined`) if it ever rebuilds workout_exercises after this.
+    addColumn("workout_days", "week", "week INTEGER NOT NULL DEFAULT 1");
+    addColumn("workout_exercises", "load", "load TEXT");
+    addColumn("workout_session_exercises", "load", "load TEXT");
   }
 
   // The online voucher store (lib/vouchers). Not wrapped in a swallowing
