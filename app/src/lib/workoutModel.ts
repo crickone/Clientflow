@@ -203,6 +203,12 @@ export function shapeLabel(days: { week?: unknown }[]): string {
   return `${plural(s.weeks, "week")}, ${plural(s.totalDays, "day")}`;
 }
 
+/** The programs list's length text from counts alone: "4 days" or "8 weeks, 32 days". */
+export function lengthLabel(weeks: number, totalDays: number): string {
+  if (weeks <= 1) return plural(totalDays, "day");
+  return `${plural(weeks, "week")}, ${plural(totalDays, "day")}`;
+}
+
 /** Plain error text when the program is over a limit, else null. */
 export function checkProgramLimits(days: WorkoutDayInput[]): string | null {
   const L = PROGRAM_LIMITS;

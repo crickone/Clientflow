@@ -5,10 +5,12 @@ import { useDraft } from "@/components/workout/useDraft";
 import { DraftNotice, DraftSaved } from "@/components/workout/DraftNotice";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Copy, Link2, Play, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, Copy, Link2, Play, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/DropdownMenu";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { ExercisePreviewModal } from "@/components/workout/ExercisePreviewModal";
@@ -16,8 +18,13 @@ import { saveProgramAction } from "@/app/workout/actions";
 import {
   blankDay,
   blankExercise,
+  copyWeek,
   dayVolume,
+  MAX_LOAD_LENGTH,
+  normaliseWeeks,
+  PROGRAM_LIMITS,
   SECTIONS,
+  weekCount,
   type ExerciseInput,
   type ProgramInput,
   type Section,
@@ -30,7 +37,9 @@ import { exerciseHasVideo } from "@/lib/youtube";
 
 export function DetailedBuilder({ initial, exercises, draftKey }: { initial: ProgramInput; exercises: ExerciseLibRow[]; draftKey?: string }) {
   const router = useRouter();
-  const [program, setProgram] = useState<ProgramInput>(initial);
+  const confirm = useConfirm();
+  const [program, setProgram] = useState<ProgramInput>(() => ({ ...initial, days: normaliseWeeks(initial.days) }));
+  // dayIdx indexes the flat program.days; the selected week is that day's week.
   const [dayIdx, setDayIdx] = useState(0);
   const [tagsText, setTagsText] = useState(initial.tags.join(", "));
   const [focused, setFocused] = useState<number | null>(null); // flat exercise index in the active day
@@ -41,11 +50,29 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
     setProgram(d.program);
     setTagsText(d.tagsText);
   }, []);
-  const draft = useDraft(draftKey ?? null, { program, tagsText }, applyDraft);
+  const draft = useDraft(draftKey ?? null, { program, tagsText }, applyDraft, normaliseDraft);
 
-  const idx = Math.min(dayIdx, program.days.length - 1);
-  const day = program.days[idx];
+  const days = program.days;
+  const idx = Math.min(dayIdx, days.length - 1);
+  const day = days[idx];
   const volume = dayVolume(day);
+
+  // Weeks. `days` stays flat and ordered by week, so a week is a run of it.
+  const week = day.week;
+  const weeks = weekCount(days);
+  const weekIdxs = days.flatMap((d, i) => (d.week === week ? [i] : []));
+  const firstOfWeek = weekIdxs[0];
+  const lastOfWeek = weekIdxs[weekIdxs.length - 1];
+  const L = PROGRAM_LIMITS;
+  const addDayBlock =
+    weekIdxs.length >= L.maxDaysPerWeek
+      ? `A week can have at most ${L.maxDaysPerWeek} days.`
+      : days.length >= L.maxDays
+        ? `A program can have at most ${L.maxDays} days.`
+        : null;
+  const weekBlock = weeks >= L.maxWeeks ? `A program can have at most ${L.maxWeeks} weeks.` : null;
+  const emptyWeekBlock = weekBlock ?? (days.length + 1 > L.maxDays ? `A program can have at most ${L.maxDays} days.` : null);
+  const copyWeekBlock = weekBlock ?? (days.length + weekIdxs.length > L.maxDays ? `Copying this week would pass ${L.maxDays} days.` : null);
 
   const mutateDay = (di: number, fn: (d: WorkoutDayInput) => WorkoutDayInput) =>
     setProgram((p) => ({ ...p, days: p.days.map((d, i) => (i === di ? fn(d) : d)) }));
@@ -54,18 +81,53 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
     mutateDay(idx, (d) => ({ ...d, exercises: d.exercises.map((e, j) => (j === fi ? { ...e, ...patch } : e)) }));
 
   const addDay = () => {
-    setProgram((p) => ({ ...p, days: [...p.days, blankDay(`Day ${p.days.length + 1}`)] }));
-    setDayIdx(program.days.length);
+    if (addDayBlock) return;
+    const at = lastOfWeek + 1;
+    const fresh = blankDay(`Day ${weekIdxs.length + 1}`, week);
+    setProgram((p) => ({ ...p, days: [...p.days.slice(0, at), fresh, ...p.days.slice(at)] }));
+    setDayIdx(at);
   };
   const duplicateDay = () => {
+    if (addDayBlock) return;
     const copy: WorkoutDayInput = JSON.parse(JSON.stringify({ ...day, id: undefined, name: `${day.name} (copy)` }));
-    setProgram((p) => ({ ...p, days: [...p.days, copy] }));
-    setDayIdx(program.days.length);
+    const at = lastOfWeek + 1;
+    setProgram((p) => ({ ...p, days: [...p.days.slice(0, at), copy, ...p.days.slice(at)] }));
+    setDayIdx(at);
   };
+  // A week keeps at least one day; to drop the last one, remove the week.
   const removeDay = (di: number) => {
-    if (program.days.length <= 1) return;
+    if (weekIdxs.length <= 1 || !weekIdxs.includes(di)) return;
     setProgram((p) => ({ ...p, days: p.days.filter((_, i) => i !== di) }));
-    setDayIdx((v) => Math.max(0, v >= di ? v - 1 : v));
+    if (di < idx) setDayIdx(idx - 1);
+    else if (di === idx) setDayIdx(di === firstOfWeek ? di : di - 1);
+  };
+  const selectWeek = (w: number) => {
+    const first = days.findIndex((d) => d.week === w);
+    if (first >= 0) setDayIdx(first);
+  };
+  const addEmptyWeek = () => {
+    if (emptyWeekBlock) return;
+    setProgram((p) => ({ ...p, days: [...p.days, blankDay("Day 1", weeks + 1)] }));
+    setDayIdx(days.length);
+  };
+  const addCopiedWeek = () => {
+    if (copyWeekBlock) return;
+    setProgram((p) => ({ ...p, days: copyWeek(p.days, week) }));
+    setDayIdx(days.length);
+  };
+  const removeWeek = async () => {
+    if (weeks <= 1) return;
+    const exerciseCount = weekIdxs.reduce((n, i) => n + days[i].exercises.length, 0);
+    const ok = await confirm({
+      title: `Remove week ${week}?`,
+      body: `Its ${weekIdxs.length} day${weekIdxs.length === 1 ? "" : "s"} and ${exerciseCount} exercise${exerciseCount === 1 ? "" : "s"} are removed. Later weeks move up one. Nothing is deleted until you save.`,
+      confirmLabel: "Remove week",
+      destructive: true,
+    });
+    if (!ok) return;
+    const next = normaliseWeeks(days.filter((d) => d.week !== week));
+    setProgram((p) => ({ ...p, days: next }));
+    setDayIdx(Math.max(0, next.findIndex((d) => d.week === Math.min(week, weekCount(next)))));
   };
   const addExercise = (section: Section) => {
     setProgram((p) => ({
@@ -128,27 +190,73 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
           <Textarea id="dp-overview" value={program.summary ?? ""} onChange={(e) => setProgram((p) => ({ ...p, summary: e.target.value }))} rows={2} placeholder="Program overview" />
         </div>
 
-        {/* day tabs */}
+        {/* weeks */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          {program.days.map((d, i) => {
+          {weeks > 1 &&
+            Array.from({ length: weeks }, (_, k) => k + 1).map((w) => (
+              <button
+                key={w}
+                type="button"
+                onClick={() => selectWeek(w)}
+                aria-pressed={w === week}
+                style={{ ...tabStyle(w === week), font: "inherit", fontSize: 13, color: w === week ? "var(--accent-ink)" : "var(--text-secondary)" }}
+              >
+                Week {w}
+              </button>
+            ))}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={Boolean(weekBlock)} title={weekBlock ?? undefined}>
+                <Plus size={14} /> Add week <ChevronDown size={14} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem
+                disabled={Boolean(emptyWeekBlock)}
+                title={emptyWeekBlock ?? undefined}
+                onSelect={addEmptyWeek}
+                style={emptyWeekBlock ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+              >
+                Empty week
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={Boolean(copyWeekBlock)}
+                title={copyWeekBlock ?? undefined}
+                onSelect={addCopiedWeek}
+                style={copyWeekBlock ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+              >
+                Copy of week {week}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {weeks > 1 && (
+            <Button variant="ghost" size="sm" onClick={removeWeek}>
+              <Trash2 size={14} /> Remove week {week}
+            </Button>
+          )}
+        </div>
+
+        {/* day tabs: the selected week's days */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {weekIdxs.map((i, n) => {
+            const d = days[i];
             const active = i === idx;
             return (
               <div
                 key={i}
+                tabIndex={0}
                 onClick={() => setDayIdx(i)}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "7px 12px",
-                  borderRadius: "var(--radius)",
-                  border: active ? "1px solid var(--accent)" : "1px solid var(--hairline)",
-                  background: active ? "var(--accent-soft)" : "transparent",
-                  cursor: "pointer",
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setDayIdx(i);
+                  }
                 }}
+                style={tabStyle(active)}
               >
-                <span style={{ fontSize: 13, color: active ? "var(--accent-ink)" : "var(--text-secondary)" }}>{d.name || `Day ${i + 1}`}</span>
-                {program.days.length > 1 && (
+                <span style={{ fontSize: 13, color: active ? "var(--accent-ink)" : "var(--text-secondary)" }}>{d.name || `Day ${n + 1}`}</span>
+                {weekIdxs.length > 1 && (
                   <button onClick={(e) => { e.stopPropagation(); removeDay(i); }} aria-label="Remove day" style={{ background: "transparent", border: "none", color: "var(--text-tertiary)", cursor: "pointer", display: "inline-flex" }}>
                     <X size={13} />
                   </button>
@@ -156,10 +264,10 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
               </div>
             );
           })}
-          <Button variant="outline" size="sm" onClick={addDay}>
+          <Button variant="outline" size="sm" onClick={addDay} disabled={Boolean(addDayBlock)} title={addDayBlock ?? undefined}>
             <Plus size={14} /> Add New Day
           </Button>
-          <Button variant="ghost" size="sm" onClick={duplicateDay}>
+          <Button variant="ghost" size="sm" onClick={duplicateDay} disabled={Boolean(addDayBlock)} title={addDayBlock ?? undefined}>
             <Copy size={14} /> Duplicate Day
           </Button>
         </div>
@@ -206,8 +314,8 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
               // too (an axis can't stay "visible" once the other isn't), which
               // would otherwise clip it.
               <div style={{ overflowX: "auto", paddingBottom: 260, marginBottom: -260 }}>
-                <div style={{ minWidth: 560, display: "flex", flexDirection: "column", gap: 14 }}>
-                  <ExerciseColumnHeads />
+                <div style={{ minWidth: 740, display: "flex", flexDirection: "column", gap: 14 }}>
+                  <ExerciseColumnHeads withLoad />
                   {rows.map(({ ex, i }, li) => (
                     <ExerciseRow
                       key={i}
@@ -324,7 +432,7 @@ function ExerciseRow({
       )}
       {groupTag && <span className="wbx-tag">{groupTag}: no rest between these, rest after the last</span>}
     <div style={{ border: "1px solid var(--hairline)", borderRadius: "var(--radius)", padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 70px 140px 90px 30px", gap: 8, alignItems: "center" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 70px 140px 170px 90px 30px", gap: 8, alignItems: "center" }}>
         <span style={{ fontFamily: "var(--font-mono), monospace", fontWeight: 600, color: "var(--text-tertiary)", textAlign: "center" }}>{letter}</span>
         <div style={{ position: "relative" }}>
           <Input
@@ -389,6 +497,14 @@ function ExerciseRow({
         </div>
         <NumCell value={ex.sets} onChange={(v) => onPatch({ sets: v })} placeholder="Sets" />
         <Input value={ex.reps ?? ""} onChange={(e) => onPatch({ reps: e.target.value })} placeholder="Reps" style={{ height: 34 }} />
+        <Input
+          value={ex.load ?? ""}
+          onChange={(e) => onPatch({ load: e.target.value })}
+          placeholder="Load, e.g. 70% or RPE 8"
+          aria-label="Load"
+          maxLength={MAX_LOAD_LENGTH}
+          style={{ height: 34 }}
+        />
         <NumCell value={ex.restSeconds} onChange={(v) => onPatch({ restSeconds: v })} placeholder="Rest s" suffix="s" />
         <button onClick={onRemove} aria-label="Remove exercise" style={{ background: "transparent", border: "none", color: "var(--text-tertiary)", cursor: "pointer" }}>
           <Trash2 size={14} />
@@ -448,6 +564,25 @@ function NumCell({ value, onChange, placeholder, suffix }: { value: number; onCh
       {suffix && <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "var(--text-tertiary)" }}>{suffix}</span>}
     </div>
   );
+}
+
+/** A day or week tab, as the builder has always drawn the day tabs. */
+function tabStyle(active: boolean): React.CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "7px 12px",
+    borderRadius: "var(--radius)",
+    border: active ? "1px solid var(--accent)" : "1px solid var(--hairline)",
+    background: active ? "var(--accent-soft)" : "transparent",
+    cursor: "pointer",
+  };
+}
+
+/** A stored draft from before weeks existed: every day lands in week 1. */
+function normaliseDraft(d: { program: ProgramInput; tagsText: string }): { program: ProgramInput; tagsText: string } {
+  return { ...d, program: { ...d.program, days: normaliseWeeks(d.program.days) } };
 }
 
 const card: React.CSSProperties = {

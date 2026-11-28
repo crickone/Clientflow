@@ -4,13 +4,13 @@
  * "3 / 8 / 0" read as three unlabelled boxes. Same grid as the rows, inset by
  * the row's 10px padding plus its 1px border so each heading sits over its box.
  */
-export function ExerciseColumnHeads() {
+export function ExerciseColumnHeads({ withLoad = false }: { withLoad?: boolean }) {
   return (
     <div
       aria-hidden
       style={{
         display: "grid",
-        gridTemplateColumns: "24px 1fr 70px 140px 90px 30px",
+        gridTemplateColumns: withLoad ? "24px 1fr 70px 140px 170px 90px 30px" : "24px 1fr 70px 140px 90px 30px",
         gap: 8,
         padding: "0 11px",
         marginBottom: -6,
@@ -23,6 +23,7 @@ export function ExerciseColumnHeads() {
       <span>Exercise</span>
       <span>Sets</span>
       <span>Reps</span>
+      {withLoad && <span>Load</span>}
       <span>Rest (sec)</span>
       <span />
     </div>

@@ -31,7 +31,7 @@ import {
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { Input } from "@/components/ui/Input";
-import { PROGRAM_TYPE_LABEL, type ProgramStatus, type ProgramType } from "@/lib/workoutModel";
+import { PROGRAM_TYPE_LABEL, lengthLabel, type ProgramStatus, type ProgramType } from "@/lib/workoutModel";
 import {
   deleteProgramAction,
   duplicateProgramAction,
@@ -45,6 +45,7 @@ interface ProgramRow {
   status: ProgramStatus;
   tags: string[];
   dayCount: number;
+  weekCount: number;
   exerciseCount: number;
   createdAt: number;
   updatedAt: number;
@@ -99,7 +100,7 @@ export function WorkoutProgramsView({ programs }: { programs: ProgramRow[] }) {
                 <div>Program name</div>
                 <div>Created</div>
                 <div>Type</div>
-                <div style={{ textAlign: "right" }}>Days</div>
+                <div>Length</div>
                 <div>Tags</div>
                 <div>Last edit</div>
                 <div style={{ textAlign: "right" }}>Actions</div>
@@ -167,8 +168,8 @@ function ProgramRowItem({ program, onGo }: { program: ProgramRow; onGo: () => vo
       <div>
         <span style={{ fontSize: 12.5, color: "var(--accent-ink)" }}>{PROGRAM_TYPE_LABEL[program.type]}</span>
       </div>
-      <div style={{ textAlign: "right", fontFamily: "var(--font-mono), monospace", fontSize: 12.5, color: "var(--text-secondary)" }}>
-        {isUpload ? "—" : program.dayCount}
+      <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 12.5, color: "var(--text-secondary)" }}>
+        {isUpload ? "—" : lengthLabel(program.weekCount, program.dayCount)}
       </div>
       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
         {program.tags.length === 0 ? (
@@ -372,7 +373,7 @@ function pill(bg: string, fg: string): React.CSSProperties {
 
 const row: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.9fr 1fr 0.8fr 0.6fr 1.1fr 1fr 0.7fr",
+  gridTemplateColumns: "1.9fr 1fr 0.8fr 1.1fr 1.1fr 1fr 0.7fr",
   gap: 12,
   padding: "12px 16px",
   borderBottom: "1px solid var(--hairline)",

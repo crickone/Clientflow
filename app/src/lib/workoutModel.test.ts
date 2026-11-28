@@ -10,6 +10,7 @@ import {
   copyWeek,
   dayLabel,
   daysInWeek,
+  lengthLabel,
   normaliseWeeks,
   programShape,
   shapeLabel,
@@ -100,6 +101,10 @@ copied[3].exercises[0].name = "Changed";
 copied[3].exercises[0].muscleGroups.push("Triceps");
 check("exercises deep copied", src[0].exercises[0].name === "Bench" && src[0].exercises[0].muscleGroups.join() === "Chest");
 check("copy of a missing week changes nothing", copyWeek(src, 9).length === 3);
+
+// ── list length text ──
+check("length: one week", lengthLabel(1, 4) === "4 days" && lengthLabel(1, 1) === "1 day" && lengthLabel(0, 0) === "0 days");
+check("length: several weeks", lengthLabel(8, 32) === "8 weeks, 32 days" && lengthLabel(2, 1) === "2 weeks, 1 day");
 
 // ── load + blanks ──
 check("load trimmed, empty -> null", cleanLoad("  70%  ") === "70%" && cleanLoad("   ") === null && cleanLoad(null) === null && cleanLoad(5) === null);

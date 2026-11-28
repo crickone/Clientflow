@@ -11,10 +11,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * debounced; a value back at the loaded state removes the draft. The builder
  * calls `clear()` once a real save succeeds.
  *
+ * `normalise` (optional) brings a stored draft up to the current shape before
+ * it is compared and applied, so a draft saved before a field existed (e.g.
+ * a day's `week`) is not mistaken for a real change.
+ *
  * Browser storage can be missing or throw (private windows, blocked site
  * data); every access is guarded and the builder simply works without it.
  */
-export function useDraft<T>(key: string | null, value: T, apply: (v: T) => void) {
+export function useDraft<T>(key: string | null, value: T, apply: (v: T) => void, normalise?: (v: T) => T) {
   const initial = useRef(JSON.stringify(value));
   const ready = useRef(false);
   const [restoredAt, setRestoredAt] = useState<number | null>(null);
@@ -26,8 +30,9 @@ export function useDraft<T>(key: string | null, value: T, apply: (v: T) => void)
       const raw = window.localStorage.getItem(key);
       if (raw) {
         const draft = JSON.parse(raw) as { at: number; value: T };
-        if (draft && JSON.stringify(draft.value) !== initial.current) {
-          apply(draft.value);
+        const stored = draft && normalise ? normalise(draft.value) : draft?.value;
+        if (draft && JSON.stringify(stored) !== initial.current) {
+          apply(stored as T);
           setRestoredAt(draft.at);
         }
       }
