@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import JSZip from "jszip";
 
-import { colName, readCsv, readXlsx, sheetsToText, SheetReadError, type Sheet } from "./sheetReader";
+import { colName, readCsv, readXlsx, sheetsToText, SheetReadError, stripTagPrefixes, type Sheet } from "./sheetReader";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -125,6 +125,18 @@ async function main() {
   const bigCut = sheetsToText(big);
   check("default cap is 60,000", bigCut.truncated && bigCut.text.length < 60_200);
   check("cut-off names the rows", /Cut off at row \d+ of 5000 on sheet Big\.$/.test(bigCut.text));
+
+  // Prefixed elements (<x:c>) read the same as plain ones; attributes keep their prefix.
+  eq("prefix stripped", stripTagPrefixes('<x:row r="1"><x:c r="A1" t="s"><x:v>0</x:v></x:c></x:row>'), '<row r="1"><c r="A1" t="s"><v>0</v></c></row>');
+  eq("attribute prefix kept", stripTagPrefixes('<sheet name="A" r:id="rId1"/>'), '<sheet name="A" r:id="rId1"/>');
+  {
+    const z = new JSZip();
+    z.file("xl/workbook.xml", '<x:workbook xmlns:x="m" xmlns:r="r"><x:sheets><x:sheet name="P" sheetId="1" r:id="rId1"/></x:sheets></x:workbook>');
+    z.file("xl/_rels/workbook.xml.rels", '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>');
+    z.file("xl/worksheets/sheet1.xml", '<x:worksheet><x:sheetData><x:row r="1"><x:c r="A1" t="inlineStr"><x:is><x:t>Squat</x:t></x:is></x:c><x:c r="B1"><x:v>5</x:v></x:c></x:row></x:sheetData></x:worksheet>');
+    const pre = await readXlsx(await z.generateAsync({ type: "nodebuffer" }));
+    eq("prefixed workbook reads", JSON.stringify(pre), JSON.stringify([{ name: "P", rows: [["Squat", "5"]] }]));
+  }
 
   console.log(`sheetReader: ${passed} checks passed`);
 }

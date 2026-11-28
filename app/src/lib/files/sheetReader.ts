@@ -137,6 +137,11 @@ function parseSheetXml(xml: string, shared: string[], onCell: () => void): strin
   return tidy(rows);
 }
 
+/** Some writers prefix every element (<x:c>, </x:row>); drop the prefix so one set of patterns reads both. Attributes keep theirs (r:id). */
+export function stripTagPrefixes(xml: string): string {
+  return xml.replace(/<(\/?)[A-Za-z][\w.-]*:(?=[A-Za-z])/g, "<$1");
+}
+
 function resolveTarget(target: string): string {
   if (target.startsWith("/")) return target.slice(1);
   const parts = ("xl/" + target).split("/");
@@ -176,7 +181,7 @@ export async function readXlsx(buf: Buffer, limits: ReadLimits = {}): Promise<Sh
     const text = await f.async("string");
     measured += Buffer.byteLength(text, "utf8");
     if (measured > maxBytes) throw tooBig();
-    return text;
+    return stripTagPrefixes(text);
   };
 
   const workbook = await read("xl/workbook.xml");
