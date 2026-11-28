@@ -130,6 +130,24 @@ export function blankProgram(type: ProgramType): ProgramInput {
 
 export const PROGRAM_LIMITS = { maxWeeks: 16, maxDaysPerWeek: 7, maxDays: 112, maxExercisesPerDay: 200 } as const;
 
+/**
+ * The builder's save limits for each text and number field (the zod schema in
+ * app/workout/actions.ts uses these). The sheet converter clamps to them, so
+ * an imported program always saves.
+ */
+export const PROGRAM_TEXT_LIMITS = {
+  title: 200,
+  dayName: 120,
+  dayInstructions: 8000,
+  exerciseName: 200,
+  reps: 60,
+  notes: 2000,
+  maxSets: 100,
+  maxRestSeconds: 86400,
+  muscleGroups: 20,
+  muscleGroup: 60,
+} as const;
+
 /** Longest target load kept, in characters. */
 export const MAX_LOAD_LENGTH = 60;
 

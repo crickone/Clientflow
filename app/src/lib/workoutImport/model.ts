@@ -10,7 +10,9 @@ import { normalizeExerciseName } from "@/lib/workoutPreviewMedia";
 import {
   checkProgramLimits,
   cleanLoad,
+  MAX_LOAD_LENGTH,
   normaliseWeeks,
+  PROGRAM_TEXT_LIMITS,
   shapeLabel,
   type ExerciseInput,
   type ProgramInput,
@@ -18,8 +20,10 @@ import {
   type WorkoutDayInput,
 } from "@/lib/workoutModel";
 
-/** One model call: system + user text in, the model's text out. */
-export type Complete = (args: { system: string; user: string; maxTokens: number }) => Promise<string>;
+/** A model reply: its text, and why it stopped ("max_tokens" when it ran out of budget). */
+export type CompleteReply = { text: string; stopReason?: string | null };
+/** One model call: system + user text in, the model's text (or text and stop reason) out. */
+export type Complete = (args: { system: string; user: string; maxTokens: number }) => Promise<string | CompleteReply>;
 
 export type ImportResult =
   | { ok: true; program: ProgramInput; unplaced: string[]; summary: string }
@@ -31,9 +35,18 @@ export type MatchExercise = (name: string) => ExerciseMatch | null;
 export const READ_ERROR =
   "I couldn't read the program from this sheet. Try again, or tidy the sheet so each week is clearly marked.";
 
+export const NO_DAYS_ERROR = "I couldn't find any training days in this sheet.";
+export const NO_EXERCISES_ERROR = "I couldn't find any exercises in this sheet.";
+export const TOO_LONG_ERROR = "Part of this sheet is too long for me to copy in one go. Split the weeks into smaller sheets and try again.";
+
 /** Answer budgets per call (metered.ts adds the thinking headroom on top). */
 export const OUTLINE_MAX_TOKENS = 4000;
 export const WEEK_MAX_TOKENS = 8000;
+/**
+ * The largest answer budget a retry may ask for. withThinkingHeadroom adds
+ * 8000, and the SDK refuses a non-streamed call above about 21,300 tokens.
+ */
+export const MAX_ANSWER_TOKENS = 13000;
 /** Week calls in flight at once. */
 export const WEEK_CONCURRENCY = 4;
 
@@ -93,8 +106,24 @@ function fence(text: string): string {
   return `<sheet>\n${text.replace(/<\/?\s*sheet\s*>/gi, (m) => m.replace("<", "< "))}\n</sheet>`;
 }
 
-export function outlineUserPrompt(sheetText: string): string {
-  return `Map out this spreadsheet.\n\n${fence(sheetText)}`;
+/**
+ * The outline request. Every sheet's name and row count is listed before the
+ * text, so a sheet past the text's size cut is still seen and can be given
+ * its weeks (each week is read from its own rows later).
+ */
+export function outlineUserPrompt(sheetText: string, sheets: Sheet[] = [], truncated = false): string {
+  const parts = ["Map out this spreadsheet."];
+  if (sheets.length) {
+    const list = sheets.map((s) => `- "${s.name.replace(/[\r\n]+/g, " ")}": ${s.rows.length} ${s.rows.length === 1 ? "row" : "rows"}`).join("\n");
+    parts.push(`It has ${sheets.length} ${sheets.length === 1 ? "sheet" : "sheets"}:\n${fence(list)}`);
+  }
+  if (truncated) {
+    parts.push(
+      "The text below is cut off; its last line says where. For a sheet the text does not reach, still give its weeks: use the sheet's name, and rows 1 to its row count when its name marks one week.",
+    );
+  }
+  parts.push(fence(sheetText));
+  return parts.join("\n\n");
 }
 
 export function weekUserPrompt(args: { week: number; title: string; days: number; headerText: string | null; weekText: string }): string {
@@ -265,7 +294,20 @@ function joinNotes(...parts: (string | null)[]): string | null {
   return kept.length ? kept.join("\n") : null;
 }
 
-/** One week's reply as program days, plus anything to check. */
+const L = PROGRAM_TEXT_LIMITS;
+
+/** Text cut to `max` characters, and the part cut off (null when it fit). */
+function cut(text: string, max: number): { kept: string; rest: string | null } {
+  if (text.length <= max) return { kept: text, rest: null };
+  return { kept: text.slice(0, max).trimEnd(), rest: text.slice(max).trim() || null };
+}
+
+/**
+ * One week's reply as program days, plus anything to check. Every field is
+ * kept within the builder's save limits (PROGRAM_TEXT_LIMITS): a value that
+ * does not fit its field moves into the exercise's notes, and text past a
+ * field's length is listed to check.
+ */
 export function weekDays(
   week: number,
   reply: WeekReply,
@@ -274,38 +316,81 @@ export function weekDays(
 ): { days: WorkoutDayInput[]; unplaced: string[] } {
   const unplaced = reply.unplaced.map((u) => `Week ${week}: ${u}`);
   const days: WorkoutDayInput[] = reply.days.map((d, di) => {
-    const dayName = d.name?.trim() || `Day ${di + 1}`;
+    const fullDayName = d.name?.trim() || `Day ${di + 1}`;
+    const dayCut = cut(fullDayName, L.dayName);
+    const dayName = dayCut.kept;
+    if (dayCut.rest) unplaced.push(`Week ${week}: the day name "${fullDayName}" was cut to ${L.dayName} characters.`);
     const exercises: ExerciseInput[] = [];
     for (const ex of d.exercises) {
-      const name = ex.name?.trim() ?? "";
-      if (!name) {
+      const fullName = ex.name?.trim() ?? "";
+      if (!fullName) {
         unplaced.push(`Week ${week}, ${dayName}: an exercise with no name`);
         continue;
       }
+      const nameCut = cut(fullName, L.exerciseName);
+      const name = nameCut.kept;
+      if (nameCut.rest) unplaced.push(`Week ${week}, ${dayName}: the exercise name "${fullName}" was cut to ${L.exerciseName} characters.`);
+
       let sets = 0;
       let setsNote: string | null = null;
       const setsText = textOf(ex.sets);
       if (setsText !== null) {
-        if (/^\d+$/.test(setsText)) sets = Number(setsText);
+        if (/^\d+$/.test(setsText) && Number(setsText) <= L.maxSets) sets = Number(setsText);
         else setsNote = `Sets: ${setsText}`;
       }
-      const rest = typeof ex.restSeconds === "number" && Number.isFinite(ex.restSeconds) && ex.restSeconds > 0 ? Math.round(ex.restSeconds) : 0;
+      let reps = textOf(ex.reps);
+      let repsNote: string | null = null;
+      if (reps && reps.length > L.reps) {
+        repsNote = `Reps: ${reps}`;
+        reps = null;
+      }
+      let load = textOf(ex.load);
+      let loadNote: string | null = null;
+      if (load && load.length > MAX_LOAD_LENGTH) {
+        loadNote = `Load: ${load}`;
+        load = null;
+      }
+      let rest = typeof ex.restSeconds === "number" && Number.isFinite(ex.restSeconds) && ex.restSeconds > 0 ? Math.round(ex.restSeconds) : 0;
+      let restNote: string | null = null;
+      if (rest > L.maxRestSeconds) {
+        restNote = `Rest: ${rest} seconds`;
+        rest = 0;
+      }
+      let notes = joinNotes(setsNote, repsNote, loadNote, restNote, textOf(ex.notes));
+      if (notes) {
+        const notesCut = cut(notes, L.notes);
+        notes = notesCut.kept;
+        if (notesCut.rest) unplaced.push(`Week ${week}, ${dayName}, ${name}: the notes were cut to ${L.notes} characters. The rest: ${notesCut.rest}`);
+      }
       const section = ex.section && SECTION_KEYS.has(ex.section as Section) ? (ex.section as Section) : "workout";
       const hit = matchExercise?.(name) ?? null;
+      const groups = hit?.muscleGroups
+        ? hit.muscleGroups
+            .split(",")
+            .map((g) => g.trim().slice(0, L.muscleGroup).trim())
+            .filter(Boolean)
+            .slice(0, L.muscleGroups)
+        : [];
       exercises.push({
         exerciseId: hit ? hit.id : null,
         section,
         name,
         sets,
-        reps: textOf(ex.reps),
+        reps,
         restSeconds: rest,
-        notes: joinNotes(setsNote, textOf(ex.notes)),
-        muscleGroups: hit?.muscleGroups ? hit.muscleGroups.split(",").map((g) => g.trim()).filter(Boolean) : [],
+        notes,
+        muscleGroups: groups,
         joined: exercises.length > 0 && ex.joined === true,
-        load: cleanLoad(textOf(ex.load)),
+        load: cleanLoad(load),
       });
     }
-    return { week, name: dayName, instructions: textOf(d.instructions), exercises };
+    let instructions = textOf(d.instructions);
+    if (instructions) {
+      const instrCut = cut(instructions, L.dayInstructions);
+      instructions = instrCut.kept;
+      if (instrCut.rest) unplaced.push(`Week ${week}, ${dayName}: the day notes were cut to ${L.dayInstructions} characters. The rest: ${instrCut.rest}`);
+    }
+    return { week, name: dayName, instructions, exercises };
   });
   if (days.length !== expectedDays) {
     unplaced.push(`Week ${week}: the outline found ${expectedDays} ${expectedDays === 1 ? "day" : "days"}, the rows gave ${days.length}.`);
@@ -320,6 +405,9 @@ function plural(n: number, one: string, many: string): string {
 /** The program from its weeks' days, checked against the limits. */
 export function assembleProgram(title: string, days: WorkoutDayInput[], unplaced: string[]): ImportResult {
   const norm = normaliseWeeks(days);
+  // A program with no days would open a builder with nothing to show.
+  if (norm.length === 0) return { ok: false, error: NO_DAYS_ERROR };
+  if (norm.every((d) => d.exercises.length === 0)) return { ok: false, error: NO_EXERCISES_ERROR };
   const limit = checkProgramLimits(norm);
   if (limit) return { ok: false, error: limit };
   const program: ProgramInput = {
@@ -341,13 +429,29 @@ export function assembleProgram(title: string, days: WorkoutDayInput[], unplaced
 
 // ---------------------------------------------------------------- orchestration
 
-/** One call, parsed; retried once on a bad reply. null after two bad replies. */
-async function ask<T>(complete: Complete, args: { system: string; user: string; maxTokens: number }, parse: (text: string) => T | null): Promise<T | null> {
+type Asked<T> = { ok: true; value: T } | { ok: false; error: string };
+
+/**
+ * One call, parsed. A bad reply is retried once with the same budget. A
+ * reply cut off at its budget is retried once with a larger one (up to
+ * MAX_ANSWER_TOKENS); cut off again, or already at the ceiling, it fails
+ * with TOO_LONG_ERROR instead of paying for the same cut-off reply twice.
+ */
+async function ask<T>(complete: Complete, args: { system: string; user: string; maxTokens: number }, parse: (text: string) => T | null): Promise<Asked<T>> {
+  let maxTokens = args.maxTokens;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const parsed = parse(await complete(args));
-    if (parsed !== null) return parsed;
+    const raw = await complete({ ...args, maxTokens });
+    const reply: CompleteReply = typeof raw === "string" ? { text: raw } : raw;
+    const parsed = parse(reply.text);
+    if (parsed !== null) return { ok: true, value: parsed };
+    if (reply.stopReason === "max_tokens") {
+      const bigger = Math.min(maxTokens * 2, MAX_ANSWER_TOKENS);
+      if (bigger <= maxTokens) return { ok: false, error: TOO_LONG_ERROR };
+      maxTokens = bigger;
+      if (attempt === 1) return { ok: false, error: TOO_LONG_ERROR };
+    }
   }
-  return null;
+  return { ok: false, error: READ_ERROR };
 }
 
 /** The "Cut off at row N ..." line sheetsToText ends a cut text with. */
@@ -372,9 +476,9 @@ export async function programFromSheets(
 
   // Pass 1: the outline.
   const whole = sheetsToText(sheets);
-  const outline = await ask(
+  const asked = await ask(
     opts.complete,
-    { system: OUTLINE_SYSTEM, user: outlineUserPrompt(whole.text), maxTokens: OUTLINE_MAX_TOKENS },
+    { system: OUTLINE_SYSTEM, user: outlineUserPrompt(whole.text, sheets, whole.truncated), maxTokens: OUTLINE_MAX_TOKENS },
     (text) => {
       const o = extractJson(text, OutlineSchema);
       if (!o) return null;
@@ -383,7 +487,8 @@ export async function programFromSheets(
       return checked ? ({ checked } as const) : null;
     },
   );
-  if (!outline) return { ok: false, error: READ_ERROR };
+  if (!asked.ok) return { ok: false, error: asked.error };
+  const outline = asked.value;
   if ("notAProgram" in outline) {
     return { ok: false, error: `This sheet does not look like a training program: ${outline.notAProgram}` };
   }
@@ -391,7 +496,7 @@ export async function programFromSheets(
   const limit = outlineLimitError(plan);
   if (limit) return { ok: false, error: limit };
 
-  const title = opts.title?.trim() || plan.title || "Imported program";
+  const title = (opts.title?.trim() || plan.title || "Imported program").slice(0, L.title).trim();
   const unplaced: string[] = [...plan.unplaced];
   if (whole.truncated) unplaced.push(`The sheet was too long to read in full. ${cutLine(whole.text)}`);
 
@@ -415,23 +520,24 @@ export async function programFromSheets(
   // Pass 2: each week, a few at a time; stop starting new ones after a failure.
   const replies: (WeekReply | null)[] = new Array(prompts.length).fill(null);
   let next = 0;
-  let failed = false;
+  let failure: string | null = null;
+  let thrown = false;
   const worker = async () => {
-    while (!failed && next < prompts.length) {
+    while (!failure && !thrown && next < prompts.length) {
       const i = next++;
-      let reply: WeekReply | null;
+      let reply: Asked<WeekReply>;
       try {
         reply = await ask(opts.complete, prompts[i].args, (text) => extractJson(text, WeekSchema));
       } catch (err) {
-        failed = true; // a cap or network error: no more calls
+        thrown = true; // a cap or network error: no more calls
         throw err;
       }
-      if (!reply) failed = true;
-      replies[i] = reply;
+      if (reply.ok) replies[i] = reply.value;
+      else failure ??= reply.error;
     }
   };
   await Promise.all(Array.from({ length: Math.min(WEEK_CONCURRENCY, prompts.length) }, worker));
-  if (failed || replies.some((r) => r === null)) return { ok: false, error: READ_ERROR };
+  if (failure || replies.some((r) => r === null)) return { ok: false, error: failure ?? READ_ERROR };
 
   const days: WorkoutDayInput[] = [];
   prompts.forEach((p, i) => {

@@ -25,7 +25,7 @@ import { buildExerciseMatcher, programFromSheets, type Complete, type ImportResu
  */
 
 export { programFromSheets } from "./model";
-export type { Complete, ImportResult, MatchExercise } from "./model";
+export type { Complete, CompleteReply, ImportResult, MatchExercise } from "./model";
 
 const AGENT_KEY = "workout-import";
 const FAILED = "I couldn't build the program just now. Try again in a moment.";
@@ -33,7 +33,7 @@ const OLD_EXCEL = "That is an old Excel file (.xls). Save it as .xlsx from Excel
 const refusal = (kind: string) => `I can read spreadsheets (.xlsx, .csv) and text files, not ${kind} files yet.`;
 const REFUSE_KINDS: Record<string, string> = { ".pdf": "PDF", ".doc": "Word", ".docx": "Word", ".ppt": "PowerPoint", ".pptx": "PowerPoint" };
 
-/** Sonnet 5.5 through the metered chokepoint (gate, call, meter); text blocks joined. */
+/** Sonnet 5.5 through the metered chokepoint (gate, call, meter); text blocks joined, with the stop reason. */
 export function meteredWorkoutComplete(tenantId: number): Complete {
   return async ({ system, user, maxTokens }) => {
     // meteredCreate applies withThinkingHeadroom and the cap gate itself.
@@ -43,10 +43,12 @@ export function meteredWorkoutComplete(tenantId: number): Complete {
       system,
       messages: [{ role: "user", content: user }],
     }));
-    return message.content
+    const text = message.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
       .map((b) => b.text)
       .join("\n");
+    // The stop reason lets the converter tell a cut-off reply from a bad one.
+    return { text, stopReason: message.stop_reason };
   };
 }
 

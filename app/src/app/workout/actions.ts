@@ -6,31 +6,31 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { deleteProgram, duplicateProgram, getProgram, saveProgram, setProgramStatus } from "@/lib/workout";
 import { importProgramFromUpload } from "@/lib/workoutImport/convert";
-import { PROGRAM_LIMITS, checkProgramLimits, type ProgramInput } from "@/lib/workoutModel";
+import { MAX_LOAD_LENGTH, PROGRAM_LIMITS, PROGRAM_TEXT_LIMITS as T, checkProgramLimits, type ProgramInput } from "@/lib/workoutModel";
 
 const exerciseSchema = z.object({
   id: z.number().int().positive().optional(),
   exerciseId: z.number().int().positive().nullable().default(null),
   section: z.enum(["warmup", "workout", "cooldown"]),
-  name: z.string().trim().max(200),
-  sets: z.coerce.number().int().min(0).max(100).catch(0),
-  reps: z.string().trim().max(60).nullable().default(null),
-  restSeconds: z.coerce.number().int().min(0).max(86400).catch(0),
-  notes: z.string().trim().max(2000).nullable().default(null),
-  muscleGroups: z.array(z.string().trim().max(60)).max(20).default([]),
+  name: z.string().trim().max(T.exerciseName),
+  sets: z.coerce.number().int().min(0).max(T.maxSets).catch(0),
+  reps: z.string().trim().max(T.reps).nullable().default(null),
+  restSeconds: z.coerce.number().int().min(0).max(T.maxRestSeconds).catch(0),
+  notes: z.string().trim().max(T.notes).nullable().default(null),
+  muscleGroups: z.array(z.string().trim().max(T.muscleGroup)).max(T.muscleGroups).default([]),
   joined: z.boolean().default(false),
-  load: z.string().trim().max(60, "A load can be at most 60 characters.").nullable().optional(),
+  load: z.string().trim().max(MAX_LOAD_LENGTH, `A load can be at most ${MAX_LOAD_LENGTH} characters.`).nullable().optional(),
 });
 const daySchema = z.object({
   id: z.number().int().positive().optional(),
   week: z.number().int().min(1).max(PROGRAM_LIMITS.maxWeeks).default(1),
-  name: z.string().trim().max(120),
-  instructions: z.string().trim().max(8000).nullable().default(null),
+  name: z.string().trim().max(T.dayName),
+  instructions: z.string().trim().max(T.dayInstructions).nullable().default(null),
   exercises: z.array(exerciseSchema).max(PROGRAM_LIMITS.maxExercisesPerDay),
 });
 const programSchema = z.object({
   id: z.number().int().positive().optional(),
-  title: z.string().trim().min(1, "Give the program a title.").max(200),
+  title: z.string().trim().min(1, "Give the program a title.").max(T.title),
   type: z.enum(["simple", "detailed", "upload"]),
   status: z.enum(["active", "archived"]).default("active"),
   tags: z.array(z.string().trim().max(80)).max(30).default([]),

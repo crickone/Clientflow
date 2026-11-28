@@ -146,11 +146,12 @@ export async function draftProgramFromFileTool(
   if (!result.ok) return { text: result.error };
 
   const writeInput = programToCreateInput(result.program);
-  const lines = [result.summary + "."];
-  if (result.unplaced.length) lines.push(`Things to check:\n${unplacedLines(result.unplaced)}`);
-  lines.push("Approve the card to save it.");
+  // The title and the lines to check are quoted from the sheet, and this text
+  // joins the reply the model reads on later turns, so it is fenced.
+  const fromSheet = [result.summary + "."];
+  if (result.unplaced.length) fromSheet.push(`Things to check:\n${unplacedLines(result.unplaced)}`);
   return {
-    text: lines.join("\n\n"),
+    text: `${fenceUntrusted(fromSheet.join("\n\n"))}\n\nApprove the card to save it.`,
     pendingWrites: [
       { name: "create_workout_program", input: writeInput, summary: deps.summarize("create_workout_program", writeInput) },
     ],
