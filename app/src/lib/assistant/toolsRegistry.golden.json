@@ -306,6 +306,7 @@
     "get_client",
     "list_social_posts",
     "export_social_posts",
-    "list_schedule"
+    "list_schedule",
+    "read_attached_file"
   ]
 }

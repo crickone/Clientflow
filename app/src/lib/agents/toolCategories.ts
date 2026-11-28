@@ -91,7 +91,7 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     label: "General",
     // load_skill sits here rather than in its own category: one read-only
     // tool does not earn a heading in the operator's tool list.
-    tools: ["business_overview", "create_form", "load_skill"],
+    tools: ["business_overview", "create_form", "load_skill", "read_attached_file"],
   },
 ];
 

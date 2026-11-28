@@ -121,6 +121,7 @@ import {
   createWebsitePageTool,
   publishWebsitePageTool,
 } from "@/lib/agents/tools.website";
+import { FILES_TOOLS, readAttachedFileTool } from "@/lib/agents/tools.files";
 import {
   CAMPAIGN_TOOLS,
   approveCampaignAssetTool,
@@ -856,6 +857,9 @@ export const TOOLS: Anthropic.Tool[] = [
   ...SCHEDULE_TOOLS,
   ...WEBSITE_TOOLS,
 
+  // ── Files the operator attached in the chat: read a spreadsheet or text file. ──
+  ...FILES_TOOLS,
+
   // ── Ads manager: Facebook/Instagram ads on the business's own ad account. ──
   ...ADS_TOOLS,
   ...GOOGLE_TOOLS,
@@ -1069,6 +1073,8 @@ export async function executeTool(
         return await addAdToCampaignTool(ctx, input);
       case "set_ad_placements":
         return await setAdPlacementsTool(ctx, input);
+      case "read_attached_file":
+        return await readAttachedFileTool(ctx, input);
       case "list_website_pages":
         return listWebsitePagesTool(ctx, input);
       case "read_website_page":
