@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { saveTrainingDaysAction } from "@/app/app/actions";
 import { WEEKDAY_SHORT } from "@/lib/trainingProgress";
+import { lengthLabel } from "@/lib/workoutModel";
+import { rotateMessage } from "@/components/clientapp/programWeeks";
 
 /** Pick which programme to follow and which days of the week to train on. */
 export function TrainingDaysForm({
@@ -14,7 +16,7 @@ export function TrainingDaysForm({
   initialProgramId,
   initialWeekdays,
 }: {
-  programs: { id: number; title: string; dayNames: string[] }[];
+  programs: { id: number; title: string; dayNames: string[]; weeks: number; daysPerWeek: number | null }[];
   initialProgramId: number;
   initialWeekdays: number[];
 }) {
@@ -47,7 +49,7 @@ export function TrainingDaysForm({
             {programs.map((p) => (
               <button key={p.id} type="button" className="td-option" aria-pressed={p.id === programId} onClick={() => setProgramId(p.id)}>
                 <span className="td-option-title">{p.title}</span>
-                <span className="td-option-sub">{p.dayNames.length} day{p.dayNames.length === 1 ? "" : "s"}</span>
+                <span className="td-option-sub">{lengthLabel(p.weeks, p.dayNames.length)}</span>
               </button>
             ))}
           </div>
@@ -63,11 +65,9 @@ export function TrainingDaysForm({
           ))}
         </div>
         <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--text-secondary)" }}>
-          {days.length === 0
-            ? "Pick the days you plan to train."
-            : program && days.length !== program.dayNames.length
-              ? `Your program has ${program.dayNames.length} days and you picked ${days.length}. The days run in order, so they will rotate across weeks.`
-              : `Each training day gets the next day of your program, in order.`}
+          {program
+            ? rotateMessage({ weeks: program.weeks, daysPerWeek: program.daysPerWeek, totalDays: program.dayNames.length }, days.length)
+            : "Pick the days you plan to train."}
         </div>
       </div>
       <Button onClick={save} loading={pending} style={{ width: "100%" }}>

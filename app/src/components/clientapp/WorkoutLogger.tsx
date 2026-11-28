@@ -373,6 +373,7 @@ export function WorkoutLogger({
                           {ex.targetSets > 1 ? `${ex.targetSets} sets` : ""}
                           {ex.targetSets > 1 && ex.targetReps ? " x " : ""}
                           {ex.targetReps ?? ""}
+                          {ex.load ? `${ex.targetSets > 1 || ex.targetReps ? " · " : ""}${ex.load}` : ""}
                         </span>
                         {ex.notes && <span className="wl-ex-notes">{ex.notes}</span>}
                       </div>
@@ -404,6 +405,7 @@ export function WorkoutLogger({
                     <div className="wl-ex-target">
                       {ex.targetSets} {ex.targetSets === 1 ? "set" : "sets"}
                       {ex.targetReps ? ` x ${ex.targetReps}` : ""}
+                      {ex.load ? ` · ${ex.load}` : ""}
                       {rests ? (groupRest > 0 ? ` · rest ${restLabel(groupRest)}` : "") : " · then straight on"}
                     </div>
                     {plan && plan.sets.some((p) => p.amrap) && !allDone && (

@@ -11,7 +11,8 @@ import { DayTabs } from "@/components/clientapp/DayTabs";
 import { ExerciseSections } from "@/components/workout/ExerciseSections";
 import { Button } from "@/components/ui/Button";
 import { startWorkoutAction } from "@/app/app/actions";
-import { PROGRAM_TYPE_LABEL, type ProgramInput } from "@/lib/workoutModel";
+import { dayLabel, PROGRAM_TYPE_LABEL, shapeLabel, type ProgramInput } from "@/lib/workoutModel";
+import { dayIndexesInWeek, tabLabelInWeek, weekList, weekOfIndex } from "@/components/clientapp/programWeeks";
 
 /**
  * The full, read-only render of an assigned workout program for the client
@@ -40,6 +41,12 @@ export function WorkoutProgramDetail({
   const [pending, start] = useTransition();
   const [blocked, setBlocked] = useState<{ error: string; id?: number } | null>(null);
   const day = program.days[dayIdx];
+  const weeks = weekList(program.days);
+  const manyWeeks = weeks.length > 1;
+  // The week shown always follows the day shown, so the picker and the tabs cannot disagree.
+  const week = weekOfIndex(program.days, dayIdx);
+  const weekDays = dayIndexesInWeek(program.days, week);
+  const title = dayLabel(program.days, dayIdx);
   const openHere = open && open.programId === program.id && open.dayPosition === dayIdx ? open : null;
 
   function startDay() {
@@ -54,7 +61,7 @@ export function WorkoutProgramDetail({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <PageTitle sub={program.type === "detailed" ? `${program.days.length} day${program.days.length === 1 ? "" : "s"}` : PROGRAM_TYPE_LABEL[program.type]}>{program.title}</PageTitle>
+      <PageTitle sub={program.type === "detailed" ? shapeLabel(program.days) : PROGRAM_TYPE_LABEL[program.type]}>{program.title}</PageTitle>
 
       {program.type === "upload" ? (
         <DocumentCard href={`/api/app/workout/file?program=${program.id}`} name={program.uploadOriginalName ?? program.title} />
@@ -72,12 +79,27 @@ export function WorkoutProgramDetail({
       ) : (
         <>
           {program.summary && <div style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>{program.summary}</div>}
-          <DayTabs labels={program.days.map((d, i) => d.name || `Day ${i + 1}`)} active={dayIdx} onChange={(i) => { setDayIdx(i); setBlocked(null); }} />
+          {manyWeeks && (
+            <DayTabs
+              labels={weeks.map((w) => `Week ${w}`)}
+              active={weeks.indexOf(week)}
+              onChange={(i) => {
+                const first = dayIndexesInWeek(program.days, weeks[i])[0];
+                if (first !== undefined) setDayIdx(first);
+                setBlocked(null);
+              }}
+            />
+          )}
+          <DayTabs
+            labels={weekDays.map((i) => tabLabelInWeek(program.days, week, i))}
+            active={Math.max(0, weekDays.indexOf(dayIdx))}
+            onChange={(i) => { setDayIdx(weekDays[i]); setBlocked(null); }}
+          />
           {day && day.exercises.length > 0 && (
             <div style={{ display: "grid", gap: 8 }}>
               <Button onClick={startDay} loading={pending} style={{ width: "100%", height: 48, fontSize: 15 }}>
                 {!pending && <Play size={16} />}
-                {openHere ? `Continue ${day.name || `Day ${dayIdx + 1}`}` : `Start ${day.name || `Day ${dayIdx + 1}`}`}
+                {openHere ? `Continue ${title}` : `Start ${title}`}
               </Button>
               {blocked && (
                 <Card style={{ padding: "12px 14px", fontSize: 13.5, color: "var(--text-secondary)", display: "grid", gap: 6 }}>
@@ -93,7 +115,7 @@ export function WorkoutProgramDetail({
           )}
           {day && (
             <Card style={{ display: "flex", flexDirection: "column", gap: 18, padding: 22 }}>
-              <div style={{ fontFamily: "var(--font-heading), sans-serif", fontSize: 19, color: "var(--text-primary)" }}>{day.name}</div>
+              <div style={{ fontFamily: "var(--font-heading), sans-serif", fontSize: 19, color: "var(--text-primary)" }}>{manyWeeks ? title : day.name}</div>
               <ExerciseSections exercises={day.exercises} instructions={day.instructions} media={media} />
             </Card>
           )}

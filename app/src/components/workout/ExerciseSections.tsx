@@ -71,6 +71,7 @@ export function ExerciseSections({
                       <span style={{ display: "flex", flexWrap: "wrap", gap: "2px 14px" }}>
                         <span style={stat}>Sets: {ex.sets}</span>
                         {ex.reps && <span style={stat}>Reps: {ex.reps}</span>}
+                        {ex.load && <span style={stat}>Load: {ex.load}</span>}
                         {ex.restSeconds > 0 && <span style={stat}>Rest: {fmtRest(ex.restSeconds)}</span>}
                       </span>
                       {ex.notes && <span style={{ fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.45 }}>{ex.notes}</span>}
