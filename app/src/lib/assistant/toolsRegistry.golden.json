@@ -307,6 +307,7 @@
     "list_social_posts",
     "export_social_posts",
     "list_schedule",
-    "read_attached_file"
+    "read_attached_file",
+    "draft_program_from_file"
   ]
 }

@@ -5,7 +5,7 @@ import { useDraft } from "@/components/workout/useDraft";
 import { DraftNotice, DraftSaved } from "@/components/workout/DraftNotice";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, Copy, Link2, Play, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, Copy, Link2, ListChecks, Play, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -46,11 +46,19 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
   const [preview, setPreview] = useState<ExerciseLibRow | null>(null);
   const [saving, start] = useTransition();
 
-  const applyDraft = useCallback((d: { program: ProgramInput; tagsText: string }) => {
+  // Lines "Build from this file" could not place in the program. Kept with
+  // the draft until dismissed; never saved with the program.
+  const [unplaced, setUnplaced] = useState<string[]>([]);
+
+  const applyDraft = useCallback((d: BuilderDraft) => {
     setProgram(d.program);
     setTagsText(d.tagsText);
+    setUnplaced(Array.isArray(d.unplaced) ? d.unplaced.filter((u) => typeof u === "string") : []);
   }, []);
-  const draft = useDraft(draftKey ?? null, { program, tagsText }, applyDraft, normaliseDraft);
+  // `unplaced` joins the draft only while it has lines, so an ordinary draft
+  // keeps exactly its old shape.
+  const draftValue: BuilderDraft = unplaced.length ? { program, tagsText, unplaced } : { program, tagsText };
+  const draft = useDraft<BuilderDraft>(draftKey ?? null, draftValue, applyDraft, normaliseDraft);
 
   const days = program.days;
   const idx = Math.min(dayIdx, days.length - 1);
@@ -159,6 +167,7 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <DraftNotice restoredAt={draft.restoredAt} onDiscard={draft.discard} />
+      {unplaced.length > 0 && <UnplacedNotice lines={unplaced} onDismiss={() => setUnplaced([])} />}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <Button variant="ghost" size="icon" onClick={() => router.push("/workout")} aria-label="Back">
           <ArrowLeft size={16} />
@@ -580,9 +589,47 @@ function tabStyle(active: boolean): React.CSSProperties {
   };
 }
 
-/** A stored draft from before weeks existed: every day lands in week 1. */
-function normaliseDraft(d: { program: ProgramInput; tagsText: string }): { program: ProgramInput; tagsText: string } {
-  return { ...d, program: { ...d.program, days: normaliseWeeks(d.program.days) } };
+/** What the builder keeps as a draft. `unplaced` comes from "Build from this file". */
+type BuilderDraft = { program: ProgramInput; tagsText: string; unplaced?: string[] };
+
+/** A stored draft from before weeks existed: every day lands in week 1. An empty `unplaced` is dropped. */
+function normaliseDraft(d: BuilderDraft): BuilderDraft {
+  const { unplaced, ...rest } = d;
+  const next: BuilderDraft = { ...rest, program: { ...d.program, days: normaliseWeeks(d.program.days) } };
+  return Array.isArray(unplaced) && unplaced.length ? { ...next, unplaced } : next;
+}
+
+/** What the sheet had that the import could not place, until the coach dismisses it. */
+function UnplacedNotice({ lines, onDismiss }: { lines: string[]; onDismiss: () => void }) {
+  return (
+    <div
+      role="status"
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 12,
+        padding: "12px 12px 12px 14px",
+        border: "1px solid var(--hairline)",
+        borderRadius: "var(--radius)",
+        background: "var(--surface-1)",
+        fontSize: 13.5,
+        color: "var(--text-secondary)",
+      }}
+    >
+      <ListChecks size={16} style={{ color: "var(--accent-ink)", flexShrink: 0, marginTop: 2 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ color: "var(--text-primary)" }}>Check these before you save:</div>
+        <ul style={{ margin: "6px 0 0", paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4, overflowWrap: "anywhere" }}>
+          {lines.map((line, i) => (
+            <li key={i}>{line}</li>
+          ))}
+        </ul>
+      </div>
+      <Button variant="ghost" size="sm" onClick={onDismiss}>
+        Dismiss
+      </Button>
+    </div>
+  );
 }
 
 const card: React.CSSProperties = {

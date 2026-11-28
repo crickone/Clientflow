@@ -49,9 +49,10 @@ export type ToolResult = {
   // tool whose result carries `pendingWrites` has them folded into the outer
   // turn's own `pendingWrites` by runAgentTurn's read branch, so a nested
   // proposal reaches the operator's Approve card exactly like a direct write.
-  // No in-tree tool sets this today — the delegation layer that used it was
-  // removed with the single-agent merge — but the fold-in is kept as correct,
-  // harmless-when-absent plumbing (see runAgentTurn.ts). Normal tools leave it
+  // draft_program_from_file (tools.files.ts) sets it: a read tool that hands
+  // its one create_workout_program write to the gate. Because the loop stops
+  // for approval before the model reads that result, runAgentTurn adds such a
+  // result's text to the reply so the operator sees it. Normal tools leave it
   // undefined.
   pendingWrites?: PendingWrite[];
   // The artifact-side mirror of `pendingWrites`, one field over: a list (not

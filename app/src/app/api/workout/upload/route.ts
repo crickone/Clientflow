@@ -8,7 +8,7 @@ import { getCurrentTenant } from "@/lib/db/tenant";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const ALLOWED = new Set([".pdf", ".xls", ".xlsx"]);
+const ALLOWED = new Set([".pdf", ".xls", ".xlsx", ".csv"]);
 const DATA_DIR = path.join(process.cwd(), "data");
 
 function workoutDir(): string {
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   }
   const ext = path.extname(file.name).toLowerCase();
   if (!ALLOWED.has(ext)) {
-    return NextResponse.json({ ok: false, error: "Only PDF, xls or xlsx files can be uploaded." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Only PDF, xls, xlsx or csv files can be uploaded." }, { status: 400 });
   }
   const dir = workoutDir();
   const filename = `program-${Date.now()}-${Math.floor(Math.random() * 1e6)}${ext}`;

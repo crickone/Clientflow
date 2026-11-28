@@ -60,10 +60,10 @@ export interface RunAgentTurnArgs {
  * a NESTED `runAgentTurn`'s deferred writes: the read branch below folds them
  * into THIS turn's own `pendingWrites`, so the SAME `if (pendingWrites.length >
  * 0) break` + confirm/Approve path handles a bubbled-up write identically to a
- * direct one. No in-tree tool produces a nested turn today (the delegation
- * layer that did was removed with the single-agent merge), so this is
- * defensive, harmless-when-absent plumbing — kept because it costs nothing and
- * keeps the write gate's fold-in correct for any future nested tool.
+ * direct one. draft_program_from_file uses it: it reads a program
+ * spreadsheet and proposes one create_workout_program write. Since the loop
+ * stops for approval before the model reads that tool's result, the result's
+ * text is added to the reply so the operator sees what the card holds.
  *
  * `artifacts` mirrors `pendingWrites` exactly, one field over, for
  * downloadable/viewable outputs (an invoice-bundle ZIP, a plan doc) instead of
@@ -170,14 +170,24 @@ export async function runAgentTurn(
           // whole `artifacts` list) rather than the single `tr.artifact` a
           // normal tool produces — fold each into this turn's own list.
           // Defensive: no in-tree tool produces a nested turn now (the
-          // delegation layer that did was removed), same as `pendingWrites` below.
+          // delegation layer that did was removed).
           if (tr.artifacts?.length) { for (const a of tr.artifacts) { artifacts.push(a); onArtifact?.(a); } }
-          // A READ tool's result can carry a nested runAgentTurn's own deferred
-          // writes — fold them into this turn's pendingWrites so they hit the
-          // same confirm/Approve path as a direct write below. The model still
-          // sees the normal tool_result text either way. Defensive plumbing now
-          // (the delegation layer that produced these was removed).
-          if (tr.pendingWrites?.length) pendingWrites.push(...tr.pendingWrites);
+          // A READ tool's result can carry deferred writes of its own (today
+          // draft_program_from_file's create_workout_program) — fold them into
+          // this turn's pendingWrites so they hit the same confirm/Approve
+          // path as a direct write below.
+          if (tr.pendingWrites?.length) {
+            pendingWrites.push(...tr.pendingWrites);
+            // The loop stops below before the model reads this result, so its
+            // text (what the card is, anything to check) is shown to the
+            // operator as part of the reply instead of being lost.
+            // draft_program_from_file is the tool that does this.
+            if (tr.text.trim()) {
+              const note = `${fullText.trim() ? "\n\n" : ""}${tr.text.trim()}`;
+              fullText += note;
+              onText?.(note);
+            }
+          }
           toolResults.push({ toolCallId: call.id, content: tr.text });
         }
       }

@@ -60,6 +60,7 @@ export const TOOL_LABEL: Record<string, string> = {
   list_social_posts: "Checking the social posts",
   list_schedule: "Checking the schedule",
   read_attached_file: "Reading the file",
+  draft_program_from_file: "Reading the program",
   list_website_pages: "Checking the website",
   read_website_page: "Reading the page",
   list_website_images: "Checking the images",

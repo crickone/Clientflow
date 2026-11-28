@@ -7,10 +7,18 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
-import { saveProgramAction } from "@/app/workout/actions";
+import { buildProgramFromUploadAction, saveProgramAction } from "@/app/workout/actions";
+import { writeDraft } from "@/components/workout/useDraft";
 import type { ProgramInput } from "@/lib/workoutModel";
 
-export function UploadProgramForm({ initial }: { initial: ProgramInput }) {
+/** Spreadsheets Adonis can copy into the builder. */
+const BUILDABLE = /\.(xlsx|csv)$/i;
+
+/**
+ * `newProgramDraftKey` is the new Detailed program builder's draft key; with
+ * it, a saved program whose file is a spreadsheet offers "Build from this file".
+ */
+export function UploadProgramForm({ initial, newProgramDraftKey }: { initial: ProgramInput; newProgramDraftKey?: string }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(initial.title === "New Program" ? "" : initial.title);
@@ -19,6 +27,32 @@ export function UploadProgramForm({ initial }: { initial: ProgramInput }) {
   const [originalName, setOriginalName] = useState<string | null>(initial.uploadOriginalName);
   const [uploading, setUploading] = useState(false);
   const [saving, start] = useTransition();
+  const [building, startBuild] = useTransition();
+  const [buildError, setBuildError] = useState<string | null>(null);
+
+  // Only the saved file: the action reads the program's stored upload, so a
+  // replaced-but-unsaved file would build the old one.
+  const canBuild =
+    !!newProgramDraftKey && !!initial.id && !!filename && filename === initial.uploadFilename && BUILDABLE.test(filename);
+
+  const build = () => {
+    if (!canBuild || !initial.id || !newProgramDraftKey) return;
+    const id = initial.id;
+    setBuildError(null);
+    startBuild(async () => {
+      let res: Awaited<ReturnType<typeof buildProgramFromUploadAction>>;
+      try {
+        res = await buildProgramFromUploadAction(id);
+      } catch {
+        return setBuildError("I couldn't build the program just now. Try again in a moment.");
+      }
+      if (!res.ok) return setBuildError(res.error);
+      if (!writeDraft(newProgramDraftKey, { program: res.program, tagsText: "", unplaced: res.unplaced })) {
+        return setBuildError("This browser would not keep the program for the builder. Allow site data and try again.");
+      }
+      router.push("/workout/new?type=detailed");
+    });
+  };
 
   async function upload(file: File) {
     setUploading(true);
@@ -86,7 +120,7 @@ export function UploadProgramForm({ initial }: { initial: ProgramInput }) {
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,.xls,.xlsx"
+            accept=".pdf,.xls,.xlsx,.csv"
             style={{ display: "none" }}
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -137,10 +171,26 @@ export function UploadProgramForm({ initial }: { initial: ProgramInput }) {
             >
               {uploading ? <Loader2 size={26} className="spin" /> : <UploadCloud size={26} style={{ color: "var(--accent-ink)" }} />}
               <div style={{ fontSize: 13.5, color: "var(--accent-ink)" }}>{uploading ? "Uploading…" : "Drop file here or click to upload."}</div>
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Supported formats: pdf, xlsx, xls</div>
+              <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Supported formats: pdf, xlsx, xls, csv</div>
             </button>
           )}
         </div>
+
+        {canBuild && (
+          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+            <Button variant="secondary" onClick={build} loading={building} disabled={building || saving || uploading}>
+              {building ? "Reading the sheet..." : "Build from this file"}
+            </Button>
+            <div style={{ flex: 1, minWidth: 220, fontSize: 12.5, color: "var(--text-tertiary)" }}>
+              Adonis copies the program into the builder for you to check. Takes about a minute.
+            </div>
+            {buildError && (
+              <div role="alert" style={{ flexBasis: "100%", fontSize: 13, color: "var(--danger)" }}>
+                {buildError}
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <Button variant="ghost" onClick={() => router.push("/workout")} disabled={saving}>

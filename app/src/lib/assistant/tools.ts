@@ -49,7 +49,7 @@ import {
 import { uploadFilesToDrive } from "@/lib/google/drive";
 import { saveDownload } from "@/lib/assistant/downloadStore";
 import { sendClientEmail } from "@/lib/clientEmail";
-import { saveExercise } from "@/lib/exerciseLibrary";
+import { listExercisesForTenant, saveExercise } from "@/lib/exerciseLibrary";
 import { saveProgram } from "@/lib/workout";
 import { checkProgramLimits, cleanLoad, type ProgramInput, type Section } from "@/lib/workoutModel";
 import { dailyTarget, mealsBetween, targetSource } from "@/lib/meals";
@@ -121,7 +121,7 @@ import {
   createWebsitePageTool,
   publishWebsitePageTool,
 } from "@/lib/agents/tools.website";
-import { FILES_TOOLS, readAttachedFileTool } from "@/lib/agents/tools.files";
+import { FILES_TOOLS, draftProgramFromFileTool, readAttachedFileTool } from "@/lib/agents/tools.files";
 import {
   CAMPAIGN_TOOLS,
   approveCampaignAssetTool,
@@ -582,7 +582,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: "create_workout_program",
     description:
-      "Build a full workout program (days → exercises, each with sets/reps/rest). Generate a complete, sensible plan. Use when asked to build/create a workout or training programme.",
+      "Build a full workout program (days → exercises, each with sets/reps/rest). Generate a complete, sensible plan. Use when asked to build/create a workout or training programme. To copy a coach's program from an attached spreadsheet, call draft_program_from_file instead.",
     input_schema: {
       type: "object",
       properties: {
@@ -611,6 +611,7 @@ export const TOOLS: Anthropic.Tool[] = [
                     muscleGroups: { type: "string" },
                     joined: { type: "boolean", description: "true = done back to back with the exercise before it (superset or circuit, same section). The group's rest goes on its last exercise." },
                     load: { type: "string", description: "Target load as written: '70%', 'RPE 8', '60 kg'" },
+                    exerciseId: { type: "number", description: "Optional: the exercise library id, when known." },
                   },
                   required: ["name"],
                 },
@@ -859,7 +860,8 @@ export const TOOLS: Anthropic.Tool[] = [
   ...SCHEDULE_TOOLS,
   ...WEBSITE_TOOLS,
 
-  // ── Files the operator attached in the chat: read a spreadsheet or text file. ──
+  // ── Files the operator attached in the chat: read a spreadsheet or text file,
+  //    or copy a program spreadsheet into a create_workout_program card. ──
   ...FILES_TOOLS,
 
   // ── Ads manager: Facebook/Instagram ads on the business's own ad account. ──
@@ -1077,6 +1079,8 @@ export async function executeTool(
         return await setAdPlacementsTool(ctx, input);
       case "read_attached_file":
         return await readAttachedFileTool(ctx, input);
+      case "draft_program_from_file":
+        return await draftProgramFromFileTool(ctx, input, { summarize: summarizeToolAction });
       case "list_website_pages":
         return listWebsitePagesTool(ctx, input);
       case "read_website_page":
@@ -1694,13 +1698,22 @@ function addExercise(ctx: ToolContext, input: Record<string, unknown>): string {
   return JSON.stringify({ result: `Added "${name}" to the exercise library.`, exerciseId: id });
 }
 
-type ExIn = { name?: unknown; section?: unknown; sets?: unknown; reps?: unknown; restSeconds?: unknown; notes?: unknown; muscleGroups?: unknown; joined?: unknown; load?: unknown };
+type ExIn = { name?: unknown; section?: unknown; sets?: unknown; reps?: unknown; restSeconds?: unknown; notes?: unknown; muscleGroups?: unknown; joined?: unknown; load?: unknown; exerciseId?: unknown };
 type WDayIn = { name?: unknown; week?: unknown; instructions?: unknown; exercises?: ExIn[] };
 
 function createWorkoutProgram(ctx: ToolContext, input: Record<string, unknown>): string {
   const title = String(input.title || "").trim() || "New Program";
   const days = Array.isArray(input.days) ? (input.days as WDayIn[]) : [];
   if (days.length === 0) return JSON.stringify({ error: "Provide at least one day with exercises." });
+
+  // A library id is kept only when this business can see that exercise (its
+  // own or a shared one); anything else saves as a free-text exercise.
+  const wantsIds = days.some((d) => Array.isArray(d.exercises) && d.exercises.some((e) => e && e.exerciseId != null));
+  const visible = wantsIds ? new Set(listExercisesForTenant(ctx.tenantId).map((x) => x.id)) : null;
+  const libraryId = (v: unknown): number | null => {
+    const n = Number(v);
+    return v != null && Number.isInteger(n) && n > 0 && visible?.has(n) ? n : null;
+  };
 
   const program: ProgramInput = {
     title,
@@ -1717,7 +1730,7 @@ function createWorkoutProgram(ctx: ToolContext, input: Record<string, unknown>):
       name: str(d.name) ?? "",
       instructions: str(d.instructions),
       exercises: (Array.isArray(d.exercises) ? d.exercises : []).map((e) => ({
-        exerciseId: null,
+        exerciseId: libraryId(e.exerciseId),
         section: ["warmup", "workout", "cooldown"].includes(String(e.section)) ? (String(e.section) as Section) : "workout",
         name: String(e.name ?? "Exercise"),
         sets: Math.round(num(e.sets, 0)),

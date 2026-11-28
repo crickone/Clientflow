@@ -90,3 +90,18 @@ export function useDraft<T>(key: string | null, value: T, apply: (v: T) => void,
 
   return { restoredAt, savedAt, clear, discard };
 }
+
+/**
+ * Puts a value in a builder's draft slot from outside that builder, in the
+ * same `{ at, value }` shape useDraft reads, so the builder restores it when
+ * it opens ("Build from this file" fills the new-program builder this way).
+ * False when the browser will not store it.
+ */
+export function writeDraft<T>(key: string, value: T): boolean {
+  try {
+    window.localStorage.setItem(key, JSON.stringify({ at: Date.now(), value }));
+    return true;
+  } catch {
+    return false;
+  }
+}

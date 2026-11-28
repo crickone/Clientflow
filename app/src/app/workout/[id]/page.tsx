@@ -27,7 +27,7 @@ export default async function EditProgramPage(props: { params: Promise<{ id: str
   if (program.type === "upload") {
     return (
       <div className="app-page" style={{ maxWidth: 900 }}>
-        <UploadProgramForm initial={program} />
+        <UploadProgramForm initial={program} newProgramDraftKey={`draft:${tenantId()}:program:new`} />
       </div>
     );
   }

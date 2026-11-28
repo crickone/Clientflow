@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireUser } from "@/lib/auth";
-import { deleteProgram, duplicateProgram, saveProgram, setProgramStatus } from "@/lib/workout";
+import { deleteProgram, duplicateProgram, getProgram, saveProgram, setProgramStatus } from "@/lib/workout";
+import { importProgramFromUpload } from "@/lib/workoutImport/convert";
 import { PROGRAM_LIMITS, checkProgramLimits, type ProgramInput } from "@/lib/workoutModel";
 
 const exerciseSchema = z.object({
@@ -80,4 +81,23 @@ export async function setProgramStatusAction(id: number, status: "active" | "arc
   if (!p.success) return;
   setProgramStatus(p.data, status);
   revalidatePath("/workout");
+}
+
+export type BuildFromUploadResult = { ok: true; program: ProgramInput; unplaced: string[] } | { ok: false; error: string };
+
+/**
+ * "Build from this file": Adonis reads an Upload program's spreadsheet and
+ * hands back a new Detailed program for the builder. Nothing is saved here;
+ * the operator checks it in the builder and saves it there.
+ */
+export async function buildProgramFromUploadAction(programId: number): Promise<BuildFromUploadResult> {
+  await requireUser();
+  const p = idSchema.safeParse(programId);
+  if (!p.success) return { ok: false, error: "I can't find that program." };
+  const program = getProgram(p.data);
+  if (!program) return { ok: false, error: "I can't find that program." };
+  if (program.type !== "upload") return { ok: false, error: "Only an uploaded program can be built from its file." };
+  const result = await importProgramFromUpload(p.data);
+  if (!result.ok) return { ok: false, error: result.error };
+  return { ok: true, program: result.program, unplaced: result.unplaced };
 }

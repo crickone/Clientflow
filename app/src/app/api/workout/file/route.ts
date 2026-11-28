@@ -13,6 +13,7 @@ const MIME: Record<string, string> = {
   ".pdf": "application/pdf",
   ".xls": "application/vnd.ms-excel",
   ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".csv": "text/csv; charset=utf-8",
 };
 
 export async function GET(req: Request) {
